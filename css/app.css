@@ -101,9 +101,11 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .floatbar { position: absolute; top: 0; left: 0; right: 0; z-index: 5; padding-top: calc(var(--top) + 10px); pointer-events: none; }
 .floatbar .wrap { display: flex; justify-content: space-between; padding: 0 16px; }
 .floatbar .round { pointer-events: auto; border-color: transparent; background: rgba(255, 253, 248, .94); box-shadow: 0 2px 8px rgba(42, 28, 18, .14); }
+.floatbar .acts { display: flex; align-items: center; gap: 8px; }
+.pillbtn { pointer-events: auto; height: 40px; padding: 0 17px; border-radius: 99px; border: 1px solid transparent; background: rgba(255, 253, 248, .94); box-shadow: 0 2px 8px rgba(42, 28, 18, .14); font-size: 14.5px; font-weight: 650; color: var(--ink); }
 /* over a page with no photo the bar is solid, so the page scrolls beneath it cleanly */
 .floatbar.solid { background: var(--bg); padding-bottom: 8px; pointer-events: auto; }
-.floatbar.solid .round { background: var(--surface); border-color: var(--line); box-shadow: none; }
+.floatbar.solid .round, .floatbar.solid .pillbtn { background: var(--surface); border-color: var(--line); box-shadow: none; }
 .hero { width: 100%; aspect-ratio: 4 / 3; max-height: 52vh; background: var(--fill); overflow: hidden; }
 .hero img { width: 100%; height: 100%; object-fit: cover; }
 .page { padding: 16px 20px calc(var(--bottom) + 40px); }

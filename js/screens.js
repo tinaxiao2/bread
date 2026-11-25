@@ -202,7 +202,10 @@
     return html`<div class="screen">
       <div class=${'floatbar' + (photo ? '' : ' solid')}><div class="wrap">
         <button type="button" class="round" aria-label="Back" onClick=${function () { nav.close(props.k); }}><${Icon} name="back"/></button>
-        <button type="button" class="round" aria-label="Edit" onClick=${function () { nav.push({ kind: 'breadForm', breadId: b.id }); }}><${Icon} name="edit"/></button>
+        <span class="acts">
+          <button type="button" class="pillbtn" onClick=${function () { nav.push({ kind: 'breadForm', splitFromId: b.id }); }}>Split</button>
+          <button type="button" class="round" aria-label="Edit" onClick=${function () { nav.push({ kind: 'breadForm', breadId: b.id }); }}><${Icon} name="edit"/></button>
+        </span>
       </div></div>
       <div class="scroll">
         ${photo ? html`<button type="button" class="hero" aria-label="View photo" onClick=${function () { setView({ id: photo }); }}><${ui.Photo} id=${photo}/></button>` : null}
@@ -358,7 +361,8 @@
     var nav = props.nav;
     var init = useRef(null);
     if (!init.current) {
-      var bread = props.breadId ? store.bread(props.breadId) : null;
+      // Editing a bread, or splitting one: a split starts as a copy of the entry, saved as a new one.
+      var bread = store.bread(props.breadId || props.splitFromId) || null;
       var baseId = bread ? bread.recipeId : (props.fromRecipeId || null);
       var base = baseId ? store.recipe(baseId) : null;
       init.current = {
@@ -380,7 +384,7 @@
     var ds = useState(false), dirty = ds[0], setDirty = ds[1];
     var bs = useState(''), busy = bs[0], setBusy = bs[1];           // '', 'saving', 'failed', 'photo'
     var os = useState(null), overlay = os[0], setOverlay = os[1];   // 'recipes' | 'discard' | 'delete' | {files} | {view}
-    var editing = !!props.breadId;
+    var editing = !!props.breadId, splitting = !editing && !!props.splitFromId;
 
     function set(patch) {
       setF(function (cur) { return Object.assign({}, cur, typeof patch === 'function' ? patch(cur) : patch); });
@@ -438,9 +442,9 @@
       return k !== typed && k.indexOf(typed) >= 0;
     }).slice(0, 4) : [];
 
-    return html`<${ui.Screen} title=${editing ? 'Edit bread' : 'New bread'} onBack=${back}
+    return html`<${ui.Screen} title=${editing ? 'Edit bread' : splitting ? 'Split bread' : 'New bread'} onBack=${back}
         onGo=${save} goDisabled=${!f.name.trim() || busy === 'saving'}>
-      ${editing ? null : html`<div class="quick">
+      ${editing || splitting ? null : html`<div class="quick">
         ${store.getState().recipes.length ? html`<button type="button" onClick=${function () { setOverlay('recipes'); }}><${Icon} name="recipes"/>Use recipe</button>` : null}
         ${props.canImport ? html`<label class="filebtn"><${Icon} name="image"/>From photo
           <input id="f-from-photo" type="file" accept="image/*" multiple aria-label="From photo"

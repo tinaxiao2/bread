@@ -22,8 +22,11 @@ title with the artifact tools (`list_artifacts`); its link is not kept in this p
 
 ## Files that are published
 
-`index.html`, `manifest.webmanifest`, `css/app.css`, `data/machine.js`, every file in `js/`
-(including `js/vendor/`), every file in `icons/`.
+`index.html`, `manifest.webmanifest`, `thumb.png`, `css/app.css`, `data/machine.js`, every file
+in `js/` (including `js/vendor/`), every file in `icons/`.
+
+`thumb.png` is the artifact's cover picture, named by the `artifact-thumbnail` link in
+`index.html`. Rebuild it with `node tools/make-icons.js`.
 
 Never published: `dev/`, `tests/`, `tools/`, `package.json`, the Markdown files.
 

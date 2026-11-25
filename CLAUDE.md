@@ -23,8 +23,9 @@ a plain static site: storage, photos and the recipe reader all come from the art
 runtime.
 
 - Artifact: "Let's Get This". Find it by title with the artifact tools; `tools/publish.md` has the steps.
-- Claude's icon set for artifacts has no bread: every bread word resolves to a coffee cup.
-  The artifact carries a 🍞 emoji marker instead, set with `publish_version`.
+- Claude's icon set for artifacts has no bread: bread, loaf, croissant, wheat, toast, bakery
+  and cake all resolve to a coffee cup. The artifact carries a bread cover picture
+  (`thumb.png`) and a 🍞 emoji marker (set with `publish_version`) instead.
 - Capabilities declared: `db` (breads and recipes), `assets` (photos), `sample` with
   images (reading a recipe from a picture).
 - There is no build step. The files in `tools/publish.md` are published as they are.
@@ -84,6 +85,10 @@ These are decisions the owner made. Keep them.
   is added on demand. Salt and Sugar are always offered as quick-add chips, followed by
   every named ingredient the owner has used before. Units follow what was last used.
 - Rows that were only offered (`_auto`) and left without an amount are not saved.
+- **Split** on a bread's page opens a copy of the entry (name, date, photo, ratings, comments,
+  recipe) that is saved as a new bread. It is for one dough baked two ways: change the
+  baking on the copy and it becomes another variation of the same recipe. The copies share
+  the photo they started with, so a photo is deleted only when no bread uses it any more.
 
 ## Working on it
 

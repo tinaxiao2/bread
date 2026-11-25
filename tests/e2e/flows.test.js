@@ -484,6 +484,70 @@ test('renaming a recipe renames every variation and the breads baked from it', a
   assert.deepEqual(await page.locator('.gal .tile .meta b').allInnerTexts(), ['Soft milk loaf', 'Soft milk loaf']);
 });
 
+test('Split copies an entry so each half can be baked its own way', async (t) => {
+  const page = await open(t);
+  // dough made in the machine
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('Country dough');
+  await field(page, 'Photo').setInputFiles(await picture(page, '#c98a3f'));
+  await field(page, 'Date').fill('2026-11-20');
+  await line(page, 'Flour').getByLabel('Amount').fill('3');
+  await program(page, 8, 'Dough').click();
+  await field(page, 'Comments').fill('Sticky.');
+  await save(page);
+  await formGone(page);
+  await count(page.locator('.gal .tile .flag'), 1);
+
+  // backing out of a split leaves nothing behind
+  await page.locator('.gal .tile').click();
+  await page.getByRole('button', { name: 'Split' }).click();
+  await page.getByRole('heading', { name: 'Split bread' }).waitFor();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('heading', { name: 'Split bread' }).waitFor({ state: 'detached' });
+
+  // the copy opens with everything the entry had
+  await page.getByRole('button', { name: 'Split' }).click();
+  assert.equal(await field(page, 'Name').inputValue(), 'Country dough');
+  assert.equal(await field(page, 'Date').inputValue(), '2026-11-20');
+  assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '3');
+  assert.equal(await program(page, 8, 'Dough').getAttribute('aria-pressed'), 'true');
+  assert.equal(await field(page, 'Comments').inputValue(), 'Sticky.');
+  await loaded(page.locator('.photo img'));
+  assert.equal(await page.getByRole('button', { name: 'Use recipe' }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Delete' }).count(), 0, 'it is a new entry, not the old one');
+
+  // this half goes on to the Bake program
+  await program(page, 12, 'Bake').click();
+  await field(page, 'Added minutes').fill('40');
+  await save(page);
+  await page.getByRole('heading', { name: 'Split bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  const tiles = page.locator('.gal .tile');
+  await count(tiles, 2);
+  await count(page.locator('.gal .tile .flag'), 1);          // the other half is still dough
+  assert.deepEqual(await tiles.locator('.meta').allInnerTexts(), ['Country dough\nNov 20', 'Country dough\nNov 20']);
+  await loaded(tiles.nth(0).locator('img'));
+  await loaded(tiles.nth(1).locator('img'));
+
+  // one recipe, two ways of baking it
+  await page.getByRole('button', { name: 'Recipes' }).click();
+  await count(page.locator('.rc'), 1);
+  assert.match(await page.locator('.rc').innerText(), /Country dough[\s\S]*Baked 2×[\s\S]*2 variations/);
+
+  // the halves share the photo they started with: deleting one must not take it from the other
+  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.locator('.gal .tile', { hasNot: page.locator('.flag') }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+  await page.locator('.screen').waitFor({ state: 'detached' });
+  await count(tiles, 1);
+  await page.reload();
+  await count(tiles, 1);
+  await loaded(tiles.locator('img'));
+});
+
 // Entries shaped the way the first version saved them: one `program` per bake, time added
 // without a Bake program, a reason left behind, and the same recipe saved as separate cards.
 const R = (name, flour, water, bake, extra) => Object.assign({

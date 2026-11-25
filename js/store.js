@@ -172,6 +172,15 @@
     if (!assets) return;
     ids.filter(Boolean).forEach(function (id) { assets.delete(id).catch(function () {}); });
   }
+  /** Entries made with Split start out sharing a photo, so one is only deleted when no other bread uses it. */
+  function dropPhoto(photo, breadId) {
+    if (!photo) return;
+    drop([photo.full, photo.thumb].filter(function (id) {
+      return id && !state.breads.some(function (b) {
+        return b.id !== breadId && b.photo && (b.photo.full === id || b.photo.thumb === id);
+      });
+    }));
+  }
   function originalsInUse(exceptRecipeId) {
     var used = {};
     state.recipes.forEach(function (r) {
@@ -239,9 +248,7 @@
           createdAt: (existing && existing.createdAt) || t,
           updatedAt: t
         }).then(function () {
-          if (existing && existing.photo && (!photo || photo.full !== existing.photo.full)) {
-            drop([existing.photo.full, existing.photo.thumb]);
-          }
+          if (existing && existing.photo && (!photo || photo.full !== existing.photo.full)) dropPhoto(existing.photo, existing.id);
           return ref.id;
         });
       });
@@ -251,7 +258,7 @@
   function deleteBread(id) {
     var b = bread(id);
     return db.collection('breads').doc(id).delete().then(function () {
-      if (b && b.photo) drop([b.photo.full, b.photo.thumb]);
+      if (b) dropPhoto(b.photo, id);
     });
   }
 

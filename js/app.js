@@ -42,7 +42,7 @@
       if (s.kind === 'bread') return html`<${S.BreadPage} key=${s.key} k=${s.key} id=${s.id} nav=${nav}/>`;
       if (s.kind === 'recipe') return html`<${S.RecipePage} key=${s.key} k=${s.key} id=${s.id} nav=${nav}/>`;
       if (s.kind === 'breadForm') {
-        return html`<${S.BreadForm} key=${s.key} k=${s.key} breadId=${s.breadId} fromRecipeId=${s.fromRecipeId}
+        return html`<${S.BreadForm} key=${s.key} k=${s.key} breadId=${s.breadId} splitFromId=${s.splitFromId} fromRecipeId=${s.fromRecipeId}
           canImport=${canImport} nav=${nav}/>`;
       }
       if (s.kind === 'recipeForm') {
