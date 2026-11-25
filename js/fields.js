@@ -51,15 +51,19 @@
   function IngredientLine(props) {
     var ing = props.ing, change = props.onChange;
     function set(patch) { change(Object.assign({}, ing, patch)); }
+    /** A new kind or name brings the unit last used with it, until an amount has been typed. */
     function setType(type) {
-      set(ing.amount ? { type: type } : { type: type, unit: LGT.store.unitFor(ing.group, type) });
+      var patch = { type: type, _auto: false };
+      if (!ing.amount) patch.unit = LGT.store.unitFor(ing.group, type);
+      set(patch);
     }
     var metric = ing.unit === 'g' || ing.unit === 'ml' || ing.unit === 'oz' || ing.unit === 'lb';
     var id = 'ing-' + ing._k;
     return html`<div class="line">
       ${ing.group === 'water' ? html`<span></span>`
         : ing.group === 'other'
-          ? html`<input id=${id + '-name'} class="mini" value=${ing.type} placeholder="Ingredient" aria-label="Ingredient" onInput=${val(function (v) { set({ type: v }); })}/>`
+          ? html`<input id=${id + '-name'} class="mini" value=${ing.type} placeholder="Ingredient" aria-label="Ingredient"
+              list="lgt-ingredient-names" autocomplete="off" onInput=${val(setType)}/>`
           : html`<${TypePicker} id=${id + '-type'} group=${ing.group} value=${ing.type} onChange=${setType}/>`}
       <input id=${id + '-amount'} class=${'mini amount' + (ing.unsure ? ' unsure' : '')} value=${ing.amount} aria-label="Amount"
         inputmode=${metric ? 'decimal' : 'text'} autocomplete="off"
@@ -75,13 +79,24 @@
 
   function IngredientsEditor(props) {
     var list = props.list;
-    function add(group) {
-      var like = { unit: LGT.store.unitFor(group, U.newIngredient(group).type) };
-      props.onChange(list.concat(keyed([U.newIngredient(group, like)])));
+    function add(group, name) {
+      var type = name !== undefined ? name : (U.DEFAULT_TYPES[group] || [''])[0];
+      var row = U.newIngredient(group, type, LGT.store.unitFor(group, type));
+      if (group === 'other' && !type) row._auto = false;         // a blank row is hers to name
+      props.onChange(list.concat(keyed([row])));
     }
     var groups = U.GROUPS.filter(function (g) { return list.some(function (i) { return i.group === g; }); });
-    var adders = U.GROUPS.filter(function (g) {
-      return g === 'flour' || g === 'dairy' || g === 'other' || groups.indexOf(g) < 0;
+    var kinds = ['flour', 'water', 'dairy', 'yeast'].filter(function (g) {
+      return g === 'flour' || g === 'dairy' || groups.indexOf(g) < 0;
+    });
+    // Named ingredients one tap away: the staples, then whatever has been added before.
+    var have = {}, known = [], offered = [];
+    list.forEach(function (i) { if (i.group === 'other' && i.type) have[String(i.type).trim().toLowerCase()] = true; });
+    U.STAPLES.concat(LGT.store.otherNames()).forEach(function (n) {
+      var k = n.toLowerCase();
+      if (known.some(function (x) { return x.toLowerCase() === k; })) return;
+      known.push(n);
+      if (!have[k]) offered.push(n);
     });
     return html`<div class="group">
       ${groups.map(function (g) {
@@ -94,10 +109,17 @@
         </div></div>`;
       })}
       <div class="addrow">
-        ${adders.map(function (g) {
+        ${kinds.map(function (g) {
           return html`<button type="button" key=${g} onClick=${function () { add(g); }}><${Icon} name="plus"/>${U.GROUP_LABEL[g]}</button>`;
         })}
+        ${offered.slice(0, 8).map(function (n) {
+          return html`<button type="button" key=${'n-' + n} onClick=${function () { add('other', n); }}><${Icon} name="plus"/>${n}</button>`;
+        })}
+        <button type="button" onClick=${function () { add('other', ''); }}><${Icon} name="plus"/>${U.GROUP_LABEL.other}</button>
       </div>
+      <datalist id="lgt-ingredient-names">
+        ${known.map(function (n) { return html`<option key=${n} value=${n}></option>`; })}
+      </datalist>
     </div>`;
   }
 
@@ -120,41 +142,47 @@
   function BakeEditor(props) {
     var bake = props.bake;
     function set(patch) { props.onChange(U.withBake(bake, patch)); }
-    var programs = LGT.machine.programs.map(function (p) {
-      return { id: p.n, body: html`<b>${p.n}</b>${p.name}` };
-    });
-    var sizes = U.sizesFor(bake.program);
+    var chosen = bake.programs || U.cleanBake(bake).programs;
+    var sizes = U.sizesFor(chosen);
     var t = U.splitMinutes(bake.minutes);
-    var oven = U.isDough(bake.program) || bake.ovenTemp !== null || bake.ovenMinutes !== null;
+    // Added time belongs to the program whose time is set by hand, so it shows only with that program.
+    var extra = U.hasManual(chosen);
+    var oven = U.hasDough(chosen) || bake.ovenTemp !== null || bake.ovenMinutes !== null;
+    var time = html`<${Field} label="Time">
+      <div class="time">
+        <${Num} label="Hours" value=${t.h} onChange=${function (v) { set({ minutes: U.joinMinutes(v, t.m) }); }}/>h
+        <${Num} label="Minutes" value=${t.m} onChange=${function (v) { set({ minutes: U.joinMinutes(t.h, v) }); }}/>min
+      </div>
+    <//>`;
     return html`
       <${Field} label="Setting">
-        <${Chips} class="c3 programs" options=${programs} value=${bake.program} none=${null}
-          onChange=${function (n) { set({ program: n }); }}/>
+        <div class="chips c3 programs">
+          ${LGT.machine.programs.map(function (p) {
+            var on = chosen.indexOf(p.n) >= 0;
+            return html`<button type="button" key=${p.n} class=${on ? 'on' : ''} aria-pressed=${on}
+              onClick=${function () { set({ programs: U.toggleProgram(chosen, p.n) }); }}><b>${p.n}</b>${p.name}</button>`;
+          })}
+        </div>
       <//>
       ${sizes.length && !props.hideSize ? html`<${Field} label="Loaf size">
         <${Chips} options=${sizes} value=${bake.size} none=""
           onChange=${function (v) { set({ size: v }); }}/>
       <//>` : null}
-      ${U.hasCrust(bake.program) ? html`<${Field} label="Crust color">
+      ${U.hasCrust(chosen) ? html`<${Field} label="Crust color">
         <${Chips} options=${LGT.machine.crusts} value=${bake.crust} none=""
           onChange=${function (v) { set({ crust: v }); }}/>
       <//>` : null}
-      <div class="cols times">
-        <${Field} label="Time">
-          <div class="time">
-            <${Num} label="Hours" value=${t.h} onChange=${function (v) { set({ minutes: U.joinMinutes(v, t.m) }); }}/>h
-            <${Num} label="Minutes" value=${t.m} onChange=${function (v) { set({ minutes: U.joinMinutes(t.h, v) }); }}/>min
-          </div>
-        <//>
+      ${extra ? html`<div class="cols times">
+        ${time}
         <${Field} label="Added time">
           <div class="time">
             <${Num} label="Added minutes" value=${bake.added} onChange=${function (v) { set({ added: U.num(v) }); }}/>min
           </div>
         <//>
       </div>
-      ${bake.added ? html`<${Field} label="Reason">
+      <${Field} label="Reason">
         <input id="f-reason" class="input" value=${bake.reason} aria-label="Reason" onInput=${val(function (v) { set({ reason: v }); })}/>
-      <//>` : null}
+      <//>` : time}
       ${oven ? html`<${Field} label="Oven">
         <div class="time">
           <${Num} class="temp" label="Oven temperature" value=${bake.ovenTemp} onChange=${function (v) { set({ ovenTemp: U.num(v) }); }}/>°F

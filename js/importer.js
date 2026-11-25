@@ -29,7 +29,7 @@
       '       "note": string,      // preparation or an alternative, e.g. "softened", "or 2 1/4 tsp bread machine yeast". "" if none.',
       '       "unsure": boolean    // true if you could not read this amount with confidence',
       '     } ] } ],',
-      ' "program": number | null,  // which of this bread machine\'s programs the recipe calls for: ' + programList(machine) + '. null if it does not say or nothing fits.',
+      ' "programs": number[],      // the programs of this bread machine the recipe uses, in order: ' + programList(machine) + '. [] if it does not say or nothing fits.',
       ' "crust": "light" | "medium" | "dark" | "",',
       ' "ovenTemp": number | null, // degrees Fahrenheit, only if the recipe bakes in an oven',
       ' "ovenMinutes": number | null,',
@@ -91,12 +91,12 @@
     }).filter(function (v) { return v.ingredients.length; });
     if (!variants.length) throw { code: 'empty' };
 
-    var n = U.num(raw.program);
+    var programs = U.cleanBake({ programs: raw.programs, program: raw.program }).programs;
     var crust = str(raw.crust).toLowerCase();
     return {
       name: str(raw.name),
       variants: variants,
-      program: U.program(n) ? n : null,
+      programs: programs,
       crust: machine.crusts.some(function (c) { return c.id === crust; }) ? crust : '',
       ovenTemp: U.num(raw.ovenTemp), ovenMinutes: U.num(raw.ovenMinutes),
       method: text(raw.method), source: str(raw.source)
@@ -108,7 +108,7 @@
     var v = reading.variants[index] || reading.variants[0];
     var bake = U.withBake(
       U.cleanBake({ crust: reading.crust, ovenTemp: reading.ovenTemp, ovenMinutes: reading.ovenMinutes }),
-      { program: reading.program, size: v.size });
+      { programs: reading.programs, size: v.size });
     return {
       name: reading.name,
       ingredients: v.ingredients.map(function (i) { return Object.assign({}, i); }),

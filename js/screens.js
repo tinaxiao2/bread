@@ -48,54 +48,69 @@
   }
 
   // ---------- shared pieces ----------
+  function bestRating(breads) {
+    var best = null;
+    breads.forEach(function (b) { var x = U.rating(b); if (x !== null && (best === null || x > best)) best = x; });
+    return best;
+  }
+
   function Tile(props) {
     var b = props.bread, has = !!(b.photo && b.photo.thumb);
+    var r = b.recipeId ? store.recipe(b.recipeId) : null;
     return html`<button type="button" class=${'tile' + (has ? ' has' : '')} onClick=${props.onOpen}>
       ${has ? html`<${ui.Photo} id=${b.photo.thumb}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
+      ${U.isBaked(r ? r.bake : null) ? null : html`<span class="flag">Dough</span>`}
       <${ui.Score} value=${U.rating(b)}/>
       <span class="meta"><b>${b.name}</b><small>${U.fmtDate(b.date)}</small></span>
     </button>`;
   }
 
   function bakeLine(bake) {
-    var p = U.program(bake.program), parts = [];
-    if (p) parts.push(p.n + ' · ' + p.name);
-    if (bake.minutes !== null && bake.minutes !== undefined) {
-      parts.push(U.fmtMinutes(bake.minutes) + (bake.added ? ' + ' + U.fmtMinutes(bake.added) : ''));
-    }
-    if (bake.ovenTemp !== null && bake.ovenTemp !== undefined) parts.push(bake.ovenTemp + '°F');
+    var b = U.cleanBake(bake), labels = U.programLabels(b.programs), parts = [];
+    if (labels.length) parts.push(labels.join(' + '));
+    if (b.minutes !== null) parts.push(U.fmtMinutes(b.minutes) + (b.added ? ' + ' + U.fmtMinutes(b.added) : ''));
+    else if (b.added) parts.push('+' + U.fmtMinutes(b.added));
+    if (b.ovenTemp !== null) parts.push(b.ovenTemp + '°F');
     return parts.join(' · ');
   }
 
-  /** The recipe as a card: ingredients, baking details, method, source, original images. */
+  /**
+   * The recipe as a card: ingredients, baking details, method, source, original images.
+   * props: recipe, title, tag, action, onAction, onOpen, onView, against (a recipe whose
+   * ingredient lines this one is compared with, so the lines that differ stand out)
+   */
   function RecipeCard(props) {
-    var r = props.recipe, b = U.cleanBake(r.bake), p = U.program(b.program), cells = [];
-    if (p) cells.push(['Setting', p.n + ' · ' + p.name]);
-    if (b.size) cells.push(['Loaf size', U.sizeLabel(b.size)]);
-    if (b.crust) cells.push(['Crust color', U.crustLabel(b.crust)]);
-    if (b.minutes !== null) cells.push(['Time', U.fmtMinutes(b.minutes)]);
-    if (b.added) cells.push(['Added', '+' + U.fmtMinutes(b.added), b.reason]);
-    if (b.ovenTemp !== null) cells.push(['Oven', b.ovenTemp + '°F', b.ovenMinutes !== null ? U.fmtMinutes(b.ovenMinutes) : '']);
-    else if (b.ovenMinutes !== null) cells.push(['Oven', U.fmtMinutes(b.ovenMinutes)]);
+    var r = props.recipe, b = U.cleanBake(r.bake), labels = U.programLabels(b.programs), cells = [];
+    if (labels.length) cells.push(['Setting', labels]);
+    if (b.size) cells.push(['Loaf size', [U.sizeLabel(b.size)]]);
+    if (b.crust) cells.push(['Crust color', [U.crustLabel(b.crust)]]);
+    if (b.minutes !== null) cells.push(['Time', [U.fmtMinutes(b.minutes)]]);
+    if (b.added) cells.push(['Added', ['+' + U.fmtMinutes(b.added)], b.reason]);
+    if (b.ovenTemp !== null) cells.push(['Oven', [b.ovenTemp + '°F'], b.ovenMinutes !== null ? U.fmtMinutes(b.ovenMinutes) : '']);
+    else if (b.ovenMinutes !== null) cells.push(['Oven', [U.fmtMinutes(b.ovenMinutes)]]);
     var link = U.safeLink(r.link), host = '';
     try { host = link ? new URL(link).hostname.replace(/^www\./, '') : ''; } catch (e) { host = ''; }
     var ings = (r.ingredients || []).filter(function (i) { return U.ingredientName(i); });
+    var marks = props.against ? U.changedLines(props.against, { ingredients: ings }) : [];
     return html`<div class="rcard">
       ${props.title ? html`<div class="rhead">
         <button type="button" class="open" onClick=${props.onOpen}>
-          <span class="label">Recipe</span><h3 class="serif">${r.name}</h3>
+          <span class="rl"><span class="label">Recipe</span>${props.tag ? html`<span class="pill sage">${props.tag}</span>` : null}</span>
+          <h3 class="serif">${r.name}</h3>
         </button>
         ${props.action ? html`<button type="button" class="btn primary sm" onClick=${props.onAction}>${props.action}</button>` : null}
       </div>` : null}
       ${ings.length ? html`<ul class="ings">
         ${ings.map(function (i, n) {
           var detail = U.ingredientDetail(i);
-          return html`<li key=${n}><span>${U.ingredientName(i)}${detail ? html`<em>${detail}</em>` : null}</span><b>${U.amountLabel(i)}</b></li>`;
+          return html`<li key=${n} class=${marks[n] ? 'diff' : ''}><span>${U.ingredientName(i)}${detail ? html`<em>${detail}</em>` : null}</span><b>${U.amountLabel(i)}</b></li>`;
         })}
       </ul>` : null}
       ${cells.length ? html`<div class="bake">
         ${cells.map(function (c) {
-          return html`<div key=${c[0]}><span class="label">${c[0]}</span><b>${c[1]}</b>${c[2] ? html`<small>${c[2]}</small>` : null}</div>`;
+          return html`<div key=${c[0]}><span class="label">${c[0]}</span>
+            ${c[1].map(function (line, n) { return html`<b key=${n}>${line}</b>`; })}
+            ${c[2] ? html`<small>${c[2]}</small>` : null}</div>`;
         })}
       </div>` : null}
       ${r.method ? html`<div class="method"><span class="label">Method</span><p>${r.method}</p></div>` : null}
@@ -180,11 +195,12 @@
     useEffect(function () { if (!b) nav.close(props.k); }, [!b]);
     if (!b) return null;
     var r = store.recipe(b.recipeId);
+    var which = r ? store.variationOf(r) : null;
     var rated = U.RATINGS.some(function (k) { return (b.ratings || {})[k[0]] > 0; });
     var notes = U.RATINGS.filter(function (k) { return (b.notes || {})[k[0]]; });
     var photo = b.photo && b.photo.full;
     return html`<div class="screen">
-      <div class="floatbar"><div class="wrap">
+      <div class=${'floatbar' + (photo ? '' : ' solid')}><div class="wrap">
         <button type="button" class="round" aria-label="Back" onClick=${function () { nav.close(props.k); }}><${Icon} name="back"/></button>
         <button type="button" class="round" aria-label="Edit" onClick=${function () { nav.push({ kind: 'breadForm', breadId: b.id }); }}><${Icon} name="edit"/></button>
       </div></div>
@@ -205,6 +221,7 @@
             ${b.comments ? html`<div class="comments">${b.comments}</div>` : null}
           </div>` : null}
           ${r ? html`<${RecipeCard} recipe=${r} title=${true} action="Bake again"
+            tag=${which.of > 1 ? 'Variation ' + which.n : ''}
             onOpen=${function () { nav.push({ kind: 'recipe', id: r.id }); }}
             onAction=${function () { nav.push({ kind: 'breadForm', fromRecipeId: r.id }); }}
             onView=${setView}/>` : null}
@@ -215,17 +232,9 @@
   }
 
   // ---------- Recipes ----------
-  function latestBread(recipeId) {
-    var list = store.breadsOf(recipeId);
-    return list.length ? list[0] : null;                   // breads are kept newest first
-  }
-  function bestRating(recipeId) {
-    var best = null;
-    store.breadsOf(recipeId).forEach(function (b) { var x = U.rating(b); if (x !== null && (best === null || x > best)) best = x; });
-    return best;
-  }
+  // A recipe is everything saved under one name. Its variations live inside it.
   function Summary(props) {
-    var items = U.ingredientSummary(props.recipe), line = bakeLine(U.cleanBake(props.recipe.bake));
+    var items = U.ingredientSummary(props.recipe), line = bakeLine(props.recipe.bake);
     if (!items.length && !line) return null;
     return html`<button type="button" class="body" onClick=${props.onOpen}>
       ${items.map(function (x, n) {
@@ -234,14 +243,13 @@
       ${line ? html`<span class="when"><${Icon} name="clock"/>${line}</span>` : null}
     </button>`;
   }
+  function CountPill(props) {
+    return props.n > 1 ? html`<span class="pill sage">${props.n} variations</span>` : null;
+  }
 
   function Recipes(props) {
-    var nav = props.nav, st = props.state;
-    var baked = [], toTry = [];
-    st.recipes.forEach(function (r) { (store.breadsOf(r.id).length ? baked : toTry).push(r); });
-    baked.sort(function (a, b) {
-      return String(latestBread(b.id).date || '').localeCompare(String(latestBread(a.id).date || ''));
-    });
+    var nav = props.nav, all = store.families();
+    var baked = all.filter(function (f) { return f.baked; }), toTry = all.filter(function (f) { return !f.baked; });
     var showBaked = props.seg === 'baked';
     return html`<div class="wrap">
       <div class="top"><h1 class="serif">Recipes</h1></div>
@@ -251,58 +259,81 @@
       </div>
       <div class="list">
         ${showBaked ? null : html`<button type="button" class="add" onClick=${props.onAdd}><${Icon} name="plus"/>Add recipe</button>`}
-        ${(showBaked ? baked : toTry).map(function (r) {
-          function open() { nav.push({ kind: 'recipe', id: r.id }); }
-          var last = showBaked ? latestBread(r.id) : null, count = store.breadsOf(r.id).length;
-          return html`<div class="rc" key=${r.id}>
+        ${(showBaked ? baked : toTry).map(function (f) {
+          function open() { nav.push({ kind: 'recipe', id: f.latest.id }); }
+          var last = f.breads[0];
+          return html`<div class="rc" key=${f.key}>
             <div class="rtop">
               <button type="button" class="open" onClick=${open}>
                 ${last ? html`<span class="thumb">${last.photo ? html`<${ui.Photo} id=${last.photo.thumb}/>` : html`<${Icon} name="loaf"/>`}</span>` : null}
                 <span>
-                  <h3 class="serif">${r.name}</h3>
-                  ${showBaked
-                    ? html`<span class="facts"><span class="pill">Baked ${count}×</span><${ui.Score} value=${bestRating(r.id)}/></span>`
-                    : r.source ? html`<span class="facts">${r.source}</span>` : null}
+                  <h3 class="serif">${f.name}</h3>
+                  <span class="facts">
+                    ${f.baked ? html`<span class="pill">Baked ${f.breads.length}×</span>` : null}
+                    <${CountPill} n=${f.variations.length}/>
+                    <${ui.Score} value=${bestRating(f.breads)}/>
+                    ${!f.baked && f.latest.source ? f.latest.source : null}
+                  </span>
                 </span>
               </button>
-              ${showBaked ? null : html`<button type="button" class="btn primary sm"
-                onClick=${function () { nav.push({ kind: 'breadForm', fromRecipeId: r.id }); }}>Bake this</button>`}
+              ${f.baked ? null : html`<button type="button" class="btn primary sm" onClick=${function () {
+                if (f.variations.length > 1) open(); else nav.push({ kind: 'breadForm', fromRecipeId: f.latest.id });
+              }}>Bake this</button>`}
             </div>
-            <${Summary} recipe=${r} onOpen=${open}/>
+            <${Summary} recipe=${f.latest} onOpen=${open}/>
           </div>`;
         })}
       </div>
     </div>`;
   }
 
-  // ---------- a recipe's page ----------
+  // ---------- a recipe's page: every variation saved under its name ----------
   function RecipePage(props) {
     var nav = props.nav, r = store.recipe(props.id);
+    var key = useRef('');
+    if (r) key.current = U.nameKey(r.name);
+    var f = store.familyByKey(key.current);
     var v = useState(null), view = v[0], setView = v[1];
-    useEffect(function () { if (!r) nav.close(props.k); }, [!r]);
-    if (!r) return null;
-    var breads = store.breadsOf(r.id), best = bestRating(r.id);
+    useEffect(function () { if (!f) nav.close(props.k); }, [!f]);
+    if (!f) return null;
+    var many = f.variations.length > 1, first = f.variations[0];
+    function edit(rv) { nav.push({ kind: 'recipeForm', recipeId: rv.id }); }
     return html`<div class="screen">
-      <div class="floatbar"><div class="wrap">
+      <div class="floatbar solid"><div class="wrap">
         <button type="button" class="round" aria-label="Back" onClick=${function () { nav.close(props.k); }}><${Icon} name="back"/></button>
-        <button type="button" class="round" aria-label="Edit" onClick=${function () { nav.push({ kind: 'recipeForm', recipeId: r.id }); }}><${Icon} name="edit"/></button>
+        ${many ? null : html`<button type="button" class="round" aria-label="Edit" onClick=${function () { edit(first); }}><${Icon} name="edit"/></button>`}
       </div></div>
       <div class="scroll">
         <div class="wrap page nohero">
-          <h2 class="serif">${r.name}</h2>
+          <h2 class="serif">${f.name}</h2>
           <div class="tags">
-            ${breads.length ? html`<span class="pill">Baked ${breads.length}×</span>` : html`<span class="pill sage">To try</span>`}
-            <${ui.Score} value=${best}/>
+            ${f.baked ? html`<span class="pill">Baked ${f.breads.length}×</span>` : html`<span class="pill sage">To try</span>`}
+            <${CountPill} n=${f.variations.length}/>
+            <${ui.Score} value=${bestRating(f.breads)}/>
           </div>
-          <${RecipeCard} recipe=${r} onView=${setView}/>
-          <div class="formend" style="margin-top:14px">
-            <button type="button" class="btn primary wide" onClick=${function () { nav.push({ kind: 'breadForm', fromRecipeId: r.id }); }}>Bake this</button>
-          </div>
-          ${breads.length ? html`<div class="made"><span class="label">Breads</span><div class="row">
-            ${breads.map(function (b) {
-              return html`<${Tile} key=${b.id} bread=${b} onOpen=${function () { nav.push({ kind: 'bread', id: b.id }); }}/>`;
-            })}
-          </div></div>` : null}
+          ${f.variations.slice().reverse().map(function (rv) {
+            var breads = store.breadsOf(rv.id), n = f.variations.indexOf(rv) + 1;
+            return html`<div class="variation" key=${rv.id}>
+              ${many ? html`<div class="vhead">
+                <span class="label">Variation ${n}</span>
+                ${breads.length ? html`<span class="pill">Baked ${breads.length}×</span>` : html`<span class="pill sage">To try</span>`}
+                <${ui.Score} value=${bestRating(breads)}/>
+                <button type="button" class="round" aria-label=${'Edit variation ' + n} onClick=${function () { edit(rv); }}><${Icon} name="edit"/></button>
+              </div>` : null}
+              <${RecipeCard} recipe=${rv} against=${many && rv !== first ? first : null} onView=${setView}/>
+              <div class="formend">
+                <button type="button" class="btn primary wide" onClick=${function () { nav.push({ kind: 'breadForm', fromRecipeId: rv.id }); }}>Bake this</button>
+              </div>
+              ${breads.length ? html`<div class="made">
+                ${many ? null : html`<span class="label">Breads</span>`}
+                <div class="row">
+                  ${breads.map(function (b) {
+                    return html`<${Tile} key=${b.id} bread=${b} onOpen=${function () { nav.push({ kind: 'bread', id: b.id }); }}/>`;
+                  })}
+                </div>
+              </div>` : null}
+            </div>`;
+          })}
         </div>
       </div>
       ${view ? html`<${ui.Viewer} id=${view.id} blob=${view.blob} onClose=${function () { setView(null); }}/>` : null}
@@ -311,13 +342,12 @@
 
   // ---------- picking a saved recipe ----------
   function RecipePicker(props) {
-    var list = store.getState().recipes;
     return html`<${ui.Sheet} title="Recipes" onClose=${props.onClose}>
-      ${list.map(function (r) {
-        var last = latestBread(r.id), count = store.breadsOf(r.id).length;
-        return html`<button type="button" class="opt" key=${r.id} onClick=${function () { props.onPick(r); }}>
+      ${store.families().map(function (f) {
+        var last = f.breads[0];
+        return html`<button type="button" class="opt" key=${f.key} onClick=${function () { props.onPick(f.latest); }}>
           <span class="thumb">${last && last.photo ? html`<${ui.Photo} id=${last.photo.thumb}/>` : html`<${Icon} name="loaf"/>`}</span>
-          <span>${r.name}<small>${count ? 'Baked ' + count + '×' : 'To try'}</small></span>
+          <span>${f.name}<small>${f.baked ? 'Baked ' + f.breads.length + '×' : 'To try'}</small></span>
         </button>`;
       })}
     <//>`;
@@ -340,7 +370,10 @@
         comments: bread ? bread.comments : '',
         draft: base ? draftFromRecipe(base) : blankDraft(),
         baseRecipeId: base ? base.id : null,
-        pending: []
+        pending: [],
+        // The recipe part is "hers" once she has edited it or chosen a recipe herself. Until
+        // then, naming the bread like a saved recipe fills it in from that recipe.
+        hers: !!(bread || base), filled: ''
       };
     }
     var fs = useState(init.current), f = fs[0], setF = fs[1];
@@ -357,14 +390,30 @@
     function pickPhoto(file) {
       U.resizeImage(file, 1600, 0.85).then(function (blob) { set({ photoBlob: blob }); }, function () { setBusy('photo'); });
     }
+    /** Same name, same recipe: fill the untouched recipe part from the one saved under this name. */
+    function follow(name) {
+      return function (cur) {
+        var patch = name === undefined ? {} : { name: name };
+        if (cur.hers) return patch;
+        var key = U.nameKey(name === undefined ? cur.name : name), fam = store.familyByKey(key);
+        if (fam && cur.filled !== key) {
+          return Object.assign(patch, { draft: draftFromRecipe(fam.latest), baseRecipeId: fam.latest.id, pending: [], filled: key });
+        }
+        if (!fam && cur.filled) return Object.assign(patch, { draft: blankDraft(), baseRecipeId: null, pending: [], filled: '' });
+        return patch;
+      };
+    }
     function useRecipe(r) {
       setOverlay(null);
-      set(function (cur) { return { draft: draftFromRecipe(r), baseRecipeId: r.id, pending: [], name: cur.name || r.name }; });
+      set(function (cur) { return { draft: draftFromRecipe(r), baseRecipeId: r.id, pending: [], name: cur.name || r.name, hers: true }; });
     }
     function useReading(result) {
       setOverlay(null);
       set(function (cur) {
-        return { draft: draftFromReading(result.reading), baseRecipeId: null, pending: result.originals, name: cur.name || result.reading.name };
+        return {
+          draft: draftFromReading(result.reading), baseRecipeId: null, pending: result.originals,
+          name: cur.name || result.reading.name, hers: true
+        };
       });
     }
     function save() {
@@ -383,18 +432,30 @@
     }
     function back() { if (dirty) setOverlay('discard'); else nav.close(props.k); }
 
+    var typed = U.nameKey(f.name);
+    var names = typed ? store.names().filter(function (n) {
+      var k = U.nameKey(n);
+      return k !== typed && k.indexOf(typed) >= 0;
+    }).slice(0, 4) : [];
+
     return html`<${ui.Screen} title=${editing ? 'Edit bread' : 'New bread'} onBack=${back}
         onGo=${save} goDisabled=${!f.name.trim() || busy === 'saving'}>
       ${editing ? null : html`<div class="quick">
         ${store.getState().recipes.length ? html`<button type="button" onClick=${function () { setOverlay('recipes'); }}><${Icon} name="recipes"/>Use recipe</button>` : null}
-        ${props.canImport ? html`<button type="button" class="opt file" style="margin:0;padding:0;border:0;background:var(--butter);font-size:14.5px;justify-content:center;gap:8px">
-          <${Icon} name="image"/>From photo
+        ${props.canImport ? html`<label class="filebtn"><${Icon} name="image"/>From photo
           <input id="f-from-photo" type="file" accept="image/*" multiple aria-label="From photo"
             onChange=${function (e) { var files = filesOf(e); if (files.length) setOverlay({ files: files }); }}/>
-        </button>` : null}
+        </label>` : null}
       </div>`}
       <${Field} label="Name">
-        <input id="f-name" class="input" value=${f.name} aria-label="Name" autocomplete="off" onInput=${function (e) { set({ name: e.target.value }); }}/>
+        <input id="f-name" class="input" value=${f.name} aria-label="Name" autocomplete="off"
+          onInput=${function (e) { set({ name: e.target.value }); }}
+          onBlur=${function () { if (!editing) setF(function (cur) { return Object.assign({}, cur, follow()(cur)); }); }}/>
+        ${names.length ? html`<div class="suggest">
+          ${names.map(function (n) {
+            return html`<button type="button" key=${n} onClick=${function () { set(follow(n)); }}>${n}</button>`;
+          })}
+        </div>` : null}
       <//>
       <div class="pd">
         ${store.getState().canUpload || f.photo ? html`<${Field} label="Photo">
@@ -405,9 +466,9 @@
           <input id="f-date" class="input" type="date" value=${f.date} aria-label="Date" onInput=${function (e) { set({ date: e.target.value }); }}/>
         <//>
       </div>
-      <${VariantChips} draft=${f.draft} onPick=${function (i) { set({ draft: Object.assign({}, f.draft, { index: i }) }); }}/>
+      <${VariantChips} draft=${f.draft} onPick=${function (i) { set({ draft: Object.assign({}, f.draft, { index: i }), hers: true }); }}/>
       <${F.RecipeFields} recipe=${recipeOf(f.draft)} pending=${f.pending} hideSize=${sizedVariants(f.draft)}
-        onChange=${function (r) { set({ draft: withRecipe(f.draft, r) }); }}
+        onChange=${function (r) { set({ draft: withRecipe(f.draft, r), hers: true }); }}
         onPending=${function (list) { set({ pending: list }); }}
         onView=${function (x) { setOverlay({ view: x }); }}/>
       <${Field} label="Ratings">
@@ -461,11 +522,9 @@
     function save() {
       if (!d.name.trim() || busy === 'saving') return;
       setBusy('saving');
+      // Saving both sizes keeps one name: they are two variations of the same recipe.
       var list = f.both
-        ? d.variants.map(function (v, i) {
-          var r = recipeOf(d, i);
-          return { recipe: Object.assign({}, r, { name: d.name.trim() + (v.label ? ' (' + v.label + ')' : '') }) };
-        })
+        ? d.variants.map(function (v, i) { return { recipe: recipeOf(d, i) }; })
         : [{ id: props.recipeId || null, recipe: recipeOf(d) }];
       store.saveRecipes(list, f.pending).then(function () { nav.close(props.k); }, function () { setBusy('failed'); });
     }

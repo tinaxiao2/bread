@@ -174,7 +174,7 @@
         { group: 'yeast', type: 'Instant', amount: '2 1/4', unit: 'tsp', note: 'or 2 3/4 tsp active dry yeast', unsure: false }
       ] }
     ],
-    program: 1, crust: 'medium', ovenTemp: null, ovenMinutes: null,
+    programs: [1], crust: 'medium', ovenTemp: null, ovenMinutes: null,
     method: 'Add everything to the pan, liquids first.\nRun the Basic cycle with a medium crust.\nCool on a rack before slicing.',
     source: 'Sample Cookbook, p. 12'
   };

@@ -20,6 +20,7 @@ test('amounts show as fractions and parse to numbers', () => {
   assert.equal(U.prettyAmount('2 7/8'), '2⅞');
   assert.equal(U.prettyAmount('1 1/4'), '1¼');
   assert.equal(U.prettyAmount('400'), '400');
+  assert.equal(U.prettyAmount('3.25'), '3.25');
   assert.equal(U.prettyAmount('1 tbsp + 1/2 tsp'), '1 tbsp + ½ tsp');
   assert.equal(U.prettyAmount('1 1/2 tbsp + 1/2 tsp'), '1½ tbsp + ½ tsp');
   assert.equal(U.prettyAmount('5/9'), '5/9', 'a fraction with no glyph is left alone');
@@ -37,13 +38,23 @@ test('ingredients are labelled for the recipe card', () => {
   assert.equal(U.ingredientName({ group: 'water', type: '' }), 'Water');
   assert.equal(U.ingredientName({ group: 'dairy', type: 'Butter' }), 'Butter');
   assert.equal(U.ingredientName({ group: 'other', type: 'Honey' }), 'Honey');
-  assert.equal(U.ingredientDetail({ group: 'yeast', type: 'SAF instant', note: 'or 2 1/4 tsp bread machine yeast' }),
-    'SAF instant, or 2 1/4 tsp bread machine yeast');
+  assert.equal(U.ingredientDetail({ group: 'yeast', type: 'Instant', note: 'or 2 1/4 tsp active dry yeast' }),
+    'Instant, or 2 1/4 tsp active dry yeast');
   assert.equal(U.amountLabel({ amount: '2 7/8', unit: 'cup' }), '2⅞ cups');
   assert.equal(U.amountLabel({ amount: '1/2', unit: 'cup' }), '½ cup');
-  assert.equal(U.amountLabel({ amount: '1', unit: 'cup' }), '1 cup');
+  assert.equal(U.amountLabel({ amount: '1.5', unit: 'cup' }), '1.5 cups');
   assert.equal(U.amountLabel({ amount: '1', unit: '' }), '1');
   assert.equal(U.amountLabel({ amount: '1 tbsp + 1 tsp', unit: '' }), '1 tbsp + 1 tsp');
+});
+
+test('a blank recipe starts with flour, water, yeast and salt', () => {
+  const rows = U.emptyRecipe().ingredients.map((i) => [i.group, i.type, i.unit]);
+  assert.deepEqual(rows, [['flour', 'AP', 'cup'], ['water', '', 'cup'], ['yeast', 'Active dry', 'tsp'], ['other', 'Salt', 'tbsp']]);
+  assert.equal(U.DEFAULT_TYPES.flour[0], 'AP');
+  assert.equal(U.DEFAULT_TYPES.yeast[0], 'Active dry');
+  assert.deepEqual(U.STAPLES, ['Salt', 'Sugar']);
+  assert.equal(U.newIngredient('other', 'Sugar').unit, 'tbsp');
+  assert.equal(U.newIngredient('dairy').type, 'Milk');
 });
 
 test('a stored recipe is trimmed, ordered and free of blank rows', () => {
@@ -54,9 +65,10 @@ test('a stored recipe is trimmed, ordered and free of blank rows', () => {
       { group: 'dairy', type: 'Milk', amount: '', unit: 'cup' },
       { group: 'flour', type: 'Bread', amount: ' 3 ', unit: 'cup' },
       { group: 'other', type: 'Melted butter', amount: '', unit: '' },
+      { group: 'other', type: 'Sugar', amount: '', unit: 'tbsp', _auto: true },
       { group: 'nonsense', type: 'Seeds', amount: '2', unit: 'handfuls' }
     ],
-    bake: { program: '1', size: '1.5', minutes: '205', added: '' },
+    bake: { programs: ['1'], size: '1.5', minutes: '205', added: '' },
     link: 'example.com/recipe'
   });
   assert.equal(r.name, 'Milk bread');
@@ -65,8 +77,8 @@ test('a stored recipe is trimmed, ordered and free of blank rows', () => {
     { group: 'other', type: 'Salt', amount: '1', unit: 'tsp', note: '' },
     { group: 'other', type: 'Melted butter', amount: '', unit: '', note: '' },
     { group: 'other', type: 'Seeds', amount: '2', unit: '', note: '' }
-  ]);
-  assert.deepEqual(r.bake, { program: 1, size: '1.5', crust: '', minutes: 205, added: null, reason: '', ovenTemp: null, ovenMinutes: null });
+  ], 'a row that was only offered (Sugar) and never given an amount is dropped; one she named is kept');
+  assert.deepEqual(r.bake, { programs: [1], size: '1.5', crust: '', minutes: 205, added: null, reason: '', ovenTemp: null, ovenMinutes: null });
   assert.equal(r.link, 'https://example.com/recipe');
 });
 
@@ -79,31 +91,82 @@ test('links are only ever https', () => {
   assert.equal(U.safeLink(''), '');
 });
 
-test('where a bread\'s recipe is saved', () => {
-  const base = Object.assign(U.cleanRecipe({
-    name: 'Milk bread',
-    ingredients: [{ group: 'flour', type: 'Bread', amount: '3', unit: 'cup' }, { group: 'water', amount: '1', unit: 'cup' }],
-    bake: { program: 1, size: '1.5', minutes: 205 }, source: 'Booklet'
-  }), { id: 'r1' });
-  const same = JSON.parse(JSON.stringify(base));
-  const moreWater = JSON.parse(JSON.stringify(base));
-  moreWater.ingredients[1].amount = '1 1/4';
-  const newSource = Object.assign(JSON.parse(JSON.stringify(base)), { source: 'Booklet, p. 14' });
-
-  assert.deepEqual(U.planRecipeSave(null, same, 0), { action: 'create', basedOn: null }, 'no recipe yet: make one');
-  assert.deepEqual(U.planRecipeSave(base, same, 3), { action: 'keep', id: 'r1' }, 'unchanged: the bread joins the card');
-  assert.deepEqual(U.planRecipeSave(base, moreWater, 1), { action: 'create', basedOn: 'r1' }, 'changed and shared: a new card');
-  assert.deepEqual(U.planRecipeSave(base, moreWater, 0), { action: 'update', id: 'r1' }, 'changed and not shared: edit in place');
-  assert.deepEqual(U.planRecipeSave(base, newSource, 3), { action: 'update', id: 'r1' }, 'only the source changed: same card');
+test('entries saved before programs could be combined still read correctly', () => {
+  // one program, with time added by hand: that was the Bake program
+  assert.deepEqual(U.cleanBake({ program: 2, size: '1.5', minutes: 255, added: 10, reason: 'too light' }),
+    { programs: [2, 12], size: '1.5', crust: '', minutes: 255, added: 10, reason: 'too light', ovenTemp: null, ovenMinutes: null });
+  // a reason left behind with no added time is dropped
+  assert.deepEqual(U.cleanBake({ program: 8, minutes: 90, added: null, reason: 'too light' }),
+    { programs: [8], size: '', crust: '', minutes: 90, added: null, reason: '', ovenTemp: null, ovenMinutes: null });
+  assert.deepEqual(U.cleanBake({ program: null }).programs, []);
+  assert.deepEqual(U.cleanBake({ programs: [1, 1, 99, '12'] }).programs, [1, 12], 'duplicates and unknown programs go');
+  // the same bake reads the same whichever way it was stored
+  const ing = [{ group: 'flour', type: 'AP', amount: '3', unit: 'cup' }];
+  assert.equal(U.recipeKey({ ingredients: ing, bake: { program: 2, added: 10 } }),
+    U.recipeKey({ ingredients: ing, bake: { programs: [2, 12], added: 10 } }));
 });
 
 test('a recipe with nothing entered is recognised as empty', () => {
-  assert.equal(U.isEmptyRecipe(U.emptyRecipe()), true, 'the blank form');
+  assert.equal(U.isEmptyRecipe(U.emptyRecipe()), true, 'the blank form, with its starting rows untouched');
   assert.equal(U.isEmptyRecipe({ name: 'Only a name' }), true);
   const withFlour = U.emptyRecipe(); withFlour.ingredients[0].amount = '3';
   assert.equal(U.isEmptyRecipe(withFlour), false);
-  assert.equal(U.isEmptyRecipe({ bake: { program: 1 } }), false);
+  assert.equal(U.isEmptyRecipe({ bake: { programs: [1] } }), false);
   assert.equal(U.isEmptyRecipe({ source: 'Mom' }), false);
+});
+
+test('names match apart from capitals and spacing', () => {
+  assert.equal(U.nameKey('French Bread'), U.nameKey('  french   bread '));
+  assert.notEqual(U.nameKey('french bread'), U.nameKey('french breads'));
+  assert.equal(U.nameKey(''), '');
+});
+
+test('where a bread\'s recipe is saved', () => {
+  const make = (id, water, extra) => Object.assign(U.cleanRecipe(Object.assign({
+    name: 'french bread',
+    ingredients: [{ group: 'flour', type: 'AP', amount: '3', unit: 'cup' }, { group: 'water', amount: water, unit: 'cup' }],
+    bake: { programs: [2], size: '1.5', minutes: 255 }, source: 'Booklet'
+  }, extra)), { id });
+  const v1 = make('v1', '1 1/4'), v2 = make('v2', '1 1/2');
+  const copy = (r, patch) => Object.assign(JSON.parse(JSON.stringify(r)), patch);
+  const plan = (o) => U.planRecipeSave(Object.assign({ family: [], current: null, base: null, others: 0 }, o));
+
+  assert.deepEqual(plan({ draft: copy(v1) }), { action: 'create', basedOn: null }, 'a new name: a new recipe');
+  assert.deepEqual(plan({ draft: U.emptyRecipe() }), { action: 'none' }, 'nothing entered and no such recipe: no card');
+
+  // the same name finds the recipe
+  assert.deepEqual(plan({ draft: copy(v1), family: [v2, v1] }), { action: 'keep', id: 'v1' }, 'same ingredients: that variation');
+  assert.deepEqual(plan({ draft: make('x', '2'), family: [v2, v1] }), { action: 'create', basedOn: null }, 'different ingredients: a new variation');
+  assert.deepEqual(plan({ draft: U.emptyRecipe(), family: [v2, v1] }), { action: 'keep', id: 'v2' }, 'nothing entered: the latest variation');
+  assert.deepEqual(plan({ draft: U.emptyRecipe(), family: [v2, v1], base: v1 }), { action: 'keep', id: 'v1' }, 'or the one the form was filled from');
+
+  // typing the same ingredients by hand must not wipe a variation's method or source
+  assert.deepEqual(plan({ draft: copy(v1, { source: '', method: '' }), family: [v1] }), { action: 'keep', id: 'v1' });
+  // editing them in a form filled from that variation does change them
+  assert.deepEqual(plan({ draft: copy(v1, { source: 'Booklet, p. 14' }), family: [v1], base: v1 }), { action: 'update', id: 'v1' });
+
+  // editing a bread
+  assert.deepEqual(plan({ draft: make('x', '2'), family: [v1], current: v1, base: v1, others: 0 }),
+    { action: 'update', id: 'v1' }, 'the only bread on its variation: edit it in place');
+  assert.deepEqual(plan({ draft: make('x', '2'), family: [v1], current: v1, base: v1, others: 2 }),
+    { action: 'create', basedOn: 'v1' }, 'others share it: a new variation');
+  assert.deepEqual(plan({ draft: copy(v1), family: [], current: v1, base: v1, others: 0 }),
+    { action: 'update', id: 'v1' }, 'renamed and alone: the variation moves with it');
+  assert.deepEqual(plan({ draft: copy(v1), family: [], current: v1, base: v1, others: 1 }),
+    { action: 'create', basedOn: 'v1' }, 'renamed while others share it: a copy under the new name');
+
+  // a different reason for the added time is not a different bake
+  const a = make('a', '1', { bake: { programs: [1, 12], size: '1.5', minutes: 205, added: 5, reason: 'crust browning' } });
+  const b = copy(a, {}); b.bake.reason = 'pale top';
+  assert.equal(U.recipeKey(a), U.recipeKey(b));
+});
+
+test('lines that differ between two variations are found', () => {
+  const base = { ingredients: [{ group: 'flour', type: 'AP', amount: '3', unit: 'cup' }, { group: 'water', amount: '1.25', unit: 'cup' }] };
+  const other = { ingredients: [{ group: 'flour', type: 'AP', amount: '3', unit: 'cup' }, { group: 'water', amount: '1.75', unit: 'cup' },
+    { group: 'other', type: 'Honey', amount: '1', unit: 'tbsp' }] };
+  assert.deepEqual(U.changedLines(base, other), [false, true, true]);
+  assert.deepEqual(U.changedLines(base, base), [false, false]);
 });
 
 test('ratings average only what was rated', () => {
@@ -121,6 +184,8 @@ test('the machine data is complete and consistent', () => {
     assert.ok(p.minutes || p.total, 'program ' + p.n + ' has a time');
     for (const size of Object.keys(p.minutes || {})) assert.ok(m.sizes.some((s) => s.id === size));
   }
+  assert.equal(m.programs.filter((p) => p.manual).length, 1, 'one program has its time set by hand');
+  assert.equal(U.manualProgram().name, 'Bake');
   // spot checks against the manual's Programs & Timing tables
   assert.equal(U.programMinutes(1, '1.5'), 3 * 60 + 25);
   assert.equal(U.programMinutes(2, '2'), 4 * 60 + 20);
@@ -129,18 +194,40 @@ test('the machine data is complete and consistent', () => {
   assert.equal(U.programMinutes(4, '2'), null, 'Ultra-Fast has no 2 lb loaf');
   assert.equal(U.programMinutes(6, '1.5'), 2 * 60 + 15);
   assert.equal(U.programMinutes(8), 90);
-  assert.equal(U.programMinutes(12), 100);
-  assert.deepEqual(U.sizesFor(6).map((s) => s.id), ['1.5']);
-  assert.deepEqual(U.sizesFor(8), []);
-  assert.equal(U.sizesFor(null).length, 3, 'any size until a program is chosen');
-  assert.equal(U.hasCrust(1), true);
-  assert.equal(U.hasCrust(2), false);
 });
 
-test('baking details stay consistent with the program', () => {
+test('what the form offers follows the programs chosen', () => {
+  assert.equal(U.sizesFor([]).length, 3, 'any size until a program is chosen');
+  assert.deepEqual(U.sizesFor([6]).map((s) => s.id), ['1.5']);
+  assert.deepEqual(U.sizesFor([8]), []);
+  assert.deepEqual(U.sizesFor([8, 12]), []);
+  assert.deepEqual(U.sizesFor([1, 12]).map((s) => s.id), ['1', '1.5', '2'], 'Bake does not narrow the sizes');
+  assert.deepEqual(U.sizesFor([1, 4]).map((s) => s.id), ['1', '1.5'], 'only sizes every sized program has');
+  assert.equal(U.hasCrust([]), true);
+  assert.equal(U.hasCrust([2]), false);
+  assert.equal(U.hasCrust([2, 1]), true);
+  assert.equal(U.hasManual([1]), false);
+  assert.equal(U.hasManual([1, 12]), true);
+  assert.equal(U.hasDough([8, 12]), true);
+  assert.deepEqual(U.programLabels([8, 12]), ['8 · Dough', '12 · Bake']);
+  assert.deepEqual(U.toggleProgram([1], 12), [1, 12]);
+  assert.deepEqual(U.toggleProgram([1, 12], 1), [12]);
+});
+
+test('time adds up across programs; Bake is timed by hand', () => {
+  assert.equal(U.totalMinutes([1], '1.5'), 205);
+  assert.equal(U.totalMinutes([1, 12], '1.5'), 205, 'Bake adds nothing by itself');
+  assert.equal(U.totalMinutes([8, 12], ''), 90);
+  assert.equal(U.totalMinutes([7, 8], ''), 305 + 90);
+  assert.equal(U.totalMinutes([12], ''), null);
+  assert.equal(U.totalMinutes([1], ''), null, 'no time until a loaf size is chosen');
+  assert.equal(U.totalMinutes([], ''), null);
+});
+
+test('baking details stay consistent as programs are chosen', () => {
   const start = U.cleanBake({});
-  const white = U.withBake(start, { program: 1 });
-  assert.equal(white.minutes, null, 'no time until a loaf size is chosen');
+  const white = U.withBake(start, { programs: [1] });
+  assert.equal(white.minutes, null);
   const sized = U.withBake(white, { size: '1.5' });
   assert.equal(sized.minutes, 205);
   assert.equal(U.withBake(sized, { size: '2' }).minutes, 210);
@@ -148,12 +235,30 @@ test('baking details stay consistent with the program', () => {
   const custom = U.withBake(sized, { minutes: 190 });
   assert.equal(U.withBake(custom, { size: '2' }).minutes, 190, 'a time she typed is not overwritten');
 
-  const gf = U.withBake(U.withBake(sized, { crust: 'dark' }), { program: 6 });
+  const withBake = U.withBake(sized, { programs: [1, 12] });
+  assert.equal(withBake.minutes, 205);
+  const added = U.withBake(U.withBake(withBake, { added: 10 }), { reason: 'crust was light' });
+  assert.deepEqual([added.added, added.reason], [10, 'crust was light']);
+  const without = U.withBake(added, { programs: [1] });
+  assert.deepEqual([without.added, without.reason], [null, ''], 'dropping Bake drops the time added with it');
+
+  const gf = U.withBake(U.withBake(sized, { crust: 'dark' }), { programs: [6] });
   assert.deepEqual([gf.size, gf.crust, gf.minutes], ['1.5', 'dark', 135], 'the only size is picked for her');
-  const dough = U.withBake(gf, { program: 8 });
+  const dough = U.withBake(gf, { programs: [8] });
   assert.deepEqual([dough.size, dough.crust, dough.minutes], ['', '', 90]);
-  const french = U.withBake(U.withBake(sized, { crust: 'dark' }), { program: 2 });
-  assert.equal(french.crust, '', 'French has no crust colour');
-  const none = U.withBake(sized, { program: null });
+  assert.equal(U.withBake(U.withBake(sized, { crust: 'dark' }), { programs: [2] }).crust, '', 'French has no crust colour');
+  const none = U.withBake(sized, { programs: [] });
   assert.deepEqual([none.size, none.minutes], ['1.5', null]);
+});
+
+test('an entry is dough until a bake is recorded', () => {
+  assert.equal(U.isBaked(null), false, 'no baking details at all');
+  assert.equal(U.isBaked({}), false);
+  assert.equal(U.isBaked({ programs: [8] }), false, 'the Dough program alone');
+  assert.equal(U.isBaked({ programs: [7, 8] }), false);
+  assert.equal(U.isBaked({ program: 8, minutes: 90 }), false, 'as saved before programs could be combined');
+  assert.equal(U.isBaked({ programs: [8, 12] }), true, 'Dough then Bake');
+  assert.equal(U.isBaked({ programs: [1] }), true);
+  assert.equal(U.isBaked({ programs: [8], ovenTemp: 375 }), true, 'Dough, then the oven');
+  assert.equal(U.isBaked({ programs: [], ovenMinutes: 30 }), true);
 });

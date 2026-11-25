@@ -1,7 +1,9 @@
 /* The bread machine this log is kept for. Everything the interface knows about the
    machine comes from here: program names, which loaf sizes and crust colours each
    program offers, and its total time in minutes (from the manual's Programs & Timing
-   tables). `aka` lists names recipes commonly use for the same program. */
+   tables). `aka` lists names recipes commonly use for the same program. `dough` marks a
+   program that stops before baking. `manual` marks the one whose time is set by hand each
+   time it is used, which the log records as added time. */
 (function (root) {
   var LGT = root.LGT = root.LGT || {};
   LGT.machine = {
@@ -28,7 +30,7 @@
       { n: 9, name: 'Jam', aka: [], crust: false, total: 80 },
       { n: 10, name: 'Packaged Mix', aka: [], crust: true, total: 154 },
       { n: 11, name: 'Cake', aka: ['Quick Bread'], crust: false, total: 112 },
-      { n: 12, name: 'Bake', aka: ['Bake Only'], crust: false, total: 100 }
+      { n: 12, name: 'Bake', aka: ['Bake Only'], crust: false, total: 100, manual: true }
     ]
   };
 })(typeof window !== 'undefined' ? window : globalThis);

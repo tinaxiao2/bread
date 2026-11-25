@@ -15,13 +15,13 @@ const READING = {
       { group: 'other', type: 'Gluten', amount: '1', unit: 'Tablespoon', note: '' },
       { group: 'other', type: 'Egg', amount: '1', unit: '', note: '' },
       { group: 'other', type: 'Butter', amount: '1', unit: 'stick', note: 'softened' },
-      { group: 'yeast', type: 'SAF', amount: '1 3/4', unit: 'tsp', note: 'or 2 1/4 tsp bread machine yeast' },
+      { group: 'yeast', type: 'Instant', amount: '1 3/4', unit: 'tsp', note: 'or 2 1/4 tsp active dry yeast' },
       { group: 'mystery', type: '', amount: '', unit: '' }
     ] },
     { label: '2-pound loaf', size: '2', ingredients: [{ group: 'flour', type: 'Bread', amount: '3 3/4', unit: 'cup' }] },
     { label: 'empty', size: '3', ingredients: [] }
   ],
-  program: 1, crust: 'Medium', ovenTemp: null, ovenMinutes: null,
+  programs: [1], crust: 'Medium', ovenTemp: null, ovenMinutes: null,
   method: '  Step one.  \n\n Step   two. ', source: ' Sample Cookbook, p. 12 '
 };
 
@@ -35,12 +35,20 @@ test('a reading is tidied before it reaches the form', () => {
     { group: 'other', type: 'Gluten', amount: '1', unit: 'tbsp', note: '', unsure: false },
     { group: 'other', type: 'Egg', amount: '1', unit: '', note: '', unsure: false },
     { group: 'other', type: 'Butter', amount: '1 stick', unit: '', note: 'softened', unsure: false },
-    { group: 'yeast', type: 'SAF', amount: '1 3/4', unit: 'tsp', note: 'or 2 1/4 tsp bread machine yeast', unsure: false }
+    { group: 'yeast', type: 'Instant', amount: '1 3/4', unit: 'tsp', note: 'or 2 1/4 tsp active dry yeast', unsure: false }
   ]);
-  assert.equal(r.program, 1);
+  assert.deepEqual(r.programs, [1]);
   assert.equal(r.crust, 'medium');
   assert.equal(r.method, 'Step one.\nStep two.');
   assert.equal(r.source, 'Sample Cookbook, p. 12');
+});
+
+test('programs come through as a list, in either shape', () => {
+  const one = { variants: [{ ingredients: [{ group: 'flour', type: 'Bread', amount: '3', unit: 'cup' }] }] };
+  assert.deepEqual(importer.normalize(Object.assign({ programs: [8, 12] }, one), machine).programs, [8, 12]);
+  assert.deepEqual(importer.normalize(Object.assign({ program: 1 }, one), machine).programs, [1], 'a single program still works');
+  assert.deepEqual(importer.normalize(Object.assign({ programs: [99, 'x'] }, one), machine).programs, []);
+  assert.deepEqual(importer.normalize(one, machine).programs, []);
 });
 
 test('small-print fractions are marked for a second look', () => {
@@ -60,34 +68,37 @@ test('an answer with no recipe in it is refused', () => {
 test('nonsense in the answer cannot reach the form', () => {
   const r = importer.normalize({
     name: 42, variants: [{ size: '5', ingredients: [{ group: 'flour', type: 7, amount: 3, unit: 'CUPS.' }] }],
-    program: 99, crust: 'burnt', ovenTemp: 'hot', method: null, source: undefined
+    programs: 'all of them', crust: 'burnt', ovenTemp: 'hot', method: null, source: undefined
   }, machine);
   assert.equal(r.name, '42');
   assert.deepEqual(r.variants[0], { label: '', size: '', ingredients: [{ group: 'flour', type: '7', amount: '3', unit: 'cup', note: '', unsure: false }] });
-  assert.deepEqual([r.program, r.crust, r.ovenTemp, r.method, r.source], [null, '', null, '', '']);
+  assert.deepEqual([r.programs, r.crust, r.ovenTemp, r.method, r.source], [[], '', null, '', '']);
 });
 
 test('each size becomes its own draft, with the time from the machine', () => {
   const r = importer.normalize(READING, machine);
   const small = importer.toDraft(r, 0), large = importer.toDraft(r, 1);
-  assert.deepEqual([small.bake.program, small.bake.size, small.bake.crust, small.bake.minutes], [1, '1.5', 'medium', 205]);
+  assert.deepEqual([small.bake.programs, small.bake.size, small.bake.crust, small.bake.minutes], [[1], '1.5', 'medium', 205]);
   assert.deepEqual([large.bake.size, large.bake.minutes], ['2', 210]);
   assert.equal(importer.variantLabel(r.variants[0]), '1½ lb');
   assert.equal(small.source, 'Sample Cookbook, p. 12');
   assert.equal(U.cleanRecipe(small).ingredients[0].group, 'flour', 'saved in the card\'s fixed order');
+  assert.notEqual(U.recipeKey(small), U.recipeKey(large), 'two sizes are two variations of one recipe');
 });
 
 test('an oven-finished recipe keeps its oven step and has no crust colour', () => {
   const r = importer.normalize({
     name: 'Rolls', variants: [{ ingredients: [{ group: 'flour', type: 'Bread', amount: '3 1/4', unit: 'cup' }] }],
-    program: 8, crust: 'medium', ovenTemp: 375, ovenMinutes: 10
+    programs: [8], crust: 'medium', ovenTemp: 375, ovenMinutes: 10
   }, machine);
   const d = importer.toDraft(r, 0);
-  assert.deepEqual([d.bake.program, d.bake.size, d.bake.crust, d.bake.minutes, d.bake.ovenTemp, d.bake.ovenMinutes], [8, '', '', 90, 375, 10]);
+  assert.deepEqual([d.bake.programs, d.bake.size, d.bake.crust, d.bake.minutes, d.bake.ovenTemp, d.bake.ovenMinutes], [[8], '', '', 90, 375, 10]);
+  assert.equal(U.isBaked(d.bake), true);
 });
 
 test('the request names the machine\'s programs and asks for exact amounts', () => {
   const p = importer.prompt(machine, true);
+  assert.match(p, /"programs": number\[\]/);
   assert.match(p, /1 White \(also called Basic\)/);
   assert.match(p, /12 Bake/);
   assert.match(p, /enlarged parts/);

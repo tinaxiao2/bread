@@ -85,13 +85,18 @@
   // ---------- ingredients ----------
   var GROUPS = ['flour', 'water', 'dairy', 'yeast', 'other'];
   var GROUP_LABEL = { flour: 'Flour', water: 'Water', dairy: 'Dairy', yeast: 'Yeast', other: 'Other' };
+  /** The kinds offered for each group. The first is the one a new row starts with. */
   var DEFAULT_TYPES = {
-    flour: ['Bread', 'AP'],
+    flour: ['AP', 'Bread'],
     dairy: ['Milk', 'Butter'],
-    yeast: ['Instant', 'Active dry', 'Bread machine']
+    yeast: ['Active dry', 'Instant', 'Bread machine']
   };
   var DEFAULT_UNIT = { flour: 'cup', water: 'cup', dairy: 'cup', yeast: 'tsp', other: 'tsp' };
-  var TYPE_UNIT = { Butter: 'tbsp' };
+  var TYPE_UNIT = { Butter: 'tbsp', Salt: 'tbsp', Sugar: 'tbsp' };
+  /** Named ingredients that are always one tap away. */
+  var STAPLES = ['Salt', 'Sugar'];
+  /** The rows a blank recipe starts with, as [group, name]. */
+  var STARTING = [['flour'], ['water'], ['yeast'], ['other', 'Salt']];
 
   function ingredientName(ing) {
     var t = (ing.type || '').trim();
@@ -108,9 +113,14 @@
     if (ing.note) parts.push(ing.note);
     return parts.join(', ');
   }
-  function newIngredient(group, like) {
-    var type = group === 'flour' ? 'Bread' : group === 'dairy' ? 'Milk' : '';
-    return { group: group, type: type, amount: '', unit: (like && like.unit) || DEFAULT_UNIT[group], note: '' };
+  /** A new row. `_auto` marks one that was offered rather than typed: left without an amount, it is not saved. */
+  function newIngredient(group, type, unit) {
+    if (type === undefined || type === null) type = (DEFAULT_TYPES[group] || [''])[0];
+    return {
+      group: group, type: type, amount: '',
+      unit: unit !== undefined && unit !== null ? unit : (TYPE_UNIT[type] || DEFAULT_UNIT[group]),
+      note: '', _auto: true
+    };
   }
   function cleanIngredient(i) {
     return {
@@ -122,28 +132,51 @@
     };
   }
   function isBlankIngredient(i) {
-    return !i.amount && !i.note && !(i.group === 'other' && i.type);
+    var c = cleanIngredient(i);
+    return !c.amount && !c.note && (!!i._auto || !(c.group === 'other' && c.type));
   }
   function sortIngredients(list) {
     return list.map(function (i, n) { return [i, n]; }).sort(function (a, b) {
       return (GROUPS.indexOf(a[0].group) - GROUPS.indexOf(b[0].group)) || (a[1] - b[1]);
     }).map(function (x) { return x[0]; });
   }
+  function lineKey(i) {
+    return [i.group, String(i.type || '').toLowerCase(), i.amount, i.unit].join('|');
+  }
+  /** Which of `other`'s ingredient lines are not in `base` exactly, as a list of true/false. */
+  function changedLines(base, other) {
+    var seen = {};
+    ((base && base.ingredients) || []).forEach(function (i) { seen[lineKey(cleanIngredient(i))] = true; });
+    return ((other && other.ingredients) || []).map(function (i) { return !seen[lineKey(cleanIngredient(i))]; });
+  }
 
   // ---------- recipes ----------
   function emptyRecipe() {
     return {
       name: '',
-      ingredients: [newIngredient('flour'), newIngredient('water'), newIngredient('dairy'), newIngredient('yeast')],
-      bake: { program: null, size: '', crust: '', minutes: null, added: null, reason: '', ovenTemp: null, ovenMinutes: null },
+      ingredients: STARTING.map(function (s) { return newIngredient(s[0], s[1]); }),
+      bake: cleanBake({}),
       method: '', source: '', link: '', originals: [], basedOn: null
     };
   }
+  /** The programs a bake used, in the order chosen. Older entries kept a single `program`. */
+  function programsOf(b) {
+    var list = Array.isArray(b.programs) ? b.programs
+      : (b.program === null || b.program === undefined || b.program === '' ? [] : [b.program]);
+    var out = [];
+    list.forEach(function (n) { n = num(n); if (n !== null && program(n) && out.indexOf(n) < 0) out.push(n); });
+    return out;
+  }
+  /** The shape the baking details are stored in. */
   function cleanBake(b) {
     b = b || {};
+    var programs = programsOf(b), added = num(b.added), manual = manualProgram();
+    // Time added by hand is the manual program's time, so having one means the other was used.
+    if (added !== null && manual && programs.indexOf(manual.n) < 0) programs.push(manual.n);
+    var extra = !manual || hasManual(programs);
     return {
-      program: num(b.program), size: b.size || '', crust: b.crust || '',
-      minutes: num(b.minutes), added: num(b.added), reason: String(b.reason || '').trim(),
+      programs: programs, size: b.size || '', crust: b.crust || '', minutes: num(b.minutes),
+      added: extra ? added : null, reason: extra ? String(b.reason || '').trim() : '',
       ovenTemp: num(b.ovenTemp), ovenMinutes: num(b.ovenMinutes)
     };
   }
@@ -151,7 +184,7 @@
   function cleanRecipe(r) {
     return {
       name: String(r.name || '').trim(),
-      ingredients: sortIngredients((r.ingredients || []).map(cleanIngredient).filter(function (i) { return !isBlankIngredient(i); })),
+      ingredients: sortIngredients((r.ingredients || []).filter(function (i) { return !isBlankIngredient(i); }).map(cleanIngredient)),
       bake: cleanBake(r.bake),
       method: String(r.method || '').trim(),
       source: String(r.source || '').trim(),
@@ -164,31 +197,48 @@
   function isEmptyRecipe(r) {
     var c = cleanRecipe(r), b = c.bake;
     return !c.ingredients.length && !c.method && !c.source && !c.link && !c.originals.length &&
-      b.program === null && !b.size && !b.crust && b.minutes === null && b.added === null && !b.reason &&
+      !b.programs.length && !b.size && !b.crust && b.minutes === null && b.added === null && !b.reason &&
       b.ovenTemp === null && b.ovenMinutes === null;
   }
-  /** What makes two recipes "the same bake": the ingredients and the baking details. */
+  /** What makes two bakes the same variation: the ingredients and the baking details. */
   function recipeKey(r) {
-    var c = cleanRecipe(r);
-    return JSON.stringify([c.ingredients, c.bake]);
+    var c = cleanRecipe(r), bake = Object.assign({}, c.bake);
+    delete bake.reason;
+    return JSON.stringify([c.ingredients, bake]);
   }
   function sameDetails(a, b) {
     var x = cleanRecipe(a), y = cleanRecipe(b);
-    return x.method === y.method && x.source === y.source && x.link === y.link &&
+    return x.method === y.method && x.source === y.source && x.link === y.link && x.bake.reason === y.bake.reason &&
       JSON.stringify(x.originals) === JSON.stringify(y.originals);
   }
+  /** Two names are the same recipe when they match apart from capitals and spacing. */
+  function nameKey(s) { return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
   /**
-   * Decide where a bread's recipe goes when the bread is saved.
-   * base: the recipe the form started from (or null). draft: the recipe as edited.
-   * others: how many OTHER breads use the base recipe.
-   * -> { action: 'create' | 'update' | 'keep', id?, basedOn? }
+   * Decide where a bread's recipe goes when the bread is saved. A recipe is known by its name;
+   * within it, each distinct set of ingredients and baking details is a variation.
+   *   draft    the recipe as entered
+   *   family   the saved variations that share the bread's name, most recent first
+   *   current  the variation this bread is on now (when editing), or null
+   *   base     the variation the form was filled from, or null
+   *   others   how many OTHER breads are on `current`
+   * -> { action: 'none' | 'keep' | 'update' | 'create', id?, basedOn? }
    */
-  function planRecipeSave(base, draft, others) {
-    if (!base) return { action: 'create', basedOn: null };
-    if (recipeKey(base) === recipeKey(draft)) {
-      return sameDetails(base, draft) ? { action: 'keep', id: base.id } : { action: 'update', id: base.id };
+  function planRecipeSave(o) {
+    var family = o.family || [];
+    function byId(r) { return family.filter(function (x) { return x.id === r.id; })[0]; }
+    if (isEmptyRecipe(o.draft)) {
+      if (!family.length) return { action: 'none' };
+      return { action: 'keep', id: ((o.base && byId(o.base)) || family[0]).id };
     }
-    return others > 0 ? { action: 'create', basedOn: base.id } : { action: 'update', id: base.id };
+    var key = recipeKey(o.draft);
+    var match = family.filter(function (r) { return recipeKey(r) === key; })[0];
+    if (match) {
+      // Only a form that was filled from this variation may change its method or source.
+      var edited = o.base && o.base.id === match.id && !sameDetails(match, o.draft);
+      return { action: edited ? 'update' : 'keep', id: match.id };
+    }
+    if (o.current && !o.others) return { action: 'update', id: o.current.id };
+    return { action: 'create', basedOn: (o.base && o.base.id) || (o.current && o.current.id) || null };
   }
   function ingredientSummary(recipe) {
     return (recipe.ingredients || []).map(function (i) {
@@ -207,25 +257,56 @@
   function fmtRating(x) { return x === null || x === undefined ? '' : x.toFixed(1); }
 
   // ---------- machine ----------
+  function machinePrograms() { return (LGT.machine && LGT.machine.programs) || []; }
   function program(n) {
-    var list = (LGT.machine && LGT.machine.programs) || [];
+    var list = machinePrograms();
     for (var i = 0; i < list.length; i++) if (list[i].n === num(n)) return list[i];
     return null;
   }
-  /** Loaf sizes on offer: every size until a program is chosen, then only the ones that program has. */
-  function sizesFor(n) {
-    var p = program(n), all = (LGT.machine && LGT.machine.sizes) || [];
-    if (!p) return all.slice();
-    if (!p.minutes) return [];
-    return all.filter(function (s) { return p.minutes[s.id] != null; });
+  function programList(programs) { return (programs || []).map(program).filter(Boolean); }
+  /** The program whose time is set by hand each time it is used, if the machine has one. */
+  function manualProgram() { return machinePrograms().filter(function (p) { return p.manual; })[0] || null; }
+  /** Loaf sizes on offer: every size until a program is chosen, then the ones every sized program has. */
+  function sizesFor(programs) {
+    var all = (LGT.machine && LGT.machine.sizes) || [], list = programList(programs);
+    if (!list.length) return all.slice();
+    var sized = list.filter(function (p) { return p.minutes; });
+    if (!sized.length) return [];
+    return all.filter(function (s) { return sized.every(function (p) { return p.minutes[s.id] != null; }); });
   }
-  function hasCrust(n) { var p = program(n); return p ? !!p.crust : true; }
-  function isDough(n) { var p = program(n); return !!(p && p.dough); }
+  function hasCrust(programs) {
+    var list = programList(programs);
+    return !list.length || list.some(function (p) { return p.crust; });
+  }
+  function hasDough(programs) { return programList(programs).some(function (p) { return p.dough; }); }
+  function hasManual(programs) { return programList(programs).some(function (p) { return p.manual; }); }
   function programMinutes(n, size) {
     var p = program(n);
     if (!p) return null;
     if (p.minutes) return p.minutes[size] != null ? p.minutes[size] : null;
     return p.total != null ? p.total : null;
+  }
+  /** The machine's own time for the chosen programs. A manual program adds nothing: its time is typed in. */
+  function totalMinutes(programs, size) {
+    var timed = programList(programs).filter(function (p) { return !p.manual; }), sum = 0;
+    if (!timed.length) return null;
+    for (var i = 0; i < timed.length; i++) {
+      var m = programMinutes(timed[i].n, size);
+      if (m === null) return null;
+      sum += m;
+    }
+    return sum;
+  }
+  function programLabels(programs) {
+    return programList(programs).map(function (p) { return p.n + ' · ' + p.name; });
+  }
+  function toggleProgram(programs, n) {
+    return programs.indexOf(n) >= 0 ? programs.filter(function (x) { return x !== n; }) : programs.concat([n]);
+  }
+  /** True when the details record an actual bake. Dough programs alone, or nothing at all, are not one. */
+  function isBaked(bake) {
+    var b = cleanBake(bake);
+    return programList(b.programs).some(function (p) { return !p.dough; }) || b.ovenTemp !== null || b.ovenMinutes !== null;
   }
   function sizeLabel(id) {
     var s = ((LGT.machine && LGT.machine.sizes) || []).filter(function (x) { return x.id === id; })[0];
@@ -235,16 +316,18 @@
     var c = ((LGT.machine && LGT.machine.crusts) || []).filter(function (x) { return x.id === id; })[0];
     return c ? c.label : '';
   }
-  /** Apply a change to the baking details, keeping size, crust and time consistent with the program. */
+  /** Apply a change to the baking details, keeping size, crust, time and added time consistent with the programs. */
   function withBake(bake, patch) {
-    var next = Object.assign({}, bake, patch);
-    var wasAuto = bake.minutes === null || bake.minutes === undefined ||
-      bake.minutes === programMinutes(bake.program, bake.size);
-    if ('program' in patch || 'size' in patch) {
-      var sizes = sizesFor(next.program);
+    var prev = cleanBake(bake);
+    var next = Object.assign({}, prev, patch);
+    next.programs = programsOf(next);
+    var wasAuto = prev.minutes === null || prev.minutes === totalMinutes(prev.programs, prev.size);
+    if ('programs' in patch || 'size' in patch) {
+      var sizes = sizesFor(next.programs);
       if (!sizes.some(function (s) { return s.id === next.size; })) next.size = sizes.length === 1 ? sizes[0].id : '';
-      if (!hasCrust(next.program)) next.crust = '';
-      if (wasAuto && !('minutes' in patch)) next.minutes = programMinutes(next.program, next.size);
+      if (!hasCrust(next.programs)) next.crust = '';
+      if (wasAuto && !('minutes' in patch)) next.minutes = totalMinutes(next.programs, next.size);
+      if (manualProgram() && !hasManual(next.programs)) { next.added = null; next.reason = ''; }
     }
     return next;
   }
@@ -293,14 +376,16 @@
     today: today, parseDate: parseDate, fmtDate: fmtDate,
     num: num, fmtMinutes: fmtMinutes, splitMinutes: splitMinutes, joinMinutes: joinMinutes,
     prettyAmount: prettyAmount, parseAmount: parseAmount, amountLabel: amountLabel, unitLabel: unitLabel,
-    UNITS: UNITS, GROUPS: GROUPS, GROUP_LABEL: GROUP_LABEL, DEFAULT_TYPES: DEFAULT_TYPES, DEFAULT_UNIT: DEFAULT_UNIT, TYPE_UNIT: TYPE_UNIT,
+    UNITS: UNITS, GROUPS: GROUPS, GROUP_LABEL: GROUP_LABEL, DEFAULT_TYPES: DEFAULT_TYPES, DEFAULT_UNIT: DEFAULT_UNIT,
+    TYPE_UNIT: TYPE_UNIT, STAPLES: STAPLES, STARTING: STARTING,
     ingredientName: ingredientName, ingredientDetail: ingredientDetail, newIngredient: newIngredient,
-    cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient,
-    emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake, recipeKey: recipeKey,
-    planRecipeSave: planRecipeSave, ingredientSummary: ingredientSummary,
+    cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient, changedLines: changedLines,
+    emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake,
+    recipeKey: recipeKey, nameKey: nameKey, planRecipeSave: planRecipeSave, ingredientSummary: ingredientSummary,
     RATINGS: RATINGS, rating: rating, fmtRating: fmtRating,
-    program: program, sizesFor: sizesFor, hasCrust: hasCrust, isDough: isDough,
-    programMinutes: programMinutes, sizeLabel: sizeLabel, crustLabel: crustLabel, withBake: withBake,
+    program: program, manualProgram: manualProgram, sizesFor: sizesFor, hasCrust: hasCrust, hasDough: hasDough,
+    hasManual: hasManual, programMinutes: programMinutes, totalMinutes: totalMinutes, programLabels: programLabels,
+    toggleProgram: toggleProgram, isBaked: isBaked, sizeLabel: sizeLabel, crustLabel: crustLabel, withBake: withBake,
     safeLink: safeLink, loadImage: loadImage, drawToBlob: drawToBlob, resizeImage: resizeImage
   };
 })(typeof window !== 'undefined' ? window : globalThis);

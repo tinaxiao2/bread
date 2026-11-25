@@ -23,6 +23,8 @@ a plain static site: storage, photos and the recipe reader all come from the art
 runtime.
 
 - Artifact: "Let's Get This". Find it by title with the artifact tools; `tools/publish.md` has the steps.
+- Claude's icon set for artifacts has no bread: every bread word resolves to a coffee cup.
+  The artifact carries a 🍞 emoji marker instead, set with `publish_version`.
 - Capabilities declared: `db` (breads and recipes), `assets` (photos), `sample` with
   images (reading a recipe from a picture).
 - There is no build step. The files in `tools/publish.md` are published as they are.
@@ -49,20 +51,39 @@ runtime.
 
 Two collections in the artifact database:
 
-- `breads/{id}`: `name`, `date` (YYYY-MM-DD), `recipeId`, `photo` (`{full, thumb}` asset
-  ids or null), `ratings` (`crust`, `crumb`, `taste`, 0 = not rated), `notes` (one per
+- `breads/{id}`: `name`, `date` (YYYY-MM-DD), `recipeId` (or null), `photo` (`{full, thumb}`
+  asset ids or null), `ratings` (`crust`, `crumb`, `taste`, 0 = not rated), `notes` (one per
   rating), `comments`, `createdAt`, `updatedAt`
 - `recipes/{id}`: `name`, `ingredients[]` (`group`, `type`, `amount`, `unit`, `note`),
-  `bake` (`program`, `size`, `crust`, `minutes`, `added`, `reason`, `ovenTemp`,
+  `bake` (`programs[]`, `size`, `crust`, `minutes`, `added`, `reason`, `ovenTemp`,
   `ovenMinutes`), `method`, `source`, `link`, `originals[]` (asset ids of imported
   images), `basedOn`, `createdAt`, `updatedAt`
 
-A recipe is "baked" when a bread points at it and "to try" otherwise. That status is
-derived, never stored.
+Entries from the first version hold a single `bake.program` instead of `bake.programs`.
+`LGT.util.cleanBake` reads both, so nothing is migrated. Always go through it.
 
-Saving a bread whose recipe is unchanged keeps it on the same card. Changing the recipe
-makes a new card when other breads use the old one, and edits the card in place when
-none do. See `LGT.util.planRecipeSave`.
+## How the owner's log works
+
+These are decisions the owner made. Keep them.
+
+- **A recipe is known by its name.** Every `recipes` document with the same name (ignoring
+  capitals and spacing) is one **variation** of that recipe: a distinct set of ingredients
+  and baking details. The Recipes tab shows one card per name, with its variations inside.
+- **A bread's name is its recipe's name.** Saving a bread named like a saved recipe joins
+  that recipe: the matching variation if the ingredients and baking details are the same,
+  a new variation if they differ. See `LGT.util.planRecipeSave`. Naming a new bread like a
+  saved recipe fills the form from that recipe's latest variation.
+- Renaming a recipe renames all its variations and the breads baked from them.
+- **Baked, To try and Dough are derived, never stored.** A recipe is baked when a bread
+  points at one of its variations. An entry is Dough until a bake is recorded: a program
+  that is not a dough program, or an oven step (`LGT.util.isBaked`).
+- **Programs can be combined** (for example Dough then Bake). The program marked `manual`
+  in `data/machine.js` (Bake) has its time typed in as "added time", so the added time and
+  its reason only exist, and only show, when that program is chosen.
+- **A blank recipe starts with** AP flour, water, active dry yeast and salt (tbsp). Dairy
+  is added on demand. Salt and Sugar are always offered as quick-add chips, followed by
+  every named ingredient the owner has used before. Units follow what was last used.
+- Rows that were only offered (`_auto`) and left without an amount are not saved.
 
 ## Working on it
 
