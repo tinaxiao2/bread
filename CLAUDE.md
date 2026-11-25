@@ -23,9 +23,11 @@ a plain static site: storage, photos and the recipe reader all come from the art
 runtime.
 
 - Artifact: "Let's Get This". Find it by title with the artifact tools; `tools/publish.md` has the steps.
-- Claude's icon set for artifacts has no bread: bread, loaf, croissant, wheat, toast, bakery
-  and cake all resolve to a coffee cup. The artifact carries a bread cover picture
-  (`thumb.png`) and a 🍞 emoji marker (set with `publish_version`) instead.
+- The artifact's icon comes from a fixed set chosen by a word passed when publishing. It has no
+  bread: `bread` and `food` give a coffee cup, `recipe` gives a book, and words it does not
+  know (loaf, croissant, wheat, toast, bakery, cake, baking) are ignored, leaving the icon
+  as it was. iPhone's Add to Home Screen uses that icon, not the page's own `icons/` or
+  `thumb.png`, so the home-screen icon cannot be made bread from here. The owner knows.
 - Capabilities declared: `db` (breads and recipes), `assets` (photos), `sample` with
   images (reading a recipe from a picture).
 - There is no build step. The files in `tools/publish.md` are published as they are.
