@@ -166,8 +166,10 @@ These are decisions the owner made. Keep them.
 - **Stats** (third tab): flour used, loaves, favorite, highest rated and time spent, all derived in
   `store.stats`. Highest rated is the label (or recipe) with the best-rated bake (ties: more
   baked, then more recent). Tapping the favorite's or highest rated's name opens its recipe page
-  (on the recipe of the latest or best bake), or the bread when it has no recipe. Those names
-  stay on one line: a long one is set smaller until it fits. Loaves and the favorite count baked (dated) entries; flour and time
+  (on the recipe of the latest or best bake), or the bread when it has no recipe. Those two names
+  stay on one line and at one size: when either is too long, both are set smaller until both
+  fit. **Countries** lists where the recipes are from: every recipe once (baked or to try), by its
+  flag or else its label's, most first; recipes with no flag are left out. Loaves and the favorite count baked (dated) entries; flour and time
   count every entry. Flour in cups or spoons is converted at about 120 g a
   cup. Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
   (flour, machine time, proofing) is counted once, with the entry it came from. The favorite

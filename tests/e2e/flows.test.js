@@ -575,6 +575,9 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
     const box = await stat(label).locator('.pick').boundingBox();
     assert.ok(box.height < 40, label + ' fits on one line');
   }
+  const sizes = await page.locator('.pick b.serif').evaluateAll((els) => els.map((el) => getComputedStyle(el).fontSize));
+  assert.equal(sizes[0], sizes[1], 'the two names are the same size');
+  await count(page.locator('.countries'), 0, 'no flags yet, so no countries');
 
   // tapping a name opens its recipe
   await stat('Highest rated').locator('.pick').click();
@@ -679,7 +682,8 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await count(page.locator('.gal .tile .fl'), 1);
 
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
-  assert.equal(await page.locator('.stat .fl').count(), 0);
+  assert.equal(await page.locator('.pick .fl').count(), 0);
+  assert.deepEqual(await page.locator('.countries li').allInnerTexts(), ['\u{1F1E8}\u{1F1F3}\nChina\n1'], 'each recipe once, by its flag');
 });
 
 test('an entry dated "–" is a plan; giving it a date makes it baked', async (t) => {

@@ -261,8 +261,17 @@
     var top = all.filter(function (t) { return t.best > 0; }).sort(function (a, b) {
       return (b.best - a.best) || (b.count - a.count) || b.last.localeCompare(a.last);
     })[0];
+    // Where the recipes are from: every recipe once, baked or to try, by its flag or its label's.
+    var byFlag = {};
+    lines().forEach(function (l) {
+      var f = l.flag || (l.parent ? labelFlag(l.parent) : '');
+      if (f) byFlag[f] = (byFlag[f] || 0) + 1;
+    });
+    var countries = Object.keys(byFlag).map(function (f) { return { flag: f, count: byFlag[f] }; }).sort(function (a, b) {
+      return (b.count - a.count) || U.flagName(a.flag).localeCompare(U.flagName(b.flag));
+    });
     return {
-      flourGrams: flour, loaves: bakedOf(state.breads).length, minutes: minutes,
+      flourGrams: flour, loaves: bakedOf(state.breads).length, minutes: minutes, countries: countries,
       favorite: fav ? pick(fav, fav.lastBread) : null,
       highestRated: top ? pick(top, top.bestBread) : null
     };

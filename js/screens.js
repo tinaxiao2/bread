@@ -723,36 +723,43 @@
   }
 
   // ---------- Stats ----------
-  /**
-   * A named stat: tap the name to open its recipe (or the bread, when it has no recipe).
-   * The name stays on one line: a long one is set smaller until it fits.
-   */
+  /** A named stat: tap the name to open its recipe (or the bread, when it has no recipe). */
   function Pick(props) {
-    var x = props.item, ref = useRef(null);
-    function fit() {
-      var el = ref.current;
-      if (!el) return;
-      el.style.fontSize = '';
-      var size = parseFloat(getComputedStyle(el).fontSize);
-      while (el.scrollWidth > el.clientWidth + 1 && size > 15) { size -= 1; el.style.fontSize = size + 'px'; }
-    }
-    H.useLayoutEffect(fit);
-    useEffect(function () {
-      // measure again once the serif font has loaded, and when the screen changes size
-      if (root.document.fonts && root.document.fonts.ready) root.document.fonts.ready.then(fit);
-      root.addEventListener('resize', fit);
-      return function () { root.removeEventListener('resize', fit); };
-    }, []);
+    var x = props.item;
     if (!x) return html`<b>–</b>`;
     return html`<button type="button" class="pick" onClick=${function () { props.nav.push(x.open); }}>
-      <b class="serif" ref=${ref}><${ui.Named} flag=${x.flag} name=${x.name}/></b>${props.children}
+      <b class="serif"><${ui.Named} flag=${x.flag} name=${x.name}/></b>${props.children}
     </button>`;
   }
+  /**
+   * The favorite and highest rated names stay on one line, at one size: when either is too
+   * long, both are set smaller until both fit.
+   */
+  function fitNames(box) {
+    if (!box) return;
+    var els = Array.prototype.slice.call(box.querySelectorAll('.pick b.serif'));
+    if (!els.length) return;
+    els.forEach(function (el) { el.style.fontSize = ''; });
+    var size = parseFloat(getComputedStyle(els[0]).fontSize);
+    function over() { return els.some(function (el) { return el.scrollWidth > el.clientWidth + 1; }); }
+    while (over() && size > 15) {
+      size -= 1;
+      els.forEach(function (el) { el.style.fontSize = size + 'px'; });
+    }
+  }
   function Stats(props) {
-    var st = store.stats(), nav = props.nav;
+    var st = store.stats(), nav = props.nav, box = useRef(null);
+    H.useLayoutEffect(function () { fitNames(box.current); });
+    useEffect(function () {
+      // measure again once the serif font has loaded, and when the screen changes size
+      function refit() { fitNames(box.current); }
+      if (root.document.fonts && root.document.fonts.ready) root.document.fonts.ready.then(refit);
+      root.addEventListener('resize', refit);
+      return function () { root.removeEventListener('resize', refit); };
+    }, []);
     return html`<div class="wrap">
       <div class="top"><h1 class="serif">Stats</h1></div>
-      <div class="stats">
+      <div class="stats" ref=${box}>
         <div class="stat"><span class="label">Flour used</span><b>${U.fmtWeight(st.flourGrams)}</b></div>
         <div class="stat"><span class="label">Loaves</span><b>${st.loaves}</b></div>
         <div class="stat wide"><span class="label">Favorite</span>
@@ -762,6 +769,13 @@
           <${Pick} item=${st.highestRated} nav=${nav}>${st.highestRated ? html`<${ui.Score} value=${st.highestRated.rating}/>` : null}<//>
         </div>
         <div class="stat wide"><span class="label">Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
+        ${st.countries.length ? html`<div class="stat wide"><span class="label">Countries</span>
+          <ul class="countries">
+            ${st.countries.map(function (c) {
+              return html`<li key=${c.flag}><span class="fl" aria-hidden="true">${U.flagEmoji(c.flag)}</span><span>${U.flagName(c.flag)}</span><b>${c.count}</b></li>`;
+            })}
+          </ul>
+        </div>` : null}
       </div>
     </div>`;
   }
