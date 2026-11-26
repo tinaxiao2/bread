@@ -97,7 +97,7 @@ test('a stored recipe is trimmed, ordered and free of blank rows', () => {
     { group: 'other', type: 'Melted butter', amount: '', unit: '', note: '' },
     { group: 'other', type: 'Seeds', amount: '2', unit: '', note: '' }
   ], 'a row that was only offered (Sugar) and never given an amount is dropped; one she named is kept');
-  assert.deepEqual(r.bake, { programs: [1], size: '1.5', crust: '', minutes: 205, added: null, reason: '', ovenTemp: null, ovenMinutes: null });
+  assert.deepEqual(r.bake, { programs: [1], size: '1.5', crust: '', minutes: 205, added: null, reason: '', proof: ['machine'], proofMinutes: null, ovenTemp: null, ovenMinutes: null });
   assert.equal(r.link, 'https://example.com/recipe');
   assert.equal(r.parent, 'french bread');
 });
@@ -123,10 +123,10 @@ test('links are only ever https', () => {
 test('entries saved before programs could be combined still read correctly', () => {
   // one program, with time added by hand: that was the Bake program
   assert.deepEqual(U.cleanBake({ program: 2, size: '1.5', minutes: 255, added: 10, reason: 'too light' }),
-    { programs: [2, 12], size: '1.5', crust: '', minutes: 255, added: 10, reason: 'too light', ovenTemp: null, ovenMinutes: null });
+    { programs: [2, 12], size: '1.5', crust: '', minutes: 255, added: 10, reason: 'too light', proof: ['machine'], proofMinutes: null, ovenTemp: null, ovenMinutes: null });
   // a reason left behind with no added time is dropped
   assert.deepEqual(U.cleanBake({ program: 8, minutes: 90, added: null, reason: 'too light' }),
-    { programs: [8], size: '', crust: '', minutes: 90, added: null, reason: '', ovenTemp: null, ovenMinutes: null });
+    { programs: [8], size: '', crust: '', minutes: 90, added: null, reason: '', proof: ['machine'], proofMinutes: null, ovenTemp: null, ovenMinutes: null });
   assert.deepEqual(U.cleanBake({ program: null }).programs, []);
   assert.deepEqual(U.cleanBake({ programs: [1, 1, 99, '12'] }).programs, [1, 12], 'duplicates and unknown programs go');
   // the same bake reads the same whichever way it was stored
@@ -290,4 +290,31 @@ test('an entry is dough until a bake is recorded', () => {
   assert.equal(U.isBaked({ programs: [1] }), true);
   assert.equal(U.isBaked({ programs: [8], ovenTemp: 375 }), true, 'Dough, then the oven');
   assert.equal(U.isBaked({ programs: [], ovenMinutes: 30 }), true);
+});
+
+test('proofing: where and how long', () => {
+  assert.deepEqual(U.cleanBake({}).proof, ['machine'], 'the bread machine unless she says otherwise');
+  assert.deepEqual(U.cleanBake({ proof: [] }).proof, [], 'unless she clears it');
+  assert.deepEqual(U.cleanBake({ proof: ['fridge', 'machine', 'oven'] }).proof, ['machine', 'fridge'], 'several, in a fixed order');
+  assert.equal(U.cleanBake({ proofMinutes: '720' }).proofMinutes, 720);
+  assert.deepEqual(U.proofLabels(['machine', 'airfryer']), ['Bread machine', 'Air fryer']);
+  const ing = [{ group: 'flour', type: 'AP', amount: '400', unit: 'g' }];
+  assert.notEqual(U.recipeKey({ ingredients: ing, bake: { proof: ['fridge'] } }), U.recipeKey({ ingredients: ing, bake: {} }),
+    'proofing somewhere else is another tweak');
+  assert.equal(U.recipeKey({ ingredients: ing, bake: { proof: ['machine'] } }), U.recipeKey({ ingredients: ing, bake: {} }),
+    'older entries match a machine proof');
+  assert.equal(U.isEmptyRecipe(U.emptyRecipe()), true, 'the default place alone is not a recipe');
+  assert.equal(U.isEmptyRecipe({ bake: { proofMinutes: 60 } }), false);
+});
+
+test('photos: a list, with the first version\'s single photo still read', () => {
+  assert.deepEqual(U.photosOf({ photo: { full: 'a', thumb: 'b' } }), [{ full: 'a', thumb: 'b' }]);
+  assert.deepEqual(U.photosOf({ photo: null }), []);
+  assert.deepEqual(U.photosOf({ photos: [{ full: 'a' }, null, { full: 'c' }], photo: { full: 'a' } }), [{ full: 'a' }, { full: 'c' }]);
+  assert.deepEqual(U.photosOf(null), []);
+});
+
+test('ratings can be half stars', () => {
+  assert.equal(U.rating({ ratings: { crust: 3.5, crumb: 4.5, taste: 4 } }).toFixed(1), '4.0');
+  assert.equal(U.rating({ ratings: { crust: 0.5 } }), 0.5);
 });

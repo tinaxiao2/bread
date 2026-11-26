@@ -24,19 +24,33 @@
     return html`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${body ? body() : null}</svg>`;
   }
 
+  /** One star, filled to `fill` (0, 0.5 or 1). */
+  function Star(props) {
+    var w = props.fill >= 1 ? '100%' : props.fill > 0 ? '50%' : '0%';
+    return html`<span class="star" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d=${STAR}/></svg>
+      <span class="fill" style=${'width:' + w}><svg viewBox="0 0 24 24"><path d=${STAR}/></svg></span>
+    </span>`;
+  }
+  function fillOf(v, n) { return v >= n ? 1 : v >= n - 0.5 ? 0.5 : 0; }
+  function label(x) { return String(x).replace('.5', '½') + ' of 5'; }
+
+  /** Ratings go in half stars. To pick one, tap the left half of a star for a half, the right for a whole. */
   function Stars(props) {
-    var v = Math.round(U.num(props.value) || 0), five = [1, 2, 3, 4, 5];
+    var v = Math.round((U.num(props.value) || 0) * 2) / 2, five = [1, 2, 3, 4, 5];
     if (!props.onChange) {
-      return html`<span class="stars" role="img" aria-label=${v + ' of 5'}>
-        ${five.map(function (n) { return html`<svg viewBox="0 0 24 24" class=${n <= v ? 'on' : ''}><path d=${STAR}/></svg>`; })}
+      return html`<span class="stars" role="img" aria-label=${label(v)}>
+        ${five.map(function (n) { return html`<${Star} key=${n} fill=${fillOf(v, n)}/>`; })}
       </span>`;
     }
+    function pick(x) { props.onChange(x === v ? 0 : x); }
     return html`<span class="stars pick" role="group" aria-label=${props.label}>
       ${five.map(function (n) {
-        return html`<button type="button" aria-label=${n + ' of 5'} aria-pressed=${n === v}
-          onClick=${function () { props.onChange(n === v ? 0 : n); }}>
-          <svg viewBox="0 0 24 24" class=${n <= v ? 'on' : ''}><path d=${STAR}/></svg>
-        </button>`;
+        return html`<span class="slot" key=${n}>
+          <${Star} fill=${fillOf(v, n)}/>
+          <button type="button" class="half l" aria-label=${label(n - 0.5)} aria-pressed=${v === n - 0.5} onClick=${function () { pick(n - 0.5); }}></button>
+          <button type="button" class="half r" aria-label=${label(n)} aria-pressed=${v === n} onClick=${function () { pick(n); }}></button>
+        </span>`;
       })}
     </span>`;
   }

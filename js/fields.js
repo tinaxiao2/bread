@@ -177,6 +177,23 @@
       <${Field} label="Reason">
         <input id="f-reason" class="input" value=${bake.reason} aria-label="Reason" onInput=${val(function (v) { set({ reason: v }); })}/>
       <//>` : time}
+      <${Field} label="Proofing">
+          <div class="chips c3">
+            ${U.PROOF_PLACES.map(function (p) {
+              var list = bake.proof || [], on = list.indexOf(p.id) >= 0;
+              return html`<button type="button" key=${p.id} class=${on ? 'on' : ''} aria-pressed=${on}
+                onClick=${function () { set({ proof: on ? list.filter(function (x) { return x !== p.id; }) : list.concat([p.id]) }); }}>${p.label}</button>`;
+            })}
+          </div>
+      <//>
+        <${Field} label="Proof time">
+          <div class="time">
+            <${Num} label="Proof hours" value=${U.splitMinutes(bake.proofMinutes).h}
+              onChange=${function (v) { set({ proofMinutes: U.joinMinutes(v, U.splitMinutes(bake.proofMinutes).m) }); }}/>h
+            <${Num} label="Proof minutes" value=${U.splitMinutes(bake.proofMinutes).m}
+              onChange=${function (v) { set({ proofMinutes: U.joinMinutes(U.splitMinutes(bake.proofMinutes).h, v) }); }}/>min
+          </div>
+        <//>
       ${oven ? html`<${Field} label="Oven">
         <div class="time">
           <${Num} class="temp" label="Oven temperature" value=${bake.ovenTemp} onChange=${function (v) { set({ ovenTemp: U.num(v) }); }}/>°F
@@ -262,26 +279,43 @@
     </div>`;
   }
 
-  // ---------- photo ----------
-  /** props: photo ({full, thumb} already saved, or null), blob (a new one, not yet saved), onPick(file), onClear() */
-  function PhotoField(props) {
-    var has = !!(props.blob || props.photo);
+  // ---------- photos ----------
+  /**
+   * props: photos (saved, [{full, thumb}]), blobs (picked, not yet saved), onAdd(files),
+   * onRemove(photo), onRemoveBlob(blob), onView({id} | {blob}). The first one is the cover.
+   */
+  function PhotosField(props) {
+    var photos = props.photos || [], blobs = props.blobs || [];
     function pick(e) {
-      var f = e.target.files && e.target.files[0];
+      var files = Array.prototype.slice.call(e.target.files || []);
       e.target.value = '';
-      if (f) props.onPick(f);
+      if (files.length) props.onAdd(files);
     }
-    return html`<div class=${'photo' + (has ? ' has' : '')}>
-      ${props.blob ? html`<${ui.BlobImage} blob=${props.blob}/>`
-        : props.photo ? html`<${ui.Photo} id=${props.photo.full}/>`
-        : html`<${Icon} name="camera"/>`}
-      <input id="f-photo" type="file" accept="image/*" aria-label="Photo" onChange=${pick}/>
-      ${has ? html`<button type="button" class="x" aria-label="Remove photo" onClick=${props.onClear}><${Icon} name="close"/></button>` : null}
+    function x(label, fn) {
+      return html`<button type="button" class="x" aria-label=${label} onClick=${fn}><${Icon} name="close"/></button>`;
+    }
+    return html`<div class="photos">
+      <div class="photo add">
+        <${Icon} name="camera"/>
+        <input id="f-photo" type="file" accept="image/*" multiple aria-label="Photo" onChange=${pick}/>
+      </div>
+      ${photos.map(function (p) {
+        return html`<div class="photo has" key=${p.full}>
+          <button type="button" class="view" aria-label="View photo" onClick=${function () { props.onView({ id: p.full }); }}><${ui.Photo} id=${p.thumb || p.full}/></button>
+          ${x('Remove photo', function () { props.onRemove(p); })}
+        </div>`;
+      })}
+      ${blobs.map(function (blob, n) {
+        return html`<div class="photo has" key=${'b' + n}>
+          <button type="button" class="view" aria-label="View photo" onClick=${function () { props.onView({ blob: blob }); }}><${ui.BlobImage} blob=${blob}/></button>
+          ${x('Remove photo', function () { props.onRemoveBlob(blob); })}
+        </div>`;
+      })}
     </div>`;
   }
 
   LGT.fields = {
     keyed: keyed, Field: Field, Area: Area, IngredientsEditor: IngredientsEditor, BakeEditor: BakeEditor,
-    RecipeFields: RecipeFields, RatingsEditor: RatingsEditor, PhotoField: PhotoField, Chips: Chips
+    RecipeFields: RecipeFields, RatingsEditor: RatingsEditor, PhotosField: PhotosField, Chips: Chips
   };
 })(typeof window !== 'undefined' ? window : globalThis);

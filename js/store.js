@@ -211,7 +211,7 @@
     if (!photo) return;
     drop([photo.full, photo.thumb].filter(function (id) {
       return id && !state.breads.some(function (b) {
-        return b.id !== breadId && b.photo && (b.photo.full === id || b.photo.thumb === id);
+        return b.id !== breadId && U.photosOf(b).some(function (p) { return p.full === id || p.thumb === id; });
       });
     }));
   }
@@ -231,7 +231,7 @@
   /**
    * Save a bread together with the recipe it followed. The bread's name is the recipe's name:
    * a bread named like a saved recipe joins it, as an existing variation or a new one.
-   * input: { id?, bread: {name, date, photo, ratings, notes, comments}, photoBlob?,
+   * input: { id?, bread: {name, date, photos, ratings, notes, comments}, photoBlobs?,
    *          recipe, baseRecipeId?, originalBlobs? }
    */
   function saveBread(input) {
@@ -243,10 +243,10 @@
     var name = String(b.name || '').trim();
 
     return Promise.all([
-      input.photoBlob ? putPhoto(input.photoBlob) : Promise.resolve(b.photo || null),
+      Promise.all((input.photoBlobs || []).map(putPhoto)),
       putOriginals(input.originalBlobs)
     ]).then(function (up) {
-      var photo = up[0];
+      var photos = U.photosOf(b).concat(up[0]);
       var draft = U.cleanRecipe(input.recipe);
       draft.originals = draft.originals.concat(up[1]);
       var fam = familyByKey(U.nameKey(name));
@@ -281,14 +281,17 @@
           name: name,
           date: b.date || U.today(),
           recipeId: recipeId,
-          photo: photo,
+          photos: photos,
+          photo: photos[0] || null,              // kept for entries read by older copies of the page
           ratings: { crust: U.num(r.crust) || 0, crumb: U.num(r.crumb) || 0, taste: U.num(r.taste) || 0 },
           notes: { crust: String(n.crust || '').trim(), crumb: String(n.crumb || '').trim(), taste: String(n.taste || '').trim() },
           comments: String(b.comments || '').trim(),
           createdAt: (existing && existing.createdAt) || t,
           updatedAt: t
         }).then(function () {
-          if (existing && existing.photo && (!photo || photo.full !== existing.photo.full)) dropPhoto(existing.photo, existing.id);
+          U.photosOf(existing).forEach(function (old) {
+            if (!photos.some(function (p) { return p.full === old.full; })) dropPhoto(old, existing.id);
+          });
           return ref.id;
         });
       });
@@ -298,7 +301,7 @@
   function deleteBread(id) {
     var b = bread(id);
     return db.collection('breads').doc(id).delete().then(function () {
-      if (b) dropPhoto(b.photo, id);
+      U.photosOf(b).forEach(function (p) { dropPhoto(p, id); });
     });
   }
 

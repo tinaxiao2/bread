@@ -54,16 +54,18 @@ runtime.
 
 Two collections in the artifact database:
 
-- `breads/{id}`: `name`, `date` (YYYY-MM-DD), `recipeId` (or null), `photo` (`{full, thumb}`
-  asset ids or null), `ratings` (`crust`, `crumb`, `taste`, 0 = not rated), `notes` (one per
-  rating), `comments`, `createdAt`, `updatedAt`
+- `breads/{id}`: `name`, `date` (YYYY-MM-DD), `recipeId` (or null), `photos` (list of
+  `{full, thumb}` asset ids, cover first; `photo` repeats the cover), `ratings` (`crust`,
+  `crumb`, `taste`, 0–5 in half steps, 0 = not rated), `notes` (one per rating), `comments`,
+  `createdAt`, `updatedAt`
 - `recipes/{id}`: `name`, `ingredients[]` (`group`, `type`, `amount`, `unit`, `note`),
-  `bake` (`programs[]`, `size`, `crust`, `minutes`, `added`, `reason`, `ovenTemp`,
-  `ovenMinutes`), `method`, `source`, `link`, `parent` (name of the recipe it is attached
+  `bake` (`programs[]`, `size`, `crust`, `minutes`, `added`, `reason`, `proof[]` (places:
+  `machine`, `airfryer`, `fridge`), `proofMinutes`, `ovenTemp`, `ovenMinutes`), `method`, `source`, `link`, `parent` (name of the recipe it is attached
   to, or ''), `originals[]` (asset ids of imported images), `basedOn`, `createdAt`, `updatedAt`
 
 Entries from the first version hold a single `bake.program` instead of `bake.programs`, and
-salt as an `other` ingredient named Salt. `LGT.util.cleanBake` and `cleanIngredient` read both
+salt as an `other` ingredient named Salt, no `proof` (read as the bread machine), and a single
+`photo` instead of `photos`. `LGT.util.cleanBake`, `cleanIngredient` and `photosOf` read both
 shapes, so nothing is migrated. Always go through them.
 
 ## How the owner's log works
@@ -94,6 +96,11 @@ These are decisions the owner made. Keep them.
   kind: Lukewarm, Warm or Hot. Dairy is added on demand. Sugar is always a quick-add chip,
   followed by every named ingredient the owner has used before.
 - Rows that were only offered (`_auto`) and left without an amount are not saved.
+- **Proofing** records where (bread machine by default; several places allowed) and for how
+  long. A different place is a different tweak.
+- **Ratings** go in half stars: the left half of a star picks the half.
+- **Several photos per bread.** The first is the cover in the Gallery; the bread page swipes
+  through them.
 - **Split** on a bread's page opens a copy of the entry (name, date, photo, ratings, comments,
   recipe) that is saved as a new bread. It is for one dough baked two ways: change the
   baking on the copy and it becomes another variation of the same recipe. The copies share

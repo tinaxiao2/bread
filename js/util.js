@@ -179,6 +179,21 @@
     return out;
   }
   /** The shape the baking details are stored in. */
+  /** Where dough can be proofed. Several can be used for one bake. */
+  var PROOF_PLACES = [
+    { id: 'machine', label: 'Bread machine' },
+    { id: 'airfryer', label: 'Air fryer' },
+    { id: 'fridge', label: 'Fridge' }
+  ];
+  var DEFAULT_PROOF = ['machine'];
+  /** The proofing places, in a fixed order. Entries saved before proofing was logged were proofed in the machine. */
+  function proofOf(b) {
+    if (!Array.isArray(b.proof)) return DEFAULT_PROOF.slice();
+    return PROOF_PLACES.map(function (p) { return p.id; }).filter(function (id) { return b.proof.indexOf(id) >= 0; });
+  }
+  function proofLabels(ids) {
+    return PROOF_PLACES.filter(function (p) { return ids.indexOf(p.id) >= 0; }).map(function (p) { return p.label; });
+  }
   function cleanBake(b) {
     b = b || {};
     var programs = programsOf(b), added = num(b.added), manual = manualProgram();
@@ -188,6 +203,7 @@
     return {
       programs: programs, size: b.size || '', crust: b.crust || '', minutes: num(b.minutes),
       added: extra ? added : null, reason: extra ? String(b.reason || '').trim() : '',
+      proof: proofOf(b), proofMinutes: num(b.proofMinutes),
       ovenTemp: num(b.ovenTemp), ovenMinutes: num(b.ovenMinutes)
     };
   }
@@ -210,7 +226,7 @@
     var c = cleanRecipe(r), b = c.bake;
     return !c.ingredients.length && !c.method && !c.source && !c.link && !c.parent && !c.originals.length &&
       !b.programs.length && !b.size && !b.crust && b.minutes === null && b.added === null && !b.reason &&
-      b.ovenTemp === null && b.ovenMinutes === null;
+      b.ovenTemp === null && b.ovenMinutes === null && b.proofMinutes === null;
   }
   /** What makes two bakes the same variation: the ingredients and the baking details. */
   function recipeKey(r) {
@@ -257,6 +273,14 @@
     return (recipe.ingredients || []).map(function (i) {
       return { name: ingredientName(i), amount: amountLabel(i) };
     }).filter(function (x) { return x.name; });
+  }
+
+  // ---------- photos ----------
+  /** A bread's photos, cover first. The first versions kept a single `photo`. */
+  function photosOf(b) {
+    if (!b) return [];
+    if (Array.isArray(b.photos)) return b.photos.filter(function (p) { return p && p.full; });
+    return b.photo && b.photo.full ? [b.photo] : [];
   }
 
   // ---------- ratings ----------
@@ -390,12 +414,12 @@
     num: num, fmtMinutes: fmtMinutes, splitMinutes: splitMinutes, joinMinutes: joinMinutes,
     prettyAmount: prettyAmount, parseAmount: parseAmount, amountLabel: amountLabel, unitLabel: unitLabel,
     UNITS: UNITS, GROUPS: GROUPS, GROUP_LABEL: GROUP_LABEL, DEFAULT_TYPES: DEFAULT_TYPES, DEFAULT_UNIT: DEFAULT_UNIT,
-    DEFAULT_TYPE: DEFAULT_TYPE, STAPLES: STAPLES, STARTING: STARTING, upgradeIngredient: upgradeIngredient,
+    DEFAULT_TYPE: DEFAULT_TYPE, PROOF_PLACES: PROOF_PLACES, proofLabels: proofLabels, STAPLES: STAPLES, STARTING: STARTING, upgradeIngredient: upgradeIngredient,
     ingredientName: ingredientName, ingredientDetail: ingredientDetail, newIngredient: newIngredient,
     cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient, changedLines: changedLines,
     emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake,
     recipeKey: recipeKey, nameKey: nameKey, planRecipeSave: planRecipeSave, ingredientSummary: ingredientSummary,
-    RATINGS: RATINGS, rating: rating, fmtRating: fmtRating,
+    photosOf: photosOf, RATINGS: RATINGS, rating: rating, fmtRating: fmtRating,
     program: program, manualProgram: manualProgram, sizesFor: sizesFor, hasCrust: hasCrust, hasDough: hasDough,
     hasManual: hasManual, programMinutes: programMinutes, totalMinutes: totalMinutes, programLabels: programLabels,
     toggleProgram: toggleProgram, isBaked: isBaked, sizeLabel: sizeLabel, crustLabel: crustLabel, withBake: withBake,

@@ -288,6 +288,60 @@ test('a recipe attached to a parent shows as one of its tweaks', async (t) => {
   await count(page.locator('.rc'), 2);
 });
 
+test('half stars, proofing and several photos', async (t) => {
+  const page = await open(t);
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('Overnight loaf');
+
+  // several photos, added in two goes; one removed again
+  await field(page, 'Photo').setInputFiles([await picture(page, '#c98a3f'), await picture(page, '#8f5a1e')]);
+  await count(page.locator('.photos .photo.has'), 2);
+  await field(page, 'Photo').setInputFiles(await picture(page, '#e8a532'));
+  await count(page.locator('.photos .photo.has'), 3);
+  await page.locator('.photos .photo.has').nth(1).getByRole('button', { name: 'Remove photo' }).click();
+  await count(page.locator('.photos .photo.has'), 2);
+
+  // proofing: the machine by default, more than one place allowed
+  const place = (n) => page.locator('.field', { hasText: 'Proofing' }).getByRole('button', { name: n, exact: true });
+  assert.equal(await place('Bread machine').getAttribute('aria-pressed'), 'true');
+  assert.equal(await place('Fridge').getAttribute('aria-pressed'), 'false');
+  await place('Fridge').click();
+  await field(page, 'Proof hours').fill('12');
+  await line(page, 'Flour').getByLabel('Amount').fill('500');
+
+  // half stars: the left half of the fourth star is 3½
+  await page.getByRole('group', { name: 'Crust' }).getByRole('button', { name: '3½ of 5' }).click();
+  await page.getByRole('group', { name: 'Taste' }).getByRole('button', { name: '4½ of 5' }).click();
+  await page.getByRole('group', { name: 'Crumb' }).getByRole('button', { name: '4 of 5' }).click();
+  assert.equal(await page.getByRole('group', { name: 'Crust' }).getByRole('button', { name: '3½ of 5' }).getAttribute('aria-pressed'), 'true');
+  await save(page);
+  await formGone(page);
+
+  const tile = page.locator('.gal .tile');
+  await count(tile, 1);
+  assert.match(await tile.innerText(), /4\.0/);
+  await count(tile.locator('.many'), 1);
+  await tile.click();
+  await count(page.locator('.hero-row .hero'), 2);
+  await count(page.locator('.dots button'), 2);
+  await loaded(page.locator('.hero-row .hero img').nth(1));
+  assert.deepEqual(await page.locator('.scores .stars').evaluateAll((s) => s.map((x) => x.getAttribute('aria-label'))),
+    ['3½ of 5', '4 of 5', '4½ of 5']);
+  const text = await page.locator('.rcard').innerText();
+  for (const want of ['PROOFING', 'Bread machine', 'Fridge', '12 h']) assert.ok(text.includes(want), want + '\n' + text);
+
+  // editing keeps the photos; removing one deletes only that one
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await count(page.locator('.photos .photo.has'), 2);
+  assert.equal(await field(page, 'Proof hours').inputValue(), '12');
+  await page.locator('.photos .photo.has').first().getByRole('button', { name: 'Remove photo' }).click();
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
+  await count(page.locator('.hero-row .hero'), 1);
+  await count(page.locator('.dots'), 0);
+  await loaded(page.locator('.hero-row .hero img'));
+});
+
 test('typing part of a name offers the saved recipe', async (t) => {
   const page = await open(t);
   await logBread(page, { photo: false });

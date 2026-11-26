@@ -53,10 +53,11 @@
   }
 
   function Tile(props) {
-    var b = props.bread, has = !!(b.photo && b.photo.thumb);
+    var b = props.bread, cover = U.photosOf(b)[0], has = !!cover;
     var r = b.recipeId ? store.recipe(b.recipeId) : null;
     return html`<button type="button" class=${'tile' + (has ? ' has' : '')} onClick=${props.onOpen}>
-      ${has ? html`<${ui.Photo} id=${b.photo.thumb}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
+      ${has ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
+      ${U.photosOf(b).length > 1 ? html`<span class="many" aria-hidden="true"><${Icon} name="image"/></span>` : null}
       ${U.isBaked(r ? r.bake : null) ? null : html`<span class="flag">Dough</span>`}
       <${ui.Score} value=${U.rating(b)}/>
       <span class="meta"><b>${b.name}</b><small>${U.fmtDate(b.date)}</small></span>
@@ -84,6 +85,8 @@
     if (b.crust) cells.push(['Crust color', [U.crustLabel(b.crust)]]);
     if (b.minutes !== null) cells.push(['Time', [U.fmtMinutes(b.minutes)]]);
     if (b.added) cells.push(['Added', ['+' + U.fmtMinutes(b.added)], b.reason]);
+    var proof = U.proofLabels(b.proof);
+    if (proof.length || b.proofMinutes !== null) cells.push(['Proofing', proof.length ? proof : [U.fmtMinutes(b.proofMinutes)], proof.length && b.proofMinutes !== null ? U.fmtMinutes(b.proofMinutes) : '']);
     if (b.ovenTemp !== null) cells.push(['Oven', [b.ovenTemp + '°F'], b.ovenMinutes !== null ? U.fmtMinutes(b.ovenMinutes) : '']);
     else if (b.ovenMinutes !== null) cells.push(['Oven', [U.fmtMinutes(b.ovenMinutes)]]);
     var link = U.safeLink(r.link), host = '';
@@ -187,6 +190,29 @@
   }
 
   // ---------- a bread's page ----------
+  /** The bread's photos, side by side: swipe between them, tap one to see it whole. */
+  function Hero(props) {
+    var photos = props.photos, s = useState(0), at = s[0], setAt = s[1], ref = useRef(null);
+    function onScroll(e) {
+      var el = e.currentTarget, i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+      if (i !== at) setAt(i);
+    }
+    function go(i) { var el = ref.current; if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' }); }
+    return html`<div class="heroes">
+      <div class="hero-row" ref=${ref} onScroll=${onScroll}>
+        ${photos.map(function (p, i) {
+          return html`<button type="button" class="hero" key=${p.full} aria-label=${'Photo ' + (i + 1)} onClick=${function () { props.onView({ id: p.full }); }}>
+            <${ui.Photo} id=${p.full}/></button>`;
+        })}
+      </div>
+      ${photos.length > 1 ? html`<div class="dots">
+        ${photos.map(function (p, i) {
+          return html`<button type="button" key=${p.full} class=${i === at ? 'on' : ''} aria-label=${'Show photo ' + (i + 1)} onClick=${function () { go(i); }}></button>`;
+        })}
+      </div>` : null}
+    </div>`;
+  }
+
   function BreadPage(props) {
     var nav = props.nav, b = store.bread(props.id);
     var v = useState(null), view = v[0], setView = v[1];
@@ -196,7 +222,7 @@
     var which = r ? store.tweakOf(r) : null;
     var rated = U.RATINGS.some(function (k) { return (b.ratings || {})[k[0]] > 0; });
     var notes = U.RATINGS.filter(function (k) { return (b.notes || {})[k[0]]; });
-    var photo = b.photo && b.photo.full;
+    var photos = U.photosOf(b), photo = photos.length > 0;
     return html`<div class="screen">
       <div class=${'floatbar' + (photo ? '' : ' solid')}><div class="wrap">
         <button type="button" class="round" aria-label="Back" onClick=${function () { nav.close(props.k); }}><${Icon} name="back"/></button>
@@ -206,7 +232,7 @@
         </span>
       </div></div>
       <div class="scroll">
-        ${photo ? html`<button type="button" class="hero" aria-label="View photo" onClick=${function () { setView({ id: photo }); }}><${ui.Photo} id=${photo}/></button>` : null}
+        ${photo ? html`<${Hero} photos=${photos} onView=${setView}/>` : null}
         <div class=${'wrap page' + (photo ? '' : ' nohero')}>
           <h2 class="serif">${b.name}</h2>
           <div class="date">${U.fmtDate(b.date, true)}</div>
@@ -267,7 +293,7 @@
           return html`<div class="rc" key=${g.key}>
             <div class="rtop">
               <button type="button" class="open" onClick=${open}>
-                ${last ? html`<span class="thumb">${last.photo ? html`<${ui.Photo} id=${last.photo.thumb}/>` : html`<${Icon} name="loaf"/>`}</span>` : null}
+                ${last ? html`<span class="thumb">${U.photosOf(last)[0] ? html`<${ui.Photo} id=${U.photosOf(last)[0].thumb}/>` : html`<${Icon} name="loaf"/>`}</span>` : null}
                 <span>
                   <h3 class="serif">${g.name}</h3>
                   <span class="facts">
@@ -351,7 +377,7 @@
       ${store.families().map(function (f) {
         var last = f.breads[0];
         return html`<button type="button" class="opt" key=${f.key} onClick=${function () { props.onPick(f.latest); }}>
-          <span class="thumb">${last && last.photo ? html`<${ui.Photo} id=${last.photo.thumb}/>` : html`<${Icon} name="loaf"/>`}</span>
+          <span class="thumb">${U.photosOf(last)[0] ? html`<${ui.Photo} id=${U.photosOf(last)[0].thumb}/>` : html`<${Icon} name="loaf"/>`}</span>
           <span>${f.name}<small>${f.baked ? 'Baked ' + f.breads.length + '×' : 'To try'}</small></span>
         </button>`;
       })}
@@ -370,7 +396,7 @@
       init.current = {
         name: bread ? bread.name : (base ? base.name : ''),
         date: bread ? bread.date : U.today(),
-        photo: bread ? bread.photo : null, photoBlob: null,
+        photos: U.photosOf(bread), photoBlobs: [],
         ratings: Object.assign({ crust: 0, crumb: 0, taste: 0 }, bread && bread.ratings),
         notes: Object.assign({ crust: '', crumb: '', taste: '' }, bread && bread.notes),
         comments: bread ? bread.comments : '',
@@ -394,7 +420,9 @@
       setBusy(function (b) { return b === 'saving' ? b : ''; });
     }
     function pickPhoto(file) {
-      U.resizeImage(file, 1600, 0.85).then(function (blob) { set({ photoBlob: blob }); }, function () { setBusy('photo'); });
+      U.resizeImage(file, 1600, 0.85).then(function (blob) {
+        set(function (cur) { return { photoBlobs: cur.photoBlobs.concat([blob]) }; });
+      }, function () { setBusy('photo'); });
     }
     /** Same name, same recipe: fill the untouched recipe part from the one saved under this name. */
     function follow(name) {
@@ -429,8 +457,8 @@
       setBusy('saving');
       store.saveBread({
         id: props.breadId || null,
-        bread: { name: f.name, date: f.date, photo: f.photo, ratings: f.ratings, notes: f.notes, comments: f.comments },
-        photoBlob: f.photoBlob, recipe: recipeOf(f.draft), baseRecipeId: f.baseRecipeId, originalBlobs: f.pending
+        bread: { name: f.name, date: f.date, photos: f.photos, ratings: f.ratings, notes: f.notes, comments: f.comments },
+        photoBlobs: f.photoBlobs, recipe: recipeOf(f.draft), baseRecipeId: f.baseRecipeId, originalBlobs: f.pending
       }).then(function () { nav.close(props.k); }, function () { setBusy('failed'); });
     }
     function remove() {
@@ -465,15 +493,16 @@
           })}
         </div>` : null}
       <//>
-      <div class="pd">
-        ${store.getState().canUpload || f.photo ? html`<${Field} label="Photo">
-          <${F.PhotoField} photo=${f.photo} blob=${f.photoBlob} onPick=${pickPhoto}
-            onClear=${function () { set({ photo: null, photoBlob: null }); }}/>
-        <//>` : null}
-        <${Field} label="Date">
-          <input id="f-date" class="input" type="date" value=${f.date} aria-label="Date" onInput=${function (e) { set({ date: e.target.value }); }}/>
-        <//>
-      </div>
+      ${store.getState().canUpload || f.photos.length ? html`<${Field} label="Photos">
+        <${F.PhotosField} photos=${f.photos} blobs=${f.photoBlobs}
+          onAdd=${function (files) { files.forEach(pickPhoto); }}
+          onRemove=${function (p) { set(function (cur) { return { photos: cur.photos.filter(function (x) { return x !== p; }) }; }); }}
+          onRemoveBlob=${function (blob) { set(function (cur) { return { photoBlobs: cur.photoBlobs.filter(function (x) { return x !== blob; }) }; }); }}
+          onView=${function (x) { setOverlay({ view: x }); }}/>
+      <//>` : null}
+      <${Field} label="Date">
+        <input id="f-date" class="input date" type="date" value=${f.date} aria-label="Date" onInput=${function (e) { set({ date: e.target.value }); }}/>
+      <//>
       <${VariantChips} draft=${f.draft} onPick=${function (i) { set({ draft: Object.assign({}, f.draft, { index: i }), hers: true }); }}/>
       <${F.RecipeFields} recipe=${recipeOf(f.draft)} pending=${f.pending} hideSize=${sizedVariants(f.draft)}
         onChange=${function (r) { set({ draft: withRecipe(f.draft, r), hers: true }); }}
