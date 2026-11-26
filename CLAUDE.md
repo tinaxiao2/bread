@@ -102,7 +102,8 @@ These are decisions the owner made. Keep them.
   (`store.previewName`), until she types her own. The recipe keeps its own name.
 - **Recipes tab**: one card per label (or per recipe with no label). A label with several recipes
   shows "N recipes" like the rating: icon and text, no background.
-- **Recipe page**: the label as the heading; arrow buttons step between its recipes (in the
+- **Recipe page**: at the top, a carousel of every photo of every bake under the label (newest
+  bake first; dots, or "3 / 14" past 10 photos); the label as the heading; arrow buttons step between its recipes (in the
   order made; it opens on the one baked last); below, that recipe's tweaks I, II, III, with the
   ingredient lines that differ from I highlighted.
 - **Flags**: a recipe can carry a country flag, picked beside the Name field. It is kept the

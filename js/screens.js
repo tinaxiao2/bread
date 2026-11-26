@@ -303,7 +303,8 @@
             <${ui.Photo} id=${p.full}/></button>`;
         })}
       </div>
-      ${photos.length > 1 ? html`<div class="dots">
+      ${photos.length > 10 ? html`<span class="herocount">${at + 1} / ${photos.length}</span>` : null}
+      ${photos.length > 1 && photos.length <= 10 ? html`<div class="dots">
         ${photos.map(function (p, i) {
           return html`<button type="button" key=${p.full} class=${i === at ? 'on' : ''} aria-label=${'Show photo ' + (i + 1)} onClick=${function () { go(i); }}></button>`;
         })}
@@ -436,14 +437,20 @@
     var at = list.indexOf(line), many = line.tweaks.length > 1, first = line.tweaks[0];
     function edit(rv) { nav.push({ kind: 'recipeForm', recipeId: rv.id }); }
     function step(d) { var next = list[at + d]; if (next) setLineId(next.id); }
+    // every photo of every bake under it, newest bake first; split copies share theirs
+    var seen = {}, photos = [];
+    g.breads.forEach(function (b) {
+      U.photosOf(b).forEach(function (p) { if (!seen[p.full]) { seen[p.full] = true; photos.push(p); } });
+    });
     var heading = html`<${ui.Named} flag=${g.label ? g.flag : line.flag} name=${g.label ? g.name : line.name}/>`;
     return html`<div class="screen">
-      <div class="floatbar solid"><div class="wrap">
+      <div class=${'floatbar' + (photos.length ? '' : ' solid')}><div class="wrap">
         <button type="button" class="round" aria-label="Back" onClick=${function () { nav.close(props.k); }}><${Icon} name="back"/></button>
         ${many ? null : html`<button type="button" class="round" aria-label="Edit" onClick=${function () { edit(first); }}><${Icon} name="edit"/></button>`}
       </div></div>
       <div class="scroll">
-        <div class="wrap page nohero">
+        ${photos.length ? html`<${Hero} photos=${photos} onView=${setView}/>` : null}
+        <div class=${'wrap page' + (photos.length ? '' : ' nohero')}>
           <h2 class="serif">${heading}</h2>
           <div class="tags">
             ${g.baked ? html`<span class="pill">Baked ${g.bakedCount}×</span>` : html`<span class="pill sage">To try</span>`}

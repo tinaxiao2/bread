@@ -261,6 +261,8 @@ test('a label gathers recipes; arrows step between them', async (t) => {
   assert.match(await titled('Mantou').innerText(), /2 recipes/);
   await titled('Mantou').locator('.open').click();
   assert.equal(await page.locator('.screen h2').innerText(), 'Mantou');
+  await count(page.locator('.screen .hero'), 2, 'every photo under the label, at the top');
+  await count(page.locator('.screen .dots button'), 2);
   assert.equal(await page.locator('.pager h3').innerText(), 'Milk Mantou', 'opens on the one baked last');
   assert.equal(await page.getByRole('button', { name: 'Next recipe' }).isDisabled(), true);
   await page.getByRole('button', { name: 'Previous recipe' }).click();
