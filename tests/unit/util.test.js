@@ -218,7 +218,9 @@ test('the machine data is complete and consistent', () => {
   assert.equal(U.programMinutes(4, '1.5'), 2 * 60 + 3);
   assert.equal(U.programMinutes(4, '2'), null, 'Ultra-Fast has no 2 lb loaf');
   assert.equal(U.programMinutes(6, '1.5'), 2 * 60 + 15);
-  assert.equal(U.programMinutes(8), 90);
+  assert.equal(U.programMinutes(8), 25, 'Dough is its kneading: its rise is logged as proofing');
+  const dough = m.programs.filter((p) => p.n === 8)[0];
+  assert.equal(dough.kneading + m.proofMinutes, dough.total, '25 + 65 is the 90 minute cycle');
 });
 
 test('what the form offers follows the programs chosen', () => {
@@ -242,8 +244,8 @@ test('what the form offers follows the programs chosen', () => {
 test('time adds up across programs; Bake is timed by hand', () => {
   assert.equal(U.totalMinutes([1], '1.5'), 205);
   assert.equal(U.totalMinutes([1, 12], '1.5'), 205, 'Bake adds nothing by itself');
-  assert.equal(U.totalMinutes([8, 12], ''), 90);
-  assert.equal(U.totalMinutes([7, 8], ''), 305 + 90);
+  assert.equal(U.totalMinutes([8, 12], ''), 25);
+  assert.equal(U.totalMinutes([7, 8], ''), 305 + 25);
   assert.equal(U.totalMinutes([12], ''), null);
   assert.equal(U.totalMinutes([1], ''), null, 'no time until a loaf size is chosen');
   assert.equal(U.totalMinutes([], ''), null);
@@ -270,7 +272,7 @@ test('baking details stay consistent as programs are chosen', () => {
   const gf = U.withBake(U.withBake(sized, { crust: 'dark' }), { programs: [6] });
   assert.deepEqual([gf.size, gf.crust, gf.minutes], ['1.5', 'dark', 135], 'the only size is picked for her');
   const dough = U.withBake(gf, { programs: [8] });
-  assert.deepEqual([dough.size, dough.crust, dough.minutes], ['', '', 90]);
+  assert.deepEqual([dough.size, dough.crust, dough.minutes], ['', '', 25]);
   assert.equal(U.withBake(U.withBake(sized, { crust: 'dark' }), { programs: [2] }).crust, '', 'French has no crust colour');
   const none = U.withBake(sized, { programs: [] });
   assert.deepEqual([none.size, none.minutes], ['1.5', null]);
@@ -368,17 +370,18 @@ test('sweeteners have their own row; some names are read the way she calls them'
 });
 
 test('dough timing and proofs follow where the dough is proofed', () => {
-  // Dough in the machine: the whole cycle, and a proof in the machine at its usual time
+  // Dough's 90 minutes are 25 of kneading and a 65 minute rise, which is the proof
   let b = U.withBake(U.cleanBake({}), { programs: [8] });
-  assert.equal(b.minutes, 90);
+  assert.equal(b.minutes, 25);
   assert.equal(b.proofMinutes, 65);
-  // proofed elsewhere: the machine only kneads, and the machine's proof time goes with it
+  assert.equal(U.minutesSpent(b), 90);
+  // proofed elsewhere: the machine's proof time goes
   b = U.withBake(b, { proof: ['fridge'] });
   assert.equal(b.minutes, 25);
   assert.equal(b.proofMinutes, null);
   // back in the machine
   b = U.withBake(b, { proof: ['fridge', 'machine'] });
-  assert.equal(b.minutes, 90);
+  assert.equal(b.minutes, 25);
   assert.equal(b.proofMinutes, 65);
   // a time she typed is kept
   b = U.withBake(b, { proofMinutes: 40 });

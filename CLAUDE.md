@@ -149,8 +149,9 @@ These are decisions the owner made. Keep them.
 - **Proofing** records where (bread machine by default; several places allowed) and for how
   long. A different place is a different tweak. A proof in the machine starts at 65 min
   (`machine.proofMinutes`) when the machine is chosen as a place, or when Dough is chosen while
-  it is. Dough's time is its knead-only 25 min (`kneadOnly`) when the dough is not proofed in
-  the machine, else the full cycle. Times she typed are kept. The + under it adds another proof
+  it is. The owner's rule: Dough's 1 h 30 is 25 min of kneading plus a 65 min rise, and the
+  rise is logged as the proof, so Dough's time is always 25 min (`kneading`); with a machine
+  proof the two add up to 1 h 30, and Stats never counts the rise twice. Times she typed are kept. The + under it adds another proof
   ("2nd proof"), each with its own places and time, starting in the machine at 65 min.
 - **Ratings** go in half stars: the left half of a star picks the half.
 - **Date** field is narrow with the date centered, and the "–" button beside it.

@@ -178,7 +178,7 @@ test('several programs can be chosen; Bake brings the added time', async (t) => 
   assert.equal(await page.getByText('Loaf size').count(), 0, 'a dough program has no loaf size');
   assert.equal(await page.getByText('Crust color').count(), 0);
   assert.equal(await field(page, 'Oven temperature').count(), 1);
-  assert.equal(await field(page, 'Hours').inputValue() + ':' + await field(page, 'Minutes').inputValue(), '1:30');
+  assert.equal(await field(page, 'Hours').inputValue() + ':' + await field(page, 'Minutes').inputValue(), '0:25', 'Dough is its kneading; the rise is the proof');
 });
 
 test('an entry with no bake recorded is marked Dough in the gallery', async (t) => {
@@ -611,7 +611,7 @@ test('Split marks the copy, so its dough is not counted twice', async (t) => {
   const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
   assert.equal(await stat('Loaves').locator('b').innerText(), '2');
   assert.equal(await stat('Flour used').locator('b').innerText(), '500 g');
-  assert.equal(await stat('Time spent').locator('b').innerText(), '3 h 15 min', '90 min of dough and 65 min in the machine once, plus 40 min of Bake');
+  assert.equal(await stat('Time spent').locator('b').innerText(), '2 h 10 min', '25 min of kneading and 65 in the machine once, plus 40 min of Bake');
 });
 
 test('a flag chosen for a recipe shows before its name everywhere', async (t) => {
@@ -797,9 +797,9 @@ test('a second proof is added with +', async (t) => {
   await field(page, 'Name').fill('Overnight rolls');
   await line(page, 'Flour').getByLabel('Amount').fill('500');
   await program(page, 8, 'Dough').click();
-  assert.equal(await field(page, 'Hours').inputValue() + ':' + await field(page, 'Minutes').inputValue(), '1:30');
-  assert.equal(await field(page, 'Proof hours').inputValue() + ':' + await field(page, 'Proof minutes').inputValue(), '1:5', 'a proof in the machine starts at 65 min');
-  // proofed in the fridge instead: the machine only kneads
+  assert.equal(await field(page, 'Hours').inputValue() + ':' + await field(page, 'Minutes').inputValue(), '0:25', 'kneading');
+  assert.equal(await field(page, 'Proof hours').inputValue() + ':' + await field(page, 'Proof minutes').inputValue(), '1:5', 'the rise in the machine');
+  // proofed in the fridge instead
   await page.locator('.field', { has: page.locator('> .label', { hasText: /^Proofing$/ }) }).getByRole('button', { name: 'Fridge' }).click();
   await page.locator('.field', { has: page.locator('> .label', { hasText: /^Proofing$/ }) }).getByRole('button', { name: 'Bread machine' }).click();
   assert.equal(await field(page, 'Hours').inputValue() + ':' + await field(page, 'Minutes').inputValue(), '0:25');

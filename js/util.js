@@ -420,20 +420,20 @@
   }
   function hasDough(programs) { return programList(programs).some(function (p) { return p.dough; }); }
   function hasManual(programs) { return programList(programs).some(function (p) { return p.manual; }); }
-  /** A program's time. A dough program is stopped after kneading when the dough is not proofed in the machine. */
-  function programMinutes(n, size, proof) {
+  /** A program's time. A dough program's rise is recorded as proofing, so its time is its kneading. */
+  function programMinutes(n, size) {
     var p = program(n);
     if (!p) return null;
     if (p.minutes) return p.minutes[size] != null ? p.minutes[size] : null;
-    if (p.kneadOnly != null && proof && proof.indexOf('machine') < 0) return p.kneadOnly;
+    if (p.kneading != null) return p.kneading;
     return p.total != null ? p.total : null;
   }
   /** The machine's own time for the chosen programs. A manual program adds nothing: its time is typed in. */
-  function totalMinutes(programs, size, proof) {
+  function totalMinutes(programs, size) {
     var timed = programList(programs).filter(function (p) { return !p.manual; }), sum = 0;
     if (!timed.length) return null;
     for (var i = 0; i < timed.length; i++) {
-      var m = programMinutes(timed[i].n, size, proof);
+      var m = programMinutes(timed[i].n, size);
       if (m === null) return null;
       sum += m;
     }
@@ -472,15 +472,15 @@
     next.programs = programsOf(next);
     next.proof = proofPlaces(next.proof);
     next.extraProofs = Array.isArray(next.extraProofs) ? next.extraProofs : [];
-    var wasAuto = prev.minutes === null || prev.minutes === totalMinutes(prev.programs, prev.size, prev.proof);
+    var wasAuto = prev.minutes === null || prev.minutes === totalMinutes(prev.programs, prev.size);
     if ('programs' in patch || 'size' in patch) {
       var sizes = sizesFor(next.programs);
       if (!sizes.some(function (s) { return s.id === next.size; })) next.size = sizes.length === 1 ? sizes[0].id : '';
       if (!hasCrust(next.programs)) next.crust = '';
       if (manualProgram() && !hasManual(next.programs)) { next.added = null; next.reason = ''; }
     }
-    if (('programs' in patch || 'size' in patch || 'proof' in patch) && wasAuto && !('minutes' in patch)) {
-      next.minutes = totalMinutes(next.programs, next.size, next.proof);
+    if (('programs' in patch || 'size' in patch) && wasAuto && !('minutes' in patch)) {
+      next.minutes = totalMinutes(next.programs, next.size);
     }
     // A proof in the machine starts at its usual time: when it is chosen, or when a dough program is
     // chosen while it is. Taking it away again takes that time with it, unless it was changed.

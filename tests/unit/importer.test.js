@@ -92,7 +92,8 @@ test('an oven-finished recipe keeps its oven step and has no crust colour', () =
     programs: [8], crust: 'medium', ovenTemp: 375, ovenMinutes: 10
   }, machine);
   const d = importer.toDraft(r, 0);
-  assert.deepEqual([d.bake.programs, d.bake.size, d.bake.crust, d.bake.minutes, d.bake.ovenTemp, d.bake.ovenMinutes], [[8], '', '', 90, 375, 10]);
+  assert.deepEqual([d.bake.programs, d.bake.size, d.bake.crust, d.bake.minutes, d.bake.ovenTemp, d.bake.ovenMinutes], [[8], '', '', 25, 375, 10]);
+  assert.deepEqual([d.bake.proof, d.bake.proofMinutes], [['machine'], 65], 'the rise in the machine is the proof');
   assert.equal(U.isBaked(d.bake), true);
 });
 
