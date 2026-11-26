@@ -494,7 +494,7 @@
       store.saveBread({
         id: props.breadId || null,
         bread: { name: f.name, date: f.date, ratings: f.ratings, notes: f.notes, comments: f.comments },
-        pics: f.pics, recipe: recipeOf(f.draft), baseRecipeId: f.baseRecipeId, originalBlobs: f.pending
+        pics: f.pics, splitFrom: splitting ? props.splitFromId : null, recipe: recipeOf(f.draft), baseRecipeId: f.baseRecipeId, originalBlobs: f.pending
       }).then(function () { nav.close(props.k); }, function () { setBusy('failed'); });
     }
     function remove() {
@@ -649,8 +649,24 @@
     <//>`;
   }
 
+  // ---------- Stats ----------
+  function Stats(props) {
+    var st = store.stats(), fav = st.favorite;
+    return html`<div class="wrap">
+      <div class="top"><h1 class="serif">Stats</h1></div>
+      <div class="stats">
+        <div class="stat"><span class="label">Flour used</span><b>${U.fmtWeight(st.flourGrams)}</b></div>
+        <div class="stat"><span class="label">Loaves</span><b>${st.loaves}</b></div>
+        <div class="stat wide"><span class="label">Favorite</span>
+          ${fav ? html`<b class="serif">${fav.name}</b><small>${fav.count}×</small>` : html`<b>–</b>`}
+        </div>
+        <div class="stat wide"><span class="label">Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
+      </div>
+    </div>`;
+  }
+
   LGT.screens = {
     Gallery: Gallery, BreadPage: BreadPage, Recipes: Recipes, RecipePage: RecipePage,
-    BreadForm: BreadForm, RecipeForm: RecipeForm, AddRecipeSheet: AddRecipeSheet, Reader: Reader
+    Stats: Stats, BreadForm: BreadForm, RecipeForm: RecipeForm, AddRecipeSheet: AddRecipeSheet, Reader: Reader
   };
 })(typeof window !== 'undefined' ? window : globalThis);

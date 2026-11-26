@@ -182,6 +182,33 @@
     return all.filter(function (g) { return !own[g.key]; }).map(function (g) { return g.name; });
   }
 
+  /**
+   * The numbers on the Stats page. Every entry is a loaf. Flour and time come from the recipe
+   * each entry followed; a split copy's dough is counted once, with the entry it came from.
+   */
+  function stats() {
+    var gs = groups(), groupOfRecipe = {};
+    gs.forEach(function (g) { g.tweaks.forEach(function (r) { groupOfRecipe[r.id] = g; }); });
+    var flour = 0, minutes = 0, tally = {};
+    state.breads.forEach(function (b) {
+      var r = b.recipeId ? recipe(b.recipeId) : null;
+      if (r) {
+        if (!b.splitFrom) (r.ingredients || []).forEach(function (i) { flour += U.flourGrams(U.upgradeIngredient(i)) || 0; });
+        minutes += U.minutesSpent(r.bake, !!b.splitFrom);
+      }
+      var g = r ? groupOfRecipe[r.id] : null, key = g ? 'g:' + g.key : 'n:' + U.nameKey(b.name);
+      if (!tally[key]) tally[key] = { name: g ? g.name : b.name, count: 0, best: 0, last: '' };
+      var t = tally[key];
+      t.count++;
+      t.best = Math.max(t.best, U.rating(b) || 0);
+      if (String(b.date || '') > t.last) t.last = String(b.date || '');
+    });
+    var favorite = Object.keys(tally).map(function (k) { return tally[k]; }).sort(function (a, b) {
+      return (b.count - a.count) || (b.best - a.best) || b.last.localeCompare(a.last);
+    })[0] || null;
+    return { flourGrams: flour, loaves: state.breads.length, favorite: favorite, minutes: minutes };
+  }
+
   /** Recipe names, most recently used first. */
   function names() { return families().map(function (f) { return f.name; }); }
   /** Named ingredients added before, most used first. */
@@ -317,6 +344,7 @@
           ratings: { crust: U.num(r.crust) || 0, crumb: U.num(r.crumb) || 0, taste: U.num(r.taste) || 0 },
           notes: { crust: String(n.crust || '').trim(), crumb: String(n.crumb || '').trim(), taste: String(n.taste || '').trim() },
           comments: String(b.comments || '').trim(),
+          splitFrom: (existing && existing.splitFrom) || input.splitFrom || null,
           createdAt: (existing && existing.createdAt) || t,
           updatedAt: t
         }).then(function () {
@@ -404,7 +432,7 @@
   LGT.store = {
     init: init, subscribe: subscribe, getState: getState,
     bread: bread, recipe: recipe, breadsOf: breadsOf,
-    family: family, families: families, familyByKey: familyByKey, groups: groups, groupOf: groupOf, tweakOf: tweakOf, toTry: toTry, setToTryOrder: setToTryOrder,
+    family: family, families: families, familyByKey: familyByKey, groups: groups, groupOf: groupOf, tweakOf: tweakOf, toTry: toTry, setToTryOrder: setToTryOrder, stats: stats,
     parentChoices: parentChoices, names: names, otherNames: otherNames, types: types, sources: sources,
     saveBread: saveBread, deleteBread: deleteBread, saveRecipes: saveRecipes, deleteRecipe: deleteRecipe
   };

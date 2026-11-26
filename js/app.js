@@ -4,7 +4,10 @@
   var H = root.htmPreact, html = H.html, useState = H.useState, useEffect = H.useEffect, useRef = H.useRef;
   var ui = LGT.ui, S = LGT.screens, Icon = ui.Icon;
 
-  function hashTab() { return root.location.hash === '#recipes' ? 'recipes' : 'gallery'; }
+  function hashTab() {
+    var h = root.location.hash;
+    return h === '#recipes' ? 'recipes' : h === '#stats' ? 'stats' : 'gallery';
+  }
   var seq = 0;
 
   function App() {
@@ -61,7 +64,7 @@
 
     return html`<div class="shell">
       <div class="main" ref=${mainRef}>
-        ${tab === 'recipes'
+        ${tab === 'stats' ? html`<${S.Stats} state=${st}/>` : tab === 'recipes'
           ? html`<${S.Recipes} state=${st} nav=${nav} seg=${seg} onSeg=${setSeg} onAdd=${function () { setAdding('sheet'); }}/>`
           : html`<${S.Gallery} state=${st} nav=${nav}/>`}
       </div>
@@ -73,6 +76,8 @@
           onClick=${function () { go('gallery'); }}><${Icon} name="gallery"/>Gallery</button>
         <button type="button" class=${'tab' + (tab === 'recipes' ? ' on' : '')} aria-current=${tab === 'recipes' ? 'page' : null}
           onClick=${function () { go('recipes'); }}><${Icon} name="recipes"/>Recipes</button>
+        <button type="button" class=${'tab' + (tab === 'stats' ? ' on' : '')} aria-current=${tab === 'stats' ? 'page' : null}
+          onClick=${function () { go('stats'); }}><${Icon} name="stats"/>Stats</button>
       </div></nav>
       ${stack.map(page)}
       ${adding === 'sheet' ? html`<${S.AddRecipeSheet} canImport=${canImport}

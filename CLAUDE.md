@@ -58,7 +58,7 @@ Two collections and one document in the artifact database:
 - `breads/{id}`: `name`, `date` (YYYY-MM-DD), `recipeId` (or null), `photos` (list of
   `{full, thumb}` asset ids, cover first; `photo` repeats the cover), `ratings` (`crust`,
   `crumb`, `taste`, 0–5 in half steps, 0 = not rated), `notes` (one per rating), `comments`,
-  `createdAt`, `updatedAt`
+  `splitFrom` (id of the entry it was split from, or null), `createdAt`, `updatedAt`
 - `recipes/{id}`: `name`, `ingredients[]` (`group`, `type`, `amount`, `unit`, `note`),
   `bake` (`programs[]`, `size`, `crust`, `minutes`, `added`, `reason`, `proof[]` (places:
   `machine`, `airfryer`, `fridge`), `proofMinutes`, `ovenTemp`, `ovenMinutes`), `method`, `source`, `link`, `parent` (name of the recipe it is attached
@@ -111,9 +111,15 @@ These are decisions the owner made. Keep them.
 - **Several photos per bread.** The first is the cover in the Gallery; the bread page swipes
   through them. In the form the photos wrap in a grid with + last, and are put in order by
   dragging (mouse: drag; phone: hold briefly, then drag, so a quick swipe still scrolls).
+- **Stats** (third tab): flour used, loaves, favorite and time spent, all derived in
+  `store.stats`. Every entry is a loaf. Flour in cups or spoons is converted at about 120 g a
+  cup. Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
+  (flour, machine time, proofing) is counted once, with the entry it came from. The favorite
+  is the parent recipe with the most entries.
 - **Split** on a bread's page opens a copy of the entry (name, date, photo, ratings, comments,
   recipe) that is saved as a new bread. It is for one dough baked two ways: change the
-  baking on the copy and it becomes another variation of the same recipe. The copies share
+  baking on the copy and it becomes another variation of the same recipe. The copy records
+  `splitFrom`. The copies share
   the photo they started with, so a photo is deleted only when no bread uses it any more.
 
 ## Working on it

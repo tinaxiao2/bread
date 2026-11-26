@@ -318,3 +318,21 @@ test('ratings can be half stars', () => {
   assert.equal(U.rating({ ratings: { crust: 3.5, crumb: 4.5, taste: 4 } }).toFixed(1), '4.0');
   assert.equal(U.rating({ ratings: { crust: 0.5 } }), 0.5);
 });
+
+test('stats arithmetic: flour in grams, time spent, and how they read', () => {
+  assert.equal(U.flourGrams({ group: 'flour', amount: '500', unit: 'g' }), 500);
+  assert.equal(U.flourGrams({ group: 'flour', amount: '3 1/4', unit: 'cup' }), 390, 'about 120 g a cup');
+  assert.equal(U.flourGrams({ group: 'flour', amount: '2', unit: 'tbsp' }), 15);
+  assert.equal(U.flourGrams({ group: 'flour', amount: '1 lb', unit: '' }), null, 'no unit: not counted');
+  assert.equal(U.flourGrams({ group: 'water', amount: '300', unit: 'g' }), null, 'only flour');
+  assert.equal(U.minutesSpent({ programs: [2, 12], minutes: 255, added: 10 }), 265);
+  assert.equal(U.minutesSpent({ programs: [8], minutes: 90, proofMinutes: 45, ovenMinutes: 20 }), 155);
+  assert.equal(U.minutesSpent({ programs: [8], minutes: 90, proofMinutes: 45, ovenMinutes: 20 }, true), 20, 'a split copy: only its own baking');
+  assert.equal(U.minutesSpent(null), 0);
+  assert.equal(U.fmtWeight(850), '850 g');
+  assert.equal(U.fmtWeight(4385), '4.4 kg');
+  assert.equal(U.fmtSpan(0), '0 min');
+  assert.equal(U.fmtSpan(205), '3 h 25 min');
+  assert.equal(U.fmtSpan(3000), '2 d 2 h');
+  assert.equal(U.fmtSpan(1439), '23 h 59 min');
+});

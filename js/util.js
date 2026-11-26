@@ -283,6 +283,38 @@
     return b.photo && b.photo.full ? [b.photo] : [];
   }
 
+  // ---------- stats ----------
+  /** Grams per unit for flour. Cups and spoons are by volume, so they are converted at about 120 g a cup. */
+  var FLOUR_GRAMS = { g: 1, oz: 28.35, lb: 453.6, cup: 120, tbsp: 7.5, tsp: 2.5, ml: 0.51 };
+  /** One flour row in grams, or null when its amount or unit cannot be weighed. */
+  function flourGrams(ing) {
+    if (!ing || ing.group !== 'flour') return null;
+    var v = parseAmount(ing.amount), k = FLOUR_GRAMS[ing.unit];
+    return v === null || !k ? null : v * k;
+  }
+  /**
+   * Minutes one entry took: the machine programs, the time added on Bake, proofing and the oven.
+   * A split copy shares the dough with the entry it came from, so only its own baking counts.
+   */
+  function minutesSpent(bake, splitCopy) {
+    var b = cleanBake(bake), sum = 0;
+    if (!splitCopy) sum += (b.minutes || 0) + (b.proofMinutes || 0);
+    return sum + (b.added || 0) + (b.ovenMinutes || 0);
+  }
+  /** "850 g" or "2.4 kg". */
+  function fmtWeight(g) {
+    g = Math.round(g || 0);
+    return g < 1000 ? g + ' g' : (Math.round(g / 100) / 10) + ' kg';
+  }
+  /** "45 min", "3 h 25 min", "2 d 4 h". */
+  function fmtSpan(min) {
+    min = Math.round(min || 0);
+    if (min < 24 * 60) return fmtMinutes(min) || '0 min';
+    var d = Math.floor(min / 1440), h = Math.round((min % 1440) / 60);
+    if (h === 24) { d++; h = 0; }
+    return d + ' d' + (h ? ' ' + h + ' h' : '');
+  }
+
   // ---------- ratings ----------
   var RATINGS = [['crust', 'Crust'], ['crumb', 'Crumb'], ['taste', 'Taste']];
   function rating(bread) {
@@ -419,7 +451,8 @@
     cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient, changedLines: changedLines,
     emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake,
     recipeKey: recipeKey, nameKey: nameKey, planRecipeSave: planRecipeSave, ingredientSummary: ingredientSummary,
-    photosOf: photosOf, RATINGS: RATINGS, rating: rating, fmtRating: fmtRating,
+    photosOf: photosOf, flourGrams: flourGrams, minutesSpent: minutesSpent, fmtWeight: fmtWeight, fmtSpan: fmtSpan,
+    RATINGS: RATINGS, rating: rating, fmtRating: fmtRating,
     program: program, manualProgram: manualProgram, sizesFor: sizesFor, hasCrust: hasCrust, hasDough: hasDough,
     hasManual: hasManual, programMinutes: programMinutes, totalMinutes: totalMinutes, programLabels: programLabels,
     toggleProgram: toggleProgram, isBaked: isBaked, sizeLabel: sizeLabel, crustLabel: crustLabel, withBake: withBake,

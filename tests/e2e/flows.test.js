@@ -552,6 +552,61 @@ test('the Parent list only offers recipes with no parent, never the recipe itsel
   assert.ok((await options()).includes('Milk Mantou'));
 });
 
+test('the Stats tab adds up flour, loaves, the favourite and time', async (t) => {
+  const r = (name, n, flour, bake) => ({ name, ingredients: [{ group: 'flour', type: 'AP', amount: flour[0], unit: flour[1] },
+    { group: 'water', type: '', amount: '300', unit: 'g' }], bake, method: '', source: '', link: '', parent: '', originals: [],
+    basedOn: null, createdAt: n, updatedAt: n });
+  const b = (name, recipeId, n, extra) => Object.assign({ name, date: '2026-11-2' + n, recipeId, photos: [], photo: null, comments: '',
+    notes: { crust: '', crumb: '', taste: '' }, ratings: { crust: 4, crumb: 4, taste: 4 }, createdAt: n, updatedAt: n }, extra);
+  const page = await open(t, { db: {
+    'recipes/a': r('Mantou', 1, ['500', 'g'], { programs: [8], minutes: 90, proofMinutes: 30 }),
+    'recipes/b': r('sandwich bread', 2, ['3', 'cup'], { program: 1, size: '1.5', minutes: 205 }),
+    'breads/1': b('Mantou', 'a', 1), 'breads/2': b('Mantou', 'a', 2),
+    'breads/3': b('Mantou', 'a', 3, { splitFrom: '2' }),            // same dough as entry 2
+    'breads/4': b('sandwich bread', 'b', 4), 'breads/5': b('Mystery', null, 5)
+  } });
+  await page.getByRole('button', { name: 'Stats' }).click();
+  const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
+  // flour: 500 g twice (the split copy shares entry 2's dough) + 3 cups at 120 g
+  assert.equal(await stat('Flour used').locator('b').innerText(), '1.4 kg');
+  assert.equal(await stat('Loaves').locator('b').innerText(), '5');
+  assert.equal(await stat('Favorite').locator('b').innerText(), 'Mantou');
+  assert.equal(await stat('Favorite').locator('small').innerText(), '3×');
+  // time: (90 + 30) twice, nothing more for the split copy, plus 205
+  assert.equal(await stat('Time spent').locator('b').innerText(), '7 h 25 min');
+
+  // a new bread changes the numbers straight away
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('sandwich bread');
+  await field(page, 'Comments').click();
+  await save(page);
+  await formGone(page);
+  assert.equal(await stat('Loaves').locator('b').innerText(), '6');
+  assert.equal(await stat('Flour used').locator('b').innerText(), '1.7 kg', '1,720 g');
+});
+
+test('Split marks the copy, so its dough is not counted twice', async (t) => {
+  const page = await open(t);
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('Two ways');
+  await line(page, 'Flour').getByLabel('Amount').fill('500');
+  await program(page, 8, 'Dough').click();
+  await save(page);
+  await formGone(page);
+  await page.locator('.gal .tile').click();
+  await page.getByRole('button', { name: 'Split' }).click();
+  await program(page, 12, 'Bake').click();
+  await field(page, 'Added minutes').fill('40');
+  await save(page);
+  await page.getByRole('heading', { name: 'Split bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Stats' }).click();
+  const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
+  assert.equal(await stat('Loaves').locator('b').innerText(), '2');
+  assert.equal(await stat('Flour used').locator('b').innerText(), '500 g');
+  assert.equal(await stat('Time spent').locator('b').innerText(), '2 h 10 min', '90 min of dough once, plus 40 min of Bake');
+});
+
 test('typing part of a name offers the saved recipe', async (t) => {
   const page = await open(t);
   await logBread(page, { photo: false });
@@ -987,9 +1042,12 @@ test('interface copy follows the owner\'s rules', async (t) => {
     });
     for (const h of found.headings) assert.ok(words(h) < 6, where + ': heading too long: "' + h + '"');
     for (const l of found.labels.filter(Boolean)) assert.ok(words(l) <= 3, where + ': label too long: "' + l + '"');
-    assert.deepEqual(found.other.filter((x) => x && !/^\d+$/.test(x)), [], where + ': explanatory text on screen');
+    assert.deepEqual(found.other.filter((x) => x && !/^\d+×?$/.test(x)), [], where + ': explanatory text on screen');
   }
   await audit('gallery');
+  await page.getByRole('button', { name: 'Stats' }).click();
+  await audit('stats');
+  await page.getByRole('button', { name: 'Gallery' }).click();
   await page.locator('.gal .tile').first().click();
   await audit('bread page');
   await page.getByRole('button', { name: 'Back' }).click();
