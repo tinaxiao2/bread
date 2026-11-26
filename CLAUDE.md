@@ -94,7 +94,11 @@ These are decisions the owner made. Keep them.
 - **Gallery has a Recipes · All toggle** (top right, remembered on the device): All is every
   entry; Recipes is one tile per parent recipe that has been baked. Tiles show the rating at the
   bottom left above the name. In the Recipes view the number of baked entries is a red
-  bubble at the top right, and one card is stacked behind the tile per extra entry (up to 3).
+  bubble at the top right, sized like an iPhone badge on an app icon (about a third of the
+  tile's width, overlapping the corner), and one card per extra entry (up to 3) steps
+  diagonally up and to the left behind the tile. Under the toggle, **Filter by** (icon +
+  brown text naming the current choice) sorts either view: Most recent, Most baked,
+  Rating (unrated last), A to Z. Remembered on the device.
 - **Sources from Reddit are just "Reddit"** (`util.cleanSource`, applied on save, when
   reading a recipe in, and when showing older ones): the link carries the subreddit and user.
 - **A bread's name is its recipe's name.** Saving a bread named like a saved recipe joins

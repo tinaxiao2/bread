@@ -59,21 +59,32 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 
 /* ---------- main tabs ---------- */
 .main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: calc(var(--top) + 14px) 0 calc(var(--bottom) + var(--tabs) + 96px); }
-.top { padding: 0 20px 14px; display: flex; align-items: center; gap: 10px; }
+.top { padding: 0 20px 14px; display: flex; align-items: flex-start; gap: 10px; }
+.top h1 { padding-top: 2px; }
 .top h1 { font-size: 31px; font-weight: 640; letter-spacing: -0.015em; line-height: 1.1; }
 .top .mark { width: 34px; height: 34px; border-radius: 10px; }
-.toggle { margin-left: auto; flex: none; display: flex; padding: 3px; border-radius: 99px; background: #EFE4D2; }
+.controls { margin-left: auto; flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.toggle { flex: none; display: flex; padding: 3px; border-radius: 99px; background: #EFE4D2; }
+.sortby { position: relative; display: flex; align-items: center; gap: 5px; padding: 2px 4px; font-size: 13px; font-weight: 650; color: var(--crust); }
+.sortby .icon { width: 16px; height: 16px; stroke-width: 2.2; }
+.sortby select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; cursor: pointer; }
+.sortby:focus-within { outline: 2px solid var(--crust); outline-offset: 2px; border-radius: 6px; }
 .toggle button { height: 30px; padding: 0 11px; border-radius: 99px; font-size: 13px; font-weight: 650; color: var(--ink2); }
 .toggle button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(60, 40, 20, .18); }
 /* Recipes view: a card for each extra entry stacked behind the tile, and the count in a bubble */
-.gal.stacks { row-gap: 16px; padding-top: 10px; }
-.stack { position: relative; padding-top: 15px; }
-.stack .layer { position: absolute; top: 15px; left: 0; right: 0; aspect-ratio: 1 / 1.08; border-radius: 22px; background: #E9DCC6; border: 1px solid rgba(255, 253, 248, .9); box-shadow: 0 2px 6px -2px rgba(60, 40, 20, .25); transform-origin: 50% 0; }
-.stack .layer.l1 { transform: translateY(-5px) scale(.94); background: #E2D2B8; }
-.stack .layer.l2 { transform: translateY(-10px) scale(.88); background: #EBDFCB; }
-.stack .layer.l3 { transform: translateY(-15px) scale(.82); background: #F1E8D9; }
+.gal.stacks { column-gap: 18px; row-gap: 18px; padding-top: 6px; }
+/* each extra entry is a card stepping up and to the left behind the tile */
+.stack { position: relative; padding-top: 15px; container-type: inline-size; }
+.stack .layer { position: absolute; top: 15px; left: 0; right: 0; aspect-ratio: 1 / 1.08; border-radius: 22px; border: 1px solid rgba(255, 253, 248, .9); box-shadow: 0 2px 6px -2px rgba(60, 40, 20, .25); }
+.stack .layer.l1 { transform: translate(-5px, -5px); background: #DCCAAC; }
+.stack .layer.l2 { transform: translate(-10px, -10px); background: #E6D8C0; }
+.stack .layer.l3 { transform: translate(-15px, -15px); background: #EFE5D4; }
 .stack .tile { box-shadow: 0 6px 14px -8px rgba(60, 40, 20, .45); }
-.badge { position: absolute; top: 5px; right: -5px; z-index: 4; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 99px; background: #E0362C; color: #fff; font-size: 13.5px; font-weight: 750; line-height: 26px; text-align: center; box-shadow: 0 0 0 2.5px var(--bg), 0 2px 6px rgba(0, 0, 0, .25); font-variant-numeric: tabular-nums; }
+/* sized like an iPhone badge on an app icon: about a third of the icon's width, overlapping its corner */
+.badge { position: absolute; z-index: 4; top: calc(15px - 9cqw); right: -9cqw; min-width: 34cqw; height: 34cqw; padding: 0 9cqw;
+  border-radius: 99px; background: #FF3B30; color: #fff; font-size: 22cqw; font-weight: 600; line-height: 34cqw; text-align: center;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .22); }
 .top h1 { white-space: nowrap; }
 @media (max-width: 430px) { .top:has(.toggle) .mark { display: none; } .top:has(.toggle) h1 { font-size: 28px; } }
 .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: var(--bottom); }

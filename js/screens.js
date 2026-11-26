@@ -191,29 +191,63 @@
     </div>`;
   }
 
-  var VIEW_KEY = 'lgt-gallery-view';
-  function savedView() { try { return localStorage.getItem(VIEW_KEY) === 'recipes' ? 'recipes' : 'all'; } catch (e) { return 'all'; } }
+  var VIEW_KEY = 'lgt-gallery-view', SORT_KEY = 'lgt-gallery-sort';
+  function remembered(key, allowed, fallback) {
+    try { var v = localStorage.getItem(key); return allowed.indexOf(v) >= 0 ? v : fallback; } catch (e) { return fallback; }
+  }
+  function remember(key, v) { try { localStorage.setItem(key, v); } catch (e) { /* a convenience only */ } }
+
+  var SORTS = [['recent', 'Most recent'], ['baked', 'Most baked'], ['rating', 'Rating'], ['az', 'A to Z']];
+  function byName(a, b) { return String(a).localeCompare(String(b), undefined, { sensitivity: 'base', numeric: true }); }
+  /** Higher first, with nothing (null) last. */
+  function desc(x, y) { return (y === null ? -Infinity : y) - (x === null ? -Infinity : x); }
+
+  /** The Gallery's entries or recipe tiles, in the chosen order. Ties keep the most recent first. */
+  function sorted(view, sort, breads) {
+    if (view === 'recipes') {
+      var gs = store.groups().filter(function (g) { return g.baked; });
+      if (sort === 'baked') return gs.slice().sort(function (a, b) { return b.bakedCount - a.bakedCount; });
+      if (sort === 'rating') return gs.slice().sort(function (a, b) { return desc(bestRating(a.breads), bestRating(b.breads)); });
+      if (sort === 'az') return gs.slice().sort(function (a, b) { return byName(a.name, b.name); });
+      return gs;
+    }
+    var count = {};
+    store.groups().forEach(function (g) { g.breads.forEach(function (b) { count[b.id] = g.bakedCount; }); });
+    if (sort === 'baked') return breads.slice().sort(function (a, b) { return (count[b.id] || 0) - (count[a.id] || 0); });
+    if (sort === 'rating') return breads.slice().sort(function (a, b) { return desc(U.rating(a), U.rating(b)); });
+    if (sort === 'az') return breads.slice().sort(function (a, b) { return byName(a.name, b.name); });
+    return breads;
+  }
 
   function Gallery(props) {
-    var vs = useState(savedView()), view = vs[0], setView = vs[1];
-    function pick(v) { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch (e) { /* a convenience only */ } }
+    var vs = useState(remembered(VIEW_KEY, ['recipes', 'all'], 'all')), view = vs[0], setView = vs[1];
+    var ss = useState(remembered(SORT_KEY, SORTS.map(function (o) { return o[0]; }), 'recent')), sort = ss[0], setSort = ss[1];
     var nav = props.nav;
+    var label = SORTS.filter(function (o) { return o[0] === sort; })[0][1];
     return html`<div class="wrap">
       <div class="top">
         <h1 class="serif">Let's Get This</h1><img class="mark" src="icons/icon.svg" alt=""/>
-        <div class="toggle" role="tablist">
-          ${[['recipes', 'Recipes'], ['all', 'All']].map(function (o) {
-            return html`<button type="button" role="tab" key=${o[0]} aria-selected=${view === o[0]} class=${view === o[0] ? 'on' : ''}
-              onClick=${function () { pick(o[0]); }}>${o[1]}</button>`;
-          })}
+        <div class="controls">
+          <div class="toggle" role="tablist">
+            ${[['recipes', 'Recipes'], ['all', 'All']].map(function (o) {
+              return html`<button type="button" role="tab" key=${o[0]} aria-selected=${view === o[0]} class=${view === o[0] ? 'on' : ''}
+                onClick=${function () { setView(o[0]); remember(VIEW_KEY, o[0]); }}>${o[1]}</button>`;
+            })}
+          </div>
+          <div class="sortby">
+            <${Icon} name="sort"/><span>${label}</span>
+            <select id="f-sort" aria-label="Filter by" value=${sort} onChange=${function (e) { setSort(e.target.value); remember(SORT_KEY, e.target.value); }}>
+              ${SORTS.map(function (o) { return html`<option key=${o[0]} value=${o[0]}>${o[1]}</option>`; })}
+            </select>
+          </div>
         </div>
       </div>
       <div class=${'gal' + (view === 'recipes' ? ' stacks' : '')}>
         ${view === 'recipes'
-          ? store.groups().filter(function (g) { return g.baked; }).map(function (g) {
+          ? sorted('recipes', sort).map(function (g) {
             return html`<${RecipeTile} key=${g.key} group=${g} onOpen=${function () { nav.push({ kind: 'recipe', id: g.latest.id }); }}/>`;
           })
-          : props.state.breads.map(function (b) {
+          : sorted('all', sort, props.state.breads).map(function (b) {
             return html`<${Tile} key=${b.id} bread=${b} onOpen=${function () { nav.push({ kind: 'bread', id: b.id }); }}/>`;
           })}
       </div>

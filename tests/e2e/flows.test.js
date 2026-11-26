@@ -743,6 +743,41 @@ test('an entry dated "–" is a plan; giving it a date makes it baked', async (t
   await count(page.locator('.rc'), 0);
 });
 
+test('the gallery can be sorted by most recent, most baked, rating or name', async (t) => {
+  const r = (name, n) => ({ name, ingredients: [{ group: 'flour', type: 'AP', amount: '500', unit: 'g' }], bake: { programs: [1], size: '1.5', minutes: 205 },
+    method: '', source: '', link: '', parent: '', originals: [], basedOn: null, createdAt: n, updatedAt: n });
+  const b = (name, rid, n, date, stars) => ({ name, date, recipeId: rid, photos: [{ full: 'seed' + n, thumb: 'seed' + n }], comments: '',
+    notes: { crust: '', crumb: '', taste: '' }, ratings: { crust: stars, crumb: stars, taste: stars }, createdAt: n, updatedAt: n });
+  const page = await open(t, { db: {
+    'recipes/a': r('apple loaf', 1), 'recipes/z': r('Zopf', 2), 'recipes/m': r('Mantou', 3),
+    'breads/1': b('Mantou', 'm', 1, '2026-11-10', 3), 'breads/2': b('Mantou', 'm', 2, '2026-11-12', 2),
+    'breads/3': b('Zopf', 'z', 3, '2026-11-20', 5), 'breads/4': b('apple loaf', 'a', 4, '2026-11-15', 0)
+  } });
+  const names = () => page.locator('.gal .tile .meta b').allInnerTexts();
+  const sortBy = async (v) => { await field(page, 'Filter by').selectOption(v); };
+
+  assert.equal(await page.locator('.sortby span').innerText(), 'Most recent');
+  assert.deepEqual(await names(), ['Zopf', 'apple loaf', 'Mantou', 'Mantou']);
+  await sortBy('baked');
+  assert.equal(await page.locator('.sortby span').innerText(), 'Most baked');
+  assert.deepEqual(await names(), ['Mantou', 'Mantou', 'Zopf', 'apple loaf']);
+  await sortBy('rating');
+  assert.deepEqual(await names(), ['Zopf', 'Mantou', 'Mantou', 'apple loaf'], 'unrated last');
+  await sortBy('az');
+  assert.deepEqual(await names(), ['apple loaf', 'Mantou', 'Mantou', 'Zopf'], 'capitals do not matter');
+
+  await page.getByRole('tab', { name: 'Recipes' }).click();
+  assert.deepEqual(await names(), ['apple loaf', 'Mantou', 'Zopf']);
+  await sortBy('baked');
+  assert.deepEqual(await names(), ['Mantou', 'Zopf', 'apple loaf']);
+  await sortBy('rating');
+  assert.deepEqual(await names(), ['Zopf', 'Mantou', 'apple loaf']);
+
+  await page.reload();
+  assert.equal(await page.locator('.sortby span').innerText(), 'Rating', 'the choice is remembered');
+  assert.deepEqual(await names(), ['Zopf', 'Mantou', 'apple loaf']);
+});
+
 test('typing part of a name offers the saved recipe', async (t) => {
   const page = await open(t);
   await logBread(page);
@@ -1169,7 +1204,7 @@ test('interface copy follows the owner\'s rules', async (t) => {
     const found = await page.evaluate(() => {
       const out = { headings: [], labels: [], other: [] };
       const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-      const ours = (el) => !el.closest('.tile, .rc .open, .rc .body, .opt, .suggest, .ings, .src, .method, .comments, .notes, .tname, #f-parent, #f-flag');
+      const ours = (el) => !el.closest('.tile, .rc .open, .rc .body, .opt, .suggest, .ings, .src, .method, .comments, .notes, .tname, #f-parent, #f-flag, #f-sort');
       document.querySelectorAll('h1,h2,h3').forEach((el) => { if (visible(el)) out.headings.push(el.textContent.trim()); });
       document.querySelectorAll('button, .label, .pill, .flag, option, label').forEach((el) => {
         if ((visible(el) || el.tagName === 'OPTION') && ours(el)) out.labels.push(el.textContent.trim());
