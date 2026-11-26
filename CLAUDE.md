@@ -116,7 +116,7 @@ These are decisions the owner made. Keep them.
   `ui.useDragOrder`).
 - **Gallery has a Recipes · All toggle** (top right, remembered on the device): All is every
   entry; Recipes is one tile per label (or recipe with no label) that has been baked. Tiles show the rating at the
-  top left, where Dough shows on an entry not baked yet (dough is not rated). In the Recipes view the number of baked entries is a brown
+  top left, where Dough shows on an entry not baked yet (dough is not rated). In the Recipes view the number of baked entries is a toffee-brown (#C27C3A)
   bubble at the top right, sized like an iPhone badge on an app icon (about a third of the
   tile's width, overlapping the corner; the tiles have extra side margin so it clears the
   screen edge), and one card per extra entry (up to 3) steps
