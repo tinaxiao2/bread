@@ -121,16 +121,25 @@ test('a new bread starts with flour, water, yeast and salt', async (t) => {
   await page.getByRole('button', { name: 'Add bread' }).click();
   assert.deepEqual(await page.locator('.grow > b').allInnerTexts(), ['Flour', 'Water', 'Yeast', 'Salt'], 'no dairy row to begin with');
   for (const g of ['Flour', 'Water', 'Yeast', 'Salt']) assert.equal(await line(page, g).getByLabel('Unit').inputValue(), 'g', g + ' starts in grams');
-  assert.equal(await line(page, 'Water').getByLabel('Type').inputValue(), '');
-  assert.deepEqual(await line(page, 'Water').getByLabel('Type').locator('option').allInnerTexts(), ['Type', 'Lukewarm', 'Warm', 'Hot', 'Other…']);
+  assert.equal(await line(page, 'Water').getByLabel('Type').inputValue(), 'Room temp');
+  assert.deepEqual(await line(page, 'Water').getByLabel('Type').locator('option').allInnerTexts(), ['Type', 'Room temp', 'Lukewarm', 'Warm', 'Hot', 'Other…']);
+  assert.deepEqual(await line(page, 'Yeast').getByLabel('Type').locator('option').allInnerTexts(), ['Type', 'Active dry', 'Instant', 'Other…']);
   assert.equal(await line(page, 'Flour').getByLabel('Type').inputValue(), 'AP');
   assert.equal(await line(page, 'Yeast').getByLabel('Type').inputValue(), 'Active dry');
   assert.deepEqual(await page.locator('.addrow button').allInnerTexts(), ['Flour', 'Dairy', 'Sugar', 'Other']);
 
+  // sweeteners have their own row, like dairy, and more than one can be added
   await chip(page, 'Sugar').click();
-  assert.equal(await line(page, 'Other').getByLabel('Ingredient').inputValue(), 'Sugar');
-  assert.equal(await line(page, 'Other').getByLabel('Unit').inputValue(), 'g');
-  assert.equal(await chip(page, 'Sugar').count(), 0, 'once added, it is no longer offered');
+  assert.equal(await line(page, 'Sugar').getByLabel('Type').inputValue(), 'Sugar');
+  assert.deepEqual(await line(page, 'Sugar').getByLabel('Type').locator('option').allInnerTexts(), ['Type', 'Sugar', 'Brown sugar', 'Honey', 'Molasses', 'Other…']);
+  assert.equal(await line(page, 'Sugar').getByLabel('Unit').inputValue(), 'g');
+  assert.equal(await chip(page, 'Sugar').count(), 1);
+
+  // an egg is counted: 1, no unit
+  await chip(page, 'Other').click();
+  await line(page, 'Other').getByLabel('Ingredient').fill('Egg');
+  assert.equal(await line(page, 'Other').getByLabel('Amount').inputValue(), '1');
+  assert.equal(await line(page, 'Other').getByLabel('Unit').inputValue(), '');
   await line(page, 'Salt').locator('.rm').click();
   assert.equal(await chip(page, 'Salt').count(), 1, 'salt can be put back');
   await chip(page, 'Salt').click();
@@ -248,7 +257,7 @@ test('baking a recipe again lands on its tweak or adds the next, numbered I, II'
 test('a label gathers recipes; arrows step between them', async (t) => {
   const page = await open(t, { db: RANKED });
   await page.getByRole('button', { name: 'Recipes', exact: true }).click();
-  const titled = (name) => page.locator('.rc', { has: page.locator('h3', { hasText: new RegExp('^' + name + '$') }) });
+  const titled = (name) => page.locator('.rc', { has: page.locator('h3', { hasText: new RegExp('^[^A-Za-z]*' + name + '$') }) });
   assert.match(await titled('Mantou').innerText(), /2 recipes/);
   await titled('Mantou').locator('.open').click();
   assert.equal(await page.locator('.screen h2').innerText(), 'Mantou');
@@ -269,24 +278,32 @@ test('a label gathers recipes; arrows step between them', async (t) => {
     await save(page);
     await formGone(page);
   }
-  await bread('Country White Bread', () => field(page, 'Parent').fill('White bread'));
+  await bread('Country White Bread', async () => {
+    assert.deepEqual(await field(page, 'Parent').locator('option').allInnerTexts(),
+      ['–', 'baguette', 'Challah', 'Croissants', 'Donuts', 'french bread', 'Mantou', 'Milk Mantou', 'New…'], 'labels and recipes, A to Z');
+    await field(page, 'Parent').selectOption('__new');
+    await field(page, 'Parent').fill('White bread');
+    // a label can have its own flag
+    await field(page, 'Parent flag').selectOption('US');
+  });
   await bread('Classic White Sandwich Bread', async () => {
-    await field(page, 'Parent').fill('whi');
-    await page.getByRole('button', { name: 'White bread', exact: true }).click();
-    assert.equal(await field(page, 'Parent').inputValue(), 'White bread');
+    await field(page, 'Parent').selectOption('White bread');
+    assert.equal(await field(page, 'Parent flag').inputValue(), 'US');
   });
   // a recipe named like the label is not under it unless it is filed there
   await bread('White bread');
   await count(titled('White bread'), 2);
   const label = titled('White bread').filter({ has: page.locator('.count') });
   await count(label, 1);
+  assert.equal(await label.locator('h3 .fl').innerText(), '\u{1F1FA}\u{1F1F8}', 'the label shows its own flag');
+  await count(titled('White bread').filter({ hasNot: page.locator('.count') }).locator('h3 .fl'), 0);
   assert.match(await label.innerText(), /Baked 2×[\s\S]*2 recipes/);
 
   // taking a recipe out of a label gives it its own card
   await label.locator('.open').click();
   assert.equal(await page.locator('.pager h3').innerText(), 'Classic White Sandwich Bread');
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
-  await field(page, 'Parent').fill('');
+  await field(page, 'Parent').selectOption('');
   await save(page);
   await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
@@ -594,7 +611,7 @@ test('Split marks the copy, so its dough is not counted twice', async (t) => {
   const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
   assert.equal(await stat('Loaves').locator('b').innerText(), '2');
   assert.equal(await stat('Flour used').locator('b').innerText(), '500 g');
-  assert.equal(await stat('Time spent').locator('b').innerText(), '2 h 10 min', '90 min of dough once, plus 40 min of Bake');
+  assert.equal(await stat('Time spent').locator('b').innerText(), '3 h 15 min', '90 min of dough and 65 min in the machine once, plus 40 min of Bake');
 });
 
 test('a flag chosen for a recipe shows before its name everywhere', async (t) => {
@@ -746,6 +763,66 @@ test('the gallery can be sorted by most recent, most baked, rating, name or coun
   assert.deepEqual(await names(), ['Zopf', 'Mantou', 'apple loaf']);
 });
 
+test('ties in Most baked and Rating go to the better rated, the more baked, then the most recent with a photo', async (t) => {
+  const r = (name, n) => ({ name, ingredients: [{ group: 'flour', type: 'AP', amount: '500', unit: 'g' }], bake: { programs: [1], size: '1.5', minutes: 205 },
+    method: '', source: '', link: '', parent: '', originals: [], basedOn: null, createdAt: n, updatedAt: n });
+  const b = (name, rid, n, date, stars, photo = true) => ({ name, date, recipeId: rid, photos: photo ? [{ full: 'seed' + n, thumb: 'seed' + n }] : [], comments: '',
+    notes: { crust: '', crumb: '', taste: '' }, ratings: { crust: stars, crumb: stars, taste: stars }, createdAt: n, updatedAt: n });
+  const db = {};
+  'abcdefg'.split('').forEach((k, i) => { db['recipes/' + k] = r(k.toUpperCase(), i + 1); });
+  Object.assign(db, {
+    'breads/1': b('A1', 'a', 1, '2026-11-02', 4), 'breads/2': b('A2', 'a', 2, '2026-11-03', 3),
+    'breads/3': b('B1', 'b', 3, '2026-11-04', 5), 'breads/4': b('B2', 'b', 4, '2026-11-05', 0),
+    'breads/5': b('C', 'c', 5, '2026-11-20', 4), 'breads/6': b('D', 'd', 6, '2026-11-22', 4),
+    'breads/7': b('E', 'e', 7, '2026-11-25', 4, false),
+    'breads/8': b('F', 'f', 8, '2026-11-01', 0), 'breads/9': b('G', 'g', 9, '2026-11-30', 0, false)
+  });
+  const page = await open(t, { db });
+  const names = () => page.locator('.gal .tile .meta b').allInnerTexts();
+  const sortBy = (v) => field(page, 'Filter by').selectOption(v);
+  await count(page.locator('.gal .tile'), 9);
+  await sortBy('baked');
+  assert.deepEqual(await names(), ['B1', 'A1', 'A2', 'B2', 'D', 'C', 'E', 'F', 'G']);
+  await sortBy('rating');
+  assert.deepEqual(await names(), ['B1', 'A1', 'D', 'C', 'E', 'A2', 'B2', 'F', 'G']);
+  await page.getByRole('tab', { name: 'Recipes' }).click();
+  assert.deepEqual(await names(), ['B', 'A', 'D', 'C', 'E', 'F', 'G']);
+  await sortBy('baked');
+  assert.deepEqual(await names(), ['B', 'A', 'D', 'C', 'E', 'F', 'G']);
+});
+
+test('a second proof is added with +', async (t) => {
+  const page = await open(t);
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('Overnight rolls');
+  await line(page, 'Flour').getByLabel('Amount').fill('500');
+  await program(page, 8, 'Dough').click();
+  assert.equal(await field(page, 'Hours').inputValue() + ':' + await field(page, 'Minutes').inputValue(), '1:30');
+  assert.equal(await field(page, 'Proof hours').inputValue() + ':' + await field(page, 'Proof minutes').inputValue(), '1:5', 'a proof in the machine starts at 65 min');
+  // proofed in the fridge instead: the machine only kneads
+  await page.locator('.field', { has: page.locator('> .label', { hasText: /^Proofing$/ }) }).getByRole('button', { name: 'Fridge' }).click();
+  await page.locator('.field', { has: page.locator('> .label', { hasText: /^Proofing$/ }) }).getByRole('button', { name: 'Bread machine' }).click();
+  assert.equal(await field(page, 'Hours').inputValue() + ':' + await field(page, 'Minutes').inputValue(), '0:25');
+  assert.equal(await field(page, 'Proof minutes').inputValue(), '');
+  await field(page, 'Proof hours').fill('10');
+
+  await page.getByRole('button', { name: 'Add proof' }).click();
+  assert.equal(await field(page, 'Proof 2 minutes').inputValue(), '5');
+  await page.locator('.field', { has: page.locator('> .label', { hasText: /^2nd proof$/ }) }).getByRole('button', { name: 'Bread machine' }).click();
+  await page.locator('.field', { has: page.locator('> .label', { hasText: /^2nd proof$/ }) }).getByRole('button', { name: 'Air fryer' }).click();
+  await field(page, 'Proof 2 hours').fill('0');
+  await field(page, 'Proof 2 minutes').fill('45');
+  await page.getByRole('button', { name: 'Add proof' }).click();
+  await page.getByRole('button', { name: 'Remove 3rd proof' }).click();
+  await count(page.locator('.field > .label', { hasText: /^3rd proof$/ }), 0);
+  await save(page);
+  await formGone(page);
+  await page.locator('.gal .tile').click();
+  const card = await page.locator('.bake').innerText();
+  assert.match(card, /PROOFING\s+Fridge\s+10 h/i);
+  assert.match(card, /2ND PROOF\s+Air fryer\s+45 min/i);
+});
+
 test('typing part of a name offers the saved recipe', async (t) => {
   const page = await open(t);
   await logBread(page);
@@ -771,19 +848,29 @@ test('ingredients added once are offered next time', async (t) => {
   await line(page, 'Yeast').getByLabel('Amount').fill('1/2');
   await line(page, 'Yeast').getByLabel('Unit').selectOption('tbsp');
   await chip(page, 'Other').click();
-  await line(page, 'Other').getByLabel('Ingredient').fill('Honey');
-  await line(page, 'Other').getByLabel('Amount').fill('2');
-  await line(page, 'Other').getByLabel('Unit').selectOption('tsp');
+  await line(page, 'Other').getByLabel('Ingredient').fill('Eggs');
+  await chip(page, 'Other').click();
+  await line(page, 'Other').getByLabel('Ingredient').nth(1).fill('Canola oil');
+  await line(page, 'Other').getByLabel('Amount').nth(1).fill('2');
+  await line(page, 'Other').getByLabel('Unit').nth(1).selectOption('tsp');
+  await chip(page, 'Other').click();
+  await line(page, 'Other').getByLabel('Ingredient').nth(2).fill('Honey');
+  await line(page, 'Other').getByLabel('Amount').nth(2).fill('2');
   await save(page);
   await formGone(page);
 
+  // honey went under Sugar, canola oil is just Oil; what was named before is one tap away
+  await page.locator('.gal .tile').click();
+  assert.match(await page.locator('.ings').innerText(), /Honey\s+2 g[\s\S]*Eggs\s+1[\s\S]*Oil\s+2 tsp/);
+  await page.getByRole('button', { name: 'Back' }).click();
   await page.getByRole('button', { name: 'Add bread' }).click();
-  assert.deepEqual(await page.locator('.addrow button').allInnerTexts(), ['Flour', 'Dairy', 'Sugar', 'Honey', 'Other']);
+  assert.deepEqual(await page.locator('.addrow button').allInnerTexts(), ['Flour', 'Dairy', 'Sugar', 'Eggs', 'Oil', 'Other']);
   assert.equal(await line(page, 'Yeast').getByLabel('Unit').inputValue(), 'g', 'units always start in grams');
-  await chip(page, 'Honey').click();
-  assert.equal(await line(page, 'Other').getByLabel('Ingredient').inputValue(), 'Honey');
-  assert.equal(await line(page, 'Other').getByLabel('Unit').inputValue(), 'g');
-  assert.deepEqual(await page.locator('#lgt-ingredient-names option').evaluateAll((o) => o.map((x) => x.value)), ['Sugar', 'Honey']);
+  await chip(page, 'Eggs').click();
+  assert.equal(await line(page, 'Other').getByLabel('Amount').inputValue(), '1');
+  assert.equal(await line(page, 'Other').getByLabel('Unit').inputValue(), '');
+  await chip(page, 'Oil').click();
+  assert.equal(await line(page, 'Other').getByLabel('Unit').nth(1).inputValue(), 'g');
 });
 
 test('edits made while a photo is still loading are kept', async (t) => {

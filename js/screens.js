@@ -11,6 +11,7 @@
   function draftFromRecipe(r) {
     return {
       name: r.name || '', method: r.method || '', source: U.cleanSource(r.source), link: r.link || '', parent: r.parent || '', flag: U.cleanFlag(r.flag),
+      parentFlag: r.parent ? store.labelFlag(r.parent) : '',
       originals: (r.originals || []).slice(), basedOn: r.basedOn || null, index: 0,
       variants: [{ label: '', ingredients: F.keyed((r.ingredients || []).map(U.upgradeIngredient)), bake: U.cleanBake(r.bake) }]
     };
@@ -20,7 +21,7 @@
   }
   function draftFromReading(reading) {
     return {
-      name: reading.name, method: reading.method, source: reading.source, link: '', parent: '', flag: '',
+      name: reading.name, method: reading.method, source: reading.source, link: '', parent: '', flag: '', parentFlag: '',
       originals: [], basedOn: null, index: 0,
       variants: reading.variants.map(function (v, i) {
         var d = importer.toDraft(reading, i);
@@ -32,7 +33,7 @@
     var v = d.variants[index === undefined ? d.index : index];
     return {
       name: d.name, ingredients: v.ingredients, bake: v.bake, method: d.method,
-      source: d.source, link: d.link, parent: d.parent, flag: d.flag, originals: d.originals, basedOn: d.basedOn
+      source: d.source, link: d.link, parent: d.parent, flag: d.flag, parentFlag: d.parentFlag, originals: d.originals, basedOn: d.basedOn
     };
   }
   /** True while the form offers the recipe's own sizes, which stand in for the loaf-size field. */
@@ -42,7 +43,7 @@
   function withRecipe(d, r) {
     var variants = d.variants.slice();
     variants[d.index] = Object.assign({}, variants[d.index], { ingredients: r.ingredients, bake: r.bake });
-    return Object.assign({}, d, { method: r.method, source: r.source, link: r.link, parent: r.parent, originals: r.originals, variants: variants });
+    return Object.assign({}, d, { method: r.method, source: r.source, link: r.link, parent: r.parent, parentFlag: r.parentFlag, originals: r.originals, variants: variants });
   }
 
   // ---------- shared pieces ----------
@@ -86,6 +87,10 @@
     if (b.added) cells.push(['Added', ['+' + U.fmtMinutes(b.added)], b.reason]);
     var proof = U.proofLabels(b.proof);
     if (proof.length || b.proofMinutes !== null) cells.push(['Proofing', proof.length ? proof : [U.fmtMinutes(b.proofMinutes)], proof.length && b.proofMinutes !== null ? U.fmtMinutes(b.proofMinutes) : '']);
+    b.extraProofs.forEach(function (x, i) {
+      var places = U.proofLabels(x.proof);
+      cells.push([U.ordinal(i + 2) + ' proof', places.length ? places : [U.fmtMinutes(x.minutes)], places.length && x.minutes !== null ? U.fmtMinutes(x.minutes) : '']);
+    });
     if (b.ovenTemp !== null) cells.push(['Oven', [b.ovenTemp + '°F'], b.ovenMinutes !== null ? U.fmtMinutes(b.ovenMinutes) : '']);
     else if (b.ovenMinutes !== null) cells.push(['Oven', [U.fmtMinutes(b.ovenMinutes)]]);
     var link = U.safeLink(r.link), host = '';
@@ -207,23 +212,43 @@
   /** Higher first, with nothing (null) last. */
   function desc(x, y) { return (y === null ? -Infinity : y) - (x === null ? -Infinity : x); }
 
-  /** The Gallery's entries or recipe tiles, in the chosen order. Ties keep the most recent first. */
+  /**
+   * The Gallery's entries or recipe tiles, in the chosen order.
+   *   Most baked: then the best rated, then the most recent with a photo, then those without one.
+   *   Rating: the rated first, best first; ties and the unrated then go by most baked, and then
+   *   the most recent with a photo, then those without one.
+   * Each item is read as { baked, rating, photo, date, created, name, flag }.
+   */
+  function recentWithPhoto(a, b) {
+    if (a.photo !== b.photo) return a.photo ? -1 : 1;
+    return b.date.localeCompare(a.date) || (b.created - a.created);
+  }
+  var ORDER = {
+    baked: function (a, b) { return (b.baked - a.baked) || desc(a.rating, b.rating) || recentWithPhoto(a, b); },
+    rating: function (a, b) { return desc(a.rating, b.rating) || (b.baked - a.baked) || recentWithPhoto(a, b); },
+    az: function (a, b) { return byName(a.name, b.name); },
+    country: function (a, b) { return byCountry(a.flag, a.name, b.flag, b.name); }
+  };
+  function inOrder(list, sort, facts) {
+    if (!ORDER[sort]) return list;
+    return list.map(function (x, i) { return { x: x, f: facts(x), i: i }; })
+      .sort(function (a, b) { return ORDER[sort](a.f, b.f) || (a.i - b.i); })
+      .map(function (y) { return y.x; });
+  }
   function sorted(view, sort, breads) {
     if (view === 'recipes') {
-      var gs = store.groups().filter(function (g) { return g.baked; });
-      if (sort === 'baked') return gs.slice().sort(function (a, b) { return b.bakedCount - a.bakedCount; });
-      if (sort === 'rating') return gs.slice().sort(function (a, b) { return desc(bestRating(a.breads), bestRating(b.breads)); });
-      if (sort === 'az') return gs.slice().sort(function (a, b) { return byName(a.name, b.name); });
-      if (sort === 'country') return gs.slice().sort(function (a, b) { return byCountry(a.flag, a.name, b.flag, b.name); });
-      return gs;
+      return inOrder(store.groups().filter(function (g) { return g.baked; }), sort, function (g) {
+        var last = g.breads[0];
+        return { baked: g.bakedCount, rating: bestRating(g.breads), photo: g.breads.some(function (b) { return U.photosOf(b).length; }),
+          date: String((last && last.date) || ''), created: (last && last.createdAt) || 0, name: g.name, flag: g.flag };
+      });
     }
     var count = {};
     store.groups().forEach(function (g) { g.breads.forEach(function (b) { count[b.id] = g.bakedCount; }); });
-    if (sort === 'baked') return breads.slice().sort(function (a, b) { return (count[b.id] || 0) - (count[a.id] || 0); });
-    if (sort === 'rating') return breads.slice().sort(function (a, b) { return desc(U.rating(a), U.rating(b)); });
-    if (sort === 'az') return breads.slice().sort(function (a, b) { return byName(a.name, b.name); });
-    if (sort === 'country') return breads.slice().sort(function (a, b) { return byCountry(store.breadFlag(a), a.name, store.breadFlag(b), b.name); });
-    return breads;
+    return inOrder(breads, sort, function (b) {
+      return { baked: count[b.id] || 0, rating: U.rating(b), photo: U.photosOf(b).length > 0,
+        date: String(b.date || ''), created: b.createdAt || 0, name: b.name, flag: store.breadFlag(b) };
+    });
   }
 
   function Gallery(props) {

@@ -3,11 +3,14 @@
    program offers, and its total time in minutes (from the manual's Programs & Timing
    tables). `aka` lists names recipes commonly use for the same program. `dough` marks a
    program that stops before baking. `manual` marks the one whose time is set by hand each
-   time it is used, which the log records as added time. */
+   time it is used, which the log records as added time. `kneadOnly` is a dough program's
+   time when the dough is taken out after kneading to be proofed somewhere else.
+   `proofMinutes` is how long a proof in the machine usually takes. */
 (function (root) {
   var LGT = root.LGT = root.LGT || {};
   LGT.machine = {
     model: 'Cuisinart CBK-110NAS',
+    proofMinutes: 65,
     sizes: [
       { id: '1', label: '1 lb' },
       { id: '1.5', label: '1½ lb' },
@@ -26,7 +29,7 @@
       { n: 5, name: 'Sweet', aka: [], crust: true, minutes: { '1': 195, '1.5': 200 } },
       { n: 6, name: 'Gluten-Free', aka: [], crust: true, minutes: { '1.5': 135 } },
       { n: 7, name: 'Artisan Dough', aka: [], crust: false, total: 305, dough: true },
-      { n: 8, name: 'Dough', aka: ['Pizza Dough'], crust: false, total: 90, dough: true },
+      { n: 8, name: 'Dough', aka: ['Pizza Dough'], crust: false, total: 90, dough: true, kneadOnly: 25 },
       { n: 9, name: 'Jam', aka: [], crust: false, total: 80 },
       { n: 10, name: 'Packaged Mix', aka: [], crust: true, total: 154 },
       { n: 11, name: 'Cake', aka: ['Quick Bread'], crust: false, total: 112 },

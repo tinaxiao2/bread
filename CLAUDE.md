@@ -53,7 +53,7 @@ runtime.
 
 ## Data
 
-Two collections and one document in the artifact database:
+Two collections and two documents in the artifact database:
 
 - `breads/{id}`: `name`, `date` (YYYY-MM-DD, or '' for "–": not baked yet), `recipeId` (or null), `photos` (list of
   `{full, thumb}` asset ids, cover first; `photo` repeats the cover), `ratings` (`crust`,
@@ -61,16 +61,19 @@ Two collections and one document in the artifact database:
   `splitFrom` (id of the entry it was split from, or null), `createdAt`, `updatedAt`
 - `recipes/{id}`: `name`, `ingredients[]` (`group`, `type`, `amount`, `unit`, `note`),
   `bake` (`programs[]`, `size`, `crust`, `minutes`, `added`, `reason`, `proof[]` (places:
-  `machine`, `airfryer`, `fridge`), `proofMinutes`, `ovenTemp`, `ovenMinutes`), `method`, `source`, `link`, `parent` (the label it is filed
+  `machine`, `airfryer`, `fridge`), `proofMinutes`, `extraProofs[]` (`{proof[], minutes}` for each proof after the first), `ovenTemp`, `ovenMinutes`), `method`, `source`, `link`, `parent` (the label it is filed
   under, or ''), `flag` (ISO country code, or ''), `line` (id of the recipe's first tweak), `tweak` (its number in
   the recipe, 1 for the first), `originals[]` (asset ids of imported images), `basedOn`, `createdAt`, `updatedAt`
+- `meta/labels`: `flags` — each label's own country flag, keyed by the label lower-cased.
 - `meta/order`: `toTry` — the owner's ranking of recipes to try, as group keys (`label:<label>` or
   `line:<id>`; keys from before, a lower-cased name, are still read). Recipes not in it come last.
 
 Entries from the first version hold a single `bake.program` instead of `bake.programs`, and
 salt as an `other` ingredient named Salt, no `proof` (read as the bread machine), and a single
 `photo` instead of `photos`. `LGT.util.cleanBake`, `cleanIngredient` and `photosOf` read both
-shapes, so nothing is migrated. Always go through them. Recipes saved before `line` existed are
+shapes, so nothing is migrated. Always go through them. `util.regroup` (inside both) also reads
+names the way the owner calls them: sugar, brown sugar, honey and molasses named as `other` are
+the Sugar row; bread machine yeast is Instant; canola oil is Oil. Recipes saved before `line` existed are
 read as one recipe per name, numbered in the order they were made (`store.lines`); saving one
 writes its `line` and `tweak`.
 
@@ -104,7 +107,11 @@ These are decisions the owner made. Keep them.
   ingredient lines that differ from I highlighted.
 - **Flags**: a recipe can carry a country flag, picked beside the Name field. It is kept the
   same on every tweak (`store.setShared`) and shows before the name everywhere (`ui.Named`).
-  A label shows the flag of its first recipe that has one. Stored as the ISO code, drawn as the emoji.
+  A label can have its own flag, picked beside the Parent field (`store.setLabelFlag`, kept in
+  `meta/labels`); without one it shows the flag of its first recipe that has one. Stored as the
+  ISO code, drawn as the emoji.
+- **Parent is a dropdown**: "–", every label and every recipe name, A to Z, then "New…" to type
+  a new label.
 - **Recipes to try are ranked** by dragging their rows (same hold-then-drag as photos,
   `ui.useDragOrder`).
 - **Gallery has a Recipes · All toggle** (top right, remembered on the device): All is every
@@ -116,6 +123,9 @@ These are decisions the owner made. Keep them.
   diagonally up and to the left behind the tile. Under the toggle, **Filter by** (icon +
   brown text naming the current choice) sorts either view: Most recent, Most baked,
   Rating (unrated last), A to Z, Country (by country name, no flag last). Remembered on the device.
+  Ties: Most baked goes to the better rated, then the most recent with a photo, then those with
+  none. Rating puts ties and the unrated in order of most baked, then the most recent with a
+  photo, then those with none.
 - **From photo on New bread saves a recipe, not a bread**: it opens Check recipe on top of the
   bread form; saving closes both and the recipe goes to To try. Cancel returns to the bread form.
 - **Sources from Reddit are just "Reddit"** (`util.cleanSource`, applied on save, when
@@ -129,14 +139,23 @@ These are decisions the owner made. Keep them.
 - **Programs can be combined** (for example Dough then Bake). The program marked `manual`
   in `data/machine.js` (Bake) has its time typed in as "added time", so the added time and
   its reason only exist, and only show, when that program is chosen.
-- **A blank recipe starts with** flour (AP), water, yeast (active dry) and salt, every
-  measurement in grams. New rows always start in grams. Salt has its own row. Water has a
-  kind: Lukewarm, Warm or Hot. Dairy is added on demand. Sugar is always a quick-add chip,
-  followed by every named ingredient the owner has used before.
+- **A blank recipe starts with** flour (AP), water (Room temp), yeast (active dry) and salt, every
+  measurement in grams. New rows always start in grams, except eggs: an egg row starts at 1
+  with no unit. Salt has its own row. Water has a kind: Room temp, Lukewarm, Warm or Hot.
+  Yeast: Active dry or Instant (bread machine yeast is Instant). Dairy and Sugar (Sugar,
+  Brown sugar, Honey, Molasses) are rows added on demand, several allowed. The chips offer
+  Flour, Dairy, Sugar, then every named ingredient the owner has used before.
 - Rows that were only offered (`_auto`) and left without an amount are not saved.
 - **Proofing** records where (bread machine by default; several places allowed) and for how
-  long. A different place is a different tweak.
+  long. A different place is a different tweak. A proof in the machine starts at 65 min
+  (`machine.proofMinutes`) when the machine is chosen as a place, or when Dough is chosen while
+  it is. Dough's time is its knead-only 25 min (`kneadOnly`) when the dough is not proofed in
+  the machine, else the full cycle. Times she typed are kept. The + under it adds another proof
+  ("2nd proof"), each with its own places and time, starting in the machine at 65 min.
 - **Ratings** go in half stars: the left half of a star picks the half.
+- **Date** field is narrow with the date centered, and the "–" button beside it.
+- Dropdowns in ingredient rows use slightly smaller text (14.5px); the viewport has
+  `maximum-scale=1` so iPhone does not zoom in when one is tapped.
 - **Several photos per bread.** The first is the cover in the Gallery; the bread page swipes
   through them. In the form the photos wrap in a grid with + last, and are put in order by
   dragging (mouse: drag; phone: hold briefly, then drag, so a quick swipe still scrolls).

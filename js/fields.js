@@ -40,7 +40,7 @@
     var e = U.flagEmoji(props.value);
     return html`<div class=${'flagpick' + (e ? ' set' : '')}>
       ${e ? html`<span class="fl" aria-hidden="true">${e}</span>` : html`<${Icon} name="flag"/>`}
-      <select id="f-flag" aria-label="Flag" value=${props.value || ''} onChange=${val(props.onChange)}>
+      <select id=${props.id || 'f-flag'} aria-label=${props.label || 'Flag'} value=${props.value || ''} onChange=${val(props.onChange)}>
         <option value="">–</option>
         ${list.map(function (c) { return html`<option key=${c} value=${c}>${U.flagEmoji(c) + ' ' + U.flagName(c)}</option>`; })}
       </select>
@@ -68,7 +68,7 @@
   function IngredientLine(props) {
     var ing = props.ing, change = props.onChange;
     function set(patch) { change(Object.assign({}, ing, patch)); }
-    function setType(type) { set({ type: type, _auto: false }); }
+    function setType(type) { change(U.countedRow(Object.assign({}, ing, { type: type, _auto: false }))); }
     var metric = ing.unit === 'g' || ing.unit === 'ml' || ing.unit === 'oz' || ing.unit === 'lb';
     var id = 'ing-' + ing._k;
     return html`<div class="line">
@@ -97,8 +97,8 @@
       props.onChange(list.concat(keyed([row])));
     }
     var groups = U.GROUPS.filter(function (g) { return list.some(function (i) { return i.group === g; }); });
-    var kinds = ['flour', 'water', 'dairy', 'yeast', 'salt'].filter(function (g) {
-      return g === 'flour' || g === 'dairy' || groups.indexOf(g) < 0;
+    var kinds = ['flour', 'water', 'dairy', 'yeast', 'salt', 'sugar'].filter(function (g) {
+      return g === 'flour' || g === 'dairy' || g === 'sugar' || groups.indexOf(g) < 0;
     });
     // Named ingredients one tap away: the staples, then whatever has been added before.
     var have = {}, known = [], offered = [];
@@ -150,6 +150,28 @@
       onInput=${function (e) { props.onChange(e.target.value.replace(/[^\d]/g, '')); }}/>`;
   }
 
+  /** Where a proof happened and for how long. A proof after the first can be removed. */
+  function Proof(props) {
+    var list = props.places || [], t = U.splitMinutes(props.minutes);
+    return html`
+      <${Field} label=${props.label}>
+        <div class="chips c3">
+          ${U.PROOF_PLACES.map(function (p) {
+            var on = list.indexOf(p.id) >= 0;
+            return html`<button type="button" key=${p.id} class=${on ? 'on' : ''} aria-pressed=${on}
+              onClick=${function () { props.onPlaces(on ? list.filter(function (x) { return x !== p.id; }) : list.concat([p.id])); }}>${p.label}</button>`;
+          })}
+        </div>
+      <//>
+      <${Field} label=${props.timeLabel}>
+        <div class="time">
+          <${Num} label=${props.names + ' hours'} value=${t.h} onChange=${function (v) { props.onMinutes(U.joinMinutes(v, t.m)); }}/>h
+          <${Num} label=${props.names + ' minutes'} value=${t.m} onChange=${function (v) { props.onMinutes(U.joinMinutes(t.h, v)); }}/>min
+          ${props.onRemove ? html`<button type="button" class="rm" aria-label=${'Remove ' + props.label} onClick=${props.onRemove}><${Icon} name="close"/></button>` : null}
+        </div>
+      <//>`;
+  }
+
   function BakeEditor(props) {
     var bake = props.bake;
     function set(patch) { props.onChange(U.withBake(bake, patch)); }
@@ -159,6 +181,7 @@
     // Added time belongs to the program whose time is set by hand, so it shows only with that program.
     var extra = U.hasManual(chosen);
     var oven = U.hasDough(chosen) || bake.ovenTemp !== null || bake.ovenMinutes !== null;
+    var extras = bake.extraProofs || [];
     var time = html`<${Field} label="Time">
       <div class="time">
         <${Num} label="Hours" value=${t.h} onChange=${function (v) { set({ minutes: U.joinMinutes(v, t.m) }); }}/>h
@@ -194,23 +217,21 @@
       <${Field} label="Reason">
         <input id="f-reason" class="input" value=${bake.reason} aria-label="Reason" onInput=${val(function (v) { set({ reason: v }); })}/>
       <//>` : time}
-      <${Field} label="Proofing">
-          <div class="chips c3">
-            ${U.PROOF_PLACES.map(function (p) {
-              var list = bake.proof || [], on = list.indexOf(p.id) >= 0;
-              return html`<button type="button" key=${p.id} class=${on ? 'on' : ''} aria-pressed=${on}
-                onClick=${function () { set({ proof: on ? list.filter(function (x) { return x !== p.id; }) : list.concat([p.id]) }); }}>${p.label}</button>`;
-            })}
-          </div>
-      <//>
-        <${Field} label="Proof time">
-          <div class="time">
-            <${Num} label="Proof hours" value=${U.splitMinutes(bake.proofMinutes).h}
-              onChange=${function (v) { set({ proofMinutes: U.joinMinutes(v, U.splitMinutes(bake.proofMinutes).m) }); }}/>h
-            <${Num} label="Proof minutes" value=${U.splitMinutes(bake.proofMinutes).m}
-              onChange=${function (v) { set({ proofMinutes: U.joinMinutes(U.splitMinutes(bake.proofMinutes).h, v) }); }}/>min
-          </div>
-        <//>
+      <${Proof} label="Proofing" timeLabel="Proof time" names="Proof" places=${bake.proof} minutes=${bake.proofMinutes}
+        onPlaces=${function (list) { set({ proof: list }); }}
+        onMinutes=${function (m) { set({ proofMinutes: m }); }}/>
+      ${extras.map(function (x, i) {
+        var name = 'Proof ' + (i + 2);
+        function put(patch) {
+          set({ extraProofs: extras.map(function (y, j) { return j === i ? Object.assign({}, y, patch) : y; }) });
+        }
+        return html`<${Proof} key=${i} label=${U.ordinal(i + 2) + ' proof'} timeLabel=${U.ordinal(i + 2) + ' proof time'} names=${name}
+          places=${x.proof} minutes=${x.minutes}
+          onPlaces=${function (list) { put({ proof: list }); }}
+          onMinutes=${function (m) { put({ minutes: m }); }}
+          onRemove=${function () { set({ extraProofs: extras.filter(function (y, j) { return j !== i; }) }); }}/>`;
+      })}
+      <button type="button" class="addproof" aria-label="Add proof" onClick=${function () { set({ extraProofs: extras.concat([U.newProof()]) }); }}><${Icon} name="plus"/></button>
       ${oven ? html`<${Field} label="Oven">
         <div class="time">
           <${Num} class="temp" label="Oven temperature" value=${bake.ovenTemp} onChange=${function (v) { set({ ovenTemp: U.num(v) }); }}/>°F
@@ -220,6 +241,27 @@
   }
 
   // ---------- the recipe part of a form ----------
+  /** The label a recipe is filed under: one of the labels or recipe names there are, or a new one typed in. */
+  function ParentPicker(props) {
+    var choices = LGT.store.parentChoices(), value = props.value || '';
+    var listed = !value || choices.some(function (n) { return U.nameKey(n) === U.nameKey(value); });
+    var s = useState(false), typing = s[0], setTyping = s[1];
+    if (typing || !listed) {
+      return html`<input id="f-parent" class="input" value=${value} aria-label="Parent" autocomplete="off" autoFocus=${typing}
+        onInput=${val(props.onChange)}
+        onBlur=${function () { if (!value.trim()) setTyping(false); }}/>`;
+    }
+    var shown = choices.filter(function (n) { return U.nameKey(n) === U.nameKey(value); })[0] || '';
+    return html`<select id="f-parent" class="input" aria-label="Parent" value=${shown}
+        onChange=${function (e) {
+          if (e.target.value === '__new') { setTyping(true); props.onChange(''); } else props.onChange(e.target.value);
+        }}>
+      <option value="">–</option>
+      ${choices.map(function (n) { return html`<option key=${n} value=${n}>${n}</option>`; })}
+      <option value="__new">New…</option>
+    </select>`;
+  }
+
   /** props: recipe, onChange, pending (Blob[] of images not yet saved), onPending, onView, hideSize */
   function RecipeFields(props) {
     var r = props.recipe;
@@ -227,18 +269,15 @@
     var known = LGT.store.sources().filter(function (s) { return s !== r.source; });
     var pending = props.pending || [];
     var hasOriginals = (r.originals && r.originals.length) || pending.length;
-    var typed = U.nameKey(r.parent);
-    var labels = LGT.store.labels().filter(function (n) {
-      var k = U.nameKey(n);
-      return typed ? k !== typed && k.indexOf(typed) >= 0 : true;
-    }).slice(0, 6);
     return html`
       <${Field} label="Parent">
-        <input id="f-parent" class="input" value=${r.parent || ''} aria-label="Parent" autocomplete="off"
-          onInput=${val(function (v) { set({ parent: v }); })}/>
-        ${labels.length ? html`<div class="suggest">
-          ${labels.map(function (n) { return html`<button type="button" key=${n} onClick=${function () { set({ parent: n }); }}>${n}</button>`; })}
-        </div>` : null}
+        <div class="namerow">
+          ${r.parent ? html`<${FlagPicker} id="f-parent-flag" label="Parent flag" value=${r.parentFlag}
+            onChange=${function (v) { set({ parentFlag: v }); }}/>` : null}
+          <${ParentPicker} value=${r.parent} onChange=${function (v) {
+            set({ parent: v, parentFlag: U.nameKey(v) === U.nameKey(r.parent) ? r.parentFlag : LGT.store.labelFlag(v) });
+          }}/>
+        </div>
       <//>
       <${Field} label="Ingredients">
         <${IngredientsEditor} list=${r.ingredients} onChange=${function (list) { set({ ingredients: list }); }}/>

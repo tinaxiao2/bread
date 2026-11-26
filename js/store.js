@@ -4,7 +4,7 @@
   var LGT = root.LGT = root.LGT || {};
   var U = LGT.util, P = LGT.platform;
 
-  var state = { phase: 'loading', slow: false, breads: [], recipes: [], toTryOrder: [], canUpload: false };
+  var state = { phase: 'loading', slow: false, breads: [], recipes: [], toTryOrder: [], labelFlags: {}, canUpload: false };
   var listeners = [];
   var db = null, assets = null, timer = null;
   var got = { breads: false, recipes: false };
@@ -51,6 +51,11 @@
         var d = snap.exists ? snap.data() : null;
         set({ toTryOrder: d && Array.isArray(d.toTry) ? d.toTry.map(String) : [] });
       }, function () {});
+      // A label has no document of its own; the flags chosen for labels are kept together here.
+      db.doc('meta/labels').onSnapshot(function (snap) {
+        var d = snap.exists ? snap.data() : null;
+        set({ labelFlags: d && d.flags && typeof d.flags === 'object' ? d.flags : {} });
+      }, function () {});
     });
   }
 
@@ -81,7 +86,9 @@
   }
   var memo = {};
   function remember(name, build) {
-    if (memo.recipes !== state.recipes || memo.breads !== state.breads) memo = { recipes: state.recipes, breads: state.breads };
+    if (memo.recipes !== state.recipes || memo.breads !== state.breads || memo.labelFlags !== state.labelFlags) {
+      memo = { recipes: state.recipes, breads: state.breads, labelFlags: state.labelFlags };
+    }
     if (!memo[name]) memo[name] = build();
     return memo[name];
   }
@@ -153,7 +160,7 @@
         return String(b.date || '').localeCompare(String(a.date || '')) || (b.createdAt || 0) - (a.createdAt || 0);
       });
       g.latest = g.lines[0].latest;
-      g.flag = (g.lines.filter(function (l) { return l.flag; })[0] || {}).flag || '';
+      g.flag = (g.label && labelFlag(g.name)) || (g.lines.filter(function (l) { return l.flag; })[0] || {}).flag || '';
       g.bakedCount = bakedOf(g.breads).length;
       g.baked = g.bakedCount > 0;
     });
@@ -177,6 +184,26 @@
     var count = {};
     lines().forEach(function (l) { if (l.flag) count[l.flag] = (count[l.flag] || 0) + l.tweaks.length; });
     return Object.keys(count).sort(function (a, b) { return count[b] - count[a]; });
+  }
+  /** The flag chosen for a label, if any. */
+  function labelFlag(name) { return U.cleanFlag(state.labelFlags[U.nameKey(name)]); }
+  /** Keep a label's flag. Nothing is written when it has not changed. */
+  function setLabelFlag(name, code) {
+    var k = U.nameKey(name), flag = U.cleanFlag(code);
+    if (!k || labelFlag(name) === flag) return Promise.resolve();
+    var next = Object.assign({}, state.labelFlags);
+    if (flag) next[k] = flag; else delete next[k];
+    set({ labelFlags: next });
+    return db.doc('meta/labels').set({ flags: next });
+  }
+  /** What the Parent list offers: every label, and every recipe's name, A to Z. */
+  function parentChoices() {
+    var seen = {}, out = [];
+    labels().concat(lines().map(function (l) { return l.name; })).forEach(function (n) {
+      var k = U.nameKey(n);
+      if (k && !seen[k]) { seen[k] = true; out.push(n); }
+    });
+    return out.sort(function (a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }); });
   }
   /** Labels already used, most recent first. */
   function labels() {
@@ -369,6 +396,7 @@
       }
       // the label and flag in the form are the recipe's: keep every tweak of it in step
       if (recipeId && line) write = write.then(function () { return setShared(line, { parent: draft.parent, flag: draft.flag }, recipeId); });
+      if (recipeId && draft.parent && 'parentFlag' in input.recipe) write = write.then(function () { return setLabelFlag(draft.parent, input.recipe.parentFlag); });
       return write.then(function () {
         var ref = input.id ? db.collection('breads').doc(input.id) : db.collection('breads').doc();
         var r = b.ratings || {}, n = b.notes || {};
@@ -409,6 +437,7 @@
    */
   function saveRecipes(list, originalBlobs) {
     var t = Date.now(), lineId = null, n = 0;
+    var first = list[0] && list[0].recipe;
     return putOriginals(originalBlobs).then(function (ids) {
       return list.reduce(function (chain, item) {
         return chain.then(function (doneIds) {
@@ -439,7 +468,10 @@
             return doneIds.concat([ref.id]);
           });
         });
-      }, Promise.resolve([]));
+      }, Promise.resolve([])).then(function (done) {
+        var parent = first ? String(first.parent || '').trim() : '';
+        return parent && 'parentFlag' in first ? setLabelFlag(parent, first.parentFlag).then(function () { return done; }) : done;
+      });
     });
   }
 
@@ -482,6 +514,7 @@
     groups: groups, groupOf: groupOf, groupByKey: groupByKey, toTry: toTry, setToTryOrder: setToTryOrder,
     stats: stats, isBakedBread: isBakedBread, bakedOf: bakedOf,
     recipeFlag: recipeFlag, breadFlag: breadFlag, groupFlag: groupFlag, flagsUsed: flagsUsed, labels: labels,
+    labelFlag: labelFlag, parentChoices: parentChoices,
     names: names, otherNames: otherNames, types: types, sources: sources,
     saveBread: saveBread, deleteBread: deleteBread, saveRecipes: saveRecipes, deleteRecipe: deleteRecipe
   };

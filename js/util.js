@@ -83,29 +83,43 @@
   }
 
   // ---------- ingredients ----------
-  var GROUPS = ['flour', 'water', 'dairy', 'yeast', 'salt', 'other'];
-  var GROUP_LABEL = { flour: 'Flour', water: 'Water', dairy: 'Dairy', yeast: 'Yeast', salt: 'Salt', other: 'Other' };
+  var GROUPS = ['flour', 'water', 'dairy', 'yeast', 'salt', 'sugar', 'other'];
+  var GROUP_LABEL = { flour: 'Flour', water: 'Water', dairy: 'Dairy', yeast: 'Yeast', salt: 'Salt', sugar: 'Sugar', other: 'Other' };
   /** The kinds offered for each group. */
   var DEFAULT_TYPES = {
     flour: ['AP', 'Bread'],
-    water: ['Lukewarm', 'Warm', 'Hot'],
+    water: ['Room temp', 'Lukewarm', 'Warm', 'Hot'],
     dairy: ['Milk', 'Butter'],
-    yeast: ['Active dry', 'Instant', 'Bread machine']
+    yeast: ['Active dry', 'Instant'],
+    sugar: ['Sugar', 'Brown sugar', 'Honey', 'Molasses']
   };
   /** The kind a new row starts with. */
-  var DEFAULT_TYPE = { flour: 'AP', water: '', dairy: 'Milk', yeast: 'Active dry', salt: '', other: '' };
+  var DEFAULT_TYPE = { flour: 'AP', water: 'Room temp', dairy: 'Milk', yeast: 'Active dry', salt: '', sugar: 'Sugar', other: '' };
   /** Every measurement starts in grams. */
   var DEFAULT_UNIT = 'g';
   /** Named ingredients that are always one tap away. */
-  var STAPLES = ['Sugar'];
+  var STAPLES = [];
   /** The rows a blank recipe starts with. */
   var STARTING = ['flour', 'water', 'yeast', 'salt'];
+  /** Counted, not weighed: a new row of one of these starts at 1, with no unit. */
+  var COUNTED = /^eggs?$/i;
 
-  /** Salt has its own row now; the first version kept it as a named "other" ingredient. */
+  /**
+   * A row as it is read today. The first version kept salt as a named "other" ingredient, and
+   * sweeteners were named ingredients before they had their own row. Some names are read as
+   * the owner calls them: bread machine yeast is instant yeast, and canola oil is just oil.
+   */
   function regroup(i) {
     var group = GROUPS.indexOf(i.group) >= 0 ? i.group : 'other';
     var type = String(i.type || '').trim();
     if (group === 'other' && /^salt$/i.test(type)) return { group: 'salt', type: '' };
+    if (group === 'other' && /^(.*\bsugar|honey|molasses)$/i.test(type)) group = 'sugar';
+    if (group === 'sugar') {
+      var known = DEFAULT_TYPES.sugar.filter(function (t) { return t.toLowerCase() === type.toLowerCase(); })[0];
+      type = known || type;
+    }
+    if (group === 'yeast' && /^bread[ -]?machine( yeast)?$/i.test(type)) type = 'Instant';
+    if (group === 'other' && /^canola( oil)?$/i.test(type)) type = 'Oil';
     return { group: group, type: group === 'salt' ? '' : type };
   }
   /** The same row, brought up to date, keeping anything else the form keeps on it. */
@@ -116,6 +130,7 @@
     if (ing.group === 'flour') return t ? (/flour/i.test(t) ? t : t + ' flour') : 'Flour';
     if (ing.group === 'water') return t ? (/water/i.test(t) ? t : t + ' water') : 'Water';
     if (ing.group === 'dairy') return t || 'Dairy';
+    if (ing.group === 'sugar') return t || 'Sugar';
     if (ing.group === 'yeast') return 'Yeast';
     if (ing.group === 'salt') return 'Salt';
     return t;
@@ -130,7 +145,13 @@
   /** A new row. `_auto` marks one that was offered rather than typed: left without an amount, it is not saved. */
   function newIngredient(group, type) {
     if (type === undefined || type === null) type = DEFAULT_TYPE[group] || '';
+    if (COUNTED.test(type)) return { group: group, type: type, amount: '1', unit: '', note: '', _auto: true };
     return { group: group, type: type, amount: '', unit: DEFAULT_UNIT, note: '', _auto: true };
+  }
+  /** Naming a row something counted (an egg) gives it a count of 1 and no unit, if nothing was entered yet. */
+  function countedRow(ing) {
+    return COUNTED.test(String(ing.type || '').trim()) && !String(ing.amount || '').trim() && ing.unit === DEFAULT_UNIT
+      ? Object.assign({}, ing, { amount: '1', unit: '' }) : ing;
   }
   function cleanIngredient(i) {
     var g = regroup(i);
@@ -191,6 +212,17 @@
     if (!Array.isArray(b.proof)) return DEFAULT_PROOF.slice();
     return PROOF_PLACES.map(function (p) { return p.id; }).filter(function (id) { return b.proof.indexOf(id) >= 0; });
   }
+  function proofPlaces(list) {
+    return PROOF_PLACES.map(function (p) { return p.id; }).filter(function (id) { return (list || []).indexOf(id) >= 0; });
+  }
+  /** Proofs after the first: each has its own places and time. */
+  function extraProofsOf(b) {
+    return (Array.isArray(b.extraProofs) ? b.extraProofs : []).map(function (x) {
+      return { proof: proofPlaces(x && x.proof), minutes: num(x && x.minutes) };
+    }).filter(function (x) { return x.proof.length || x.minutes !== null; });
+  }
+  /** How long a proof in the machine usually takes. */
+  function machineProofMinutes() { return (LGT.machine && LGT.machine.proofMinutes) || null; }
   function proofLabels(ids) {
     return PROOF_PLACES.filter(function (p) { return ids.indexOf(p.id) >= 0; }).map(function (p) { return p.label; });
   }
@@ -203,7 +235,7 @@
     return {
       programs: programs, size: b.size || '', crust: b.crust || '', minutes: num(b.minutes),
       added: extra ? added : null, reason: extra ? String(b.reason || '').trim() : '',
-      proof: proofOf(b), proofMinutes: num(b.proofMinutes),
+      proof: proofOf(b), proofMinutes: num(b.proofMinutes), extraProofs: extraProofsOf(b),
       ovenTemp: num(b.ovenTemp), ovenMinutes: num(b.ovenMinutes)
     };
   }
@@ -232,7 +264,7 @@
     var c = cleanRecipe(r), b = c.bake;
     return !c.ingredients.length && !c.method && !c.source && !c.link && !c.parent && !c.flag && !c.originals.length &&
       !b.programs.length && !b.size && !b.crust && b.minutes === null && b.added === null && !b.reason &&
-      b.ovenTemp === null && b.ovenMinutes === null && b.proofMinutes === null;
+      b.ovenTemp === null && b.ovenMinutes === null && b.proofMinutes === null && !b.extraProofs.length;
   }
   /** What makes two bakes the same variation: the ingredients and the baking details. */
   function recipeKey(r) {
@@ -334,7 +366,10 @@
    */
   function minutesSpent(bake, splitCopy) {
     var b = cleanBake(bake), sum = 0;
-    if (!splitCopy) sum += (b.minutes || 0) + (b.proofMinutes || 0);
+    if (!splitCopy) {
+      sum += (b.minutes || 0) + (b.proofMinutes || 0);
+      b.extraProofs.forEach(function (x) { sum += x.minutes || 0; });
+    }
     return sum + (b.added || 0) + (b.ovenMinutes || 0);
   }
   /** "850 g" or "2.4 kg". */
@@ -385,18 +420,20 @@
   }
   function hasDough(programs) { return programList(programs).some(function (p) { return p.dough; }); }
   function hasManual(programs) { return programList(programs).some(function (p) { return p.manual; }); }
-  function programMinutes(n, size) {
+  /** A program's time. A dough program is stopped after kneading when the dough is not proofed in the machine. */
+  function programMinutes(n, size, proof) {
     var p = program(n);
     if (!p) return null;
     if (p.minutes) return p.minutes[size] != null ? p.minutes[size] : null;
+    if (p.kneadOnly != null && proof && proof.indexOf('machine') < 0) return p.kneadOnly;
     return p.total != null ? p.total : null;
   }
   /** The machine's own time for the chosen programs. A manual program adds nothing: its time is typed in. */
-  function totalMinutes(programs, size) {
+  function totalMinutes(programs, size, proof) {
     var timed = programList(programs).filter(function (p) { return !p.manual; }), sum = 0;
     if (!timed.length) return null;
     for (var i = 0; i < timed.length; i++) {
-      var m = programMinutes(timed[i].n, size);
+      var m = programMinutes(timed[i].n, size, proof);
       if (m === null) return null;
       sum += m;
     }
@@ -421,18 +458,37 @@
     var c = ((LGT.machine && LGT.machine.crusts) || []).filter(function (x) { return x.id === id; })[0];
     return c ? c.label : '';
   }
+  /** 2 -> "2nd", 3 -> "3rd", 11 -> "11th". */
+  function ordinal(n) {
+    var t = n % 100, u = n % 10;
+    return n + (t >= 11 && t <= 13 ? 'th' : u === 1 ? 'st' : u === 2 ? 'nd' : u === 3 ? 'rd' : 'th');
+  }
+  /** Another proof, starting in the machine at its usual time. */
+  function newProof() { return { proof: DEFAULT_PROOF.slice(), minutes: machineProofMinutes() }; }
   /** Apply a change to the baking details, keeping size, crust, time and added time consistent with the programs. */
   function withBake(bake, patch) {
     var prev = cleanBake(bake);
     var next = Object.assign({}, prev, patch);
     next.programs = programsOf(next);
-    var wasAuto = prev.minutes === null || prev.minutes === totalMinutes(prev.programs, prev.size);
+    next.proof = proofPlaces(next.proof);
+    next.extraProofs = Array.isArray(next.extraProofs) ? next.extraProofs : [];
+    var wasAuto = prev.minutes === null || prev.minutes === totalMinutes(prev.programs, prev.size, prev.proof);
     if ('programs' in patch || 'size' in patch) {
       var sizes = sizesFor(next.programs);
       if (!sizes.some(function (s) { return s.id === next.size; })) next.size = sizes.length === 1 ? sizes[0].id : '';
       if (!hasCrust(next.programs)) next.crust = '';
-      if (wasAuto && !('minutes' in patch)) next.minutes = totalMinutes(next.programs, next.size);
       if (manualProgram() && !hasManual(next.programs)) { next.added = null; next.reason = ''; }
+    }
+    if (('programs' in patch || 'size' in patch || 'proof' in patch) && wasAuto && !('minutes' in patch)) {
+      next.minutes = totalMinutes(next.programs, next.size, next.proof);
+    }
+    // A proof in the machine starts at its usual time: when it is chosen, or when a dough program is
+    // chosen while it is. Taking it away again takes that time with it, unless it was changed.
+    var usual = machineProofMinutes(), inMachine = next.proof.indexOf('machine') >= 0;
+    if (usual !== null && !('proofMinutes' in patch)) {
+      var turnedOn = inMachine && (prev.proof.indexOf('machine') < 0 || (hasDough(next.programs) && !hasDough(prev.programs)));
+      if (turnedOn && prev.proofMinutes === null) next.proofMinutes = usual;
+      if (!inMachine && prev.proof.indexOf('machine') >= 0 && prev.proofMinutes === usual) next.proofMinutes = null;
     }
     return next;
   }
@@ -482,7 +538,7 @@
     num: num, fmtMinutes: fmtMinutes, splitMinutes: splitMinutes, joinMinutes: joinMinutes,
     prettyAmount: prettyAmount, parseAmount: parseAmount, amountLabel: amountLabel, unitLabel: unitLabel,
     UNITS: UNITS, GROUPS: GROUPS, GROUP_LABEL: GROUP_LABEL, DEFAULT_TYPES: DEFAULT_TYPES, DEFAULT_UNIT: DEFAULT_UNIT,
-    DEFAULT_TYPE: DEFAULT_TYPE, PROOF_PLACES: PROOF_PLACES, proofLabels: proofLabels, STAPLES: STAPLES, STARTING: STARTING, upgradeIngredient: upgradeIngredient,
+    DEFAULT_TYPE: DEFAULT_TYPE, PROOF_PLACES: PROOF_PLACES, proofLabels: proofLabels, newProof: newProof, ordinal: ordinal, countedRow: countedRow, STAPLES: STAPLES, STARTING: STARTING, upgradeIngredient: upgradeIngredient,
     ingredientName: ingredientName, ingredientDetail: ingredientDetail, newIngredient: newIngredient,
     cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient, changedLines: changedLines,
     emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake,

@@ -49,12 +49,13 @@ test('ingredients are labelled for the recipe card', () => {
 
 test('a blank recipe starts with flour, water, yeast and salt, all in grams', () => {
   const rows = U.emptyRecipe().ingredients.map((i) => [i.group, i.type, i.unit]);
-  assert.deepEqual(rows, [['flour', 'AP', 'g'], ['water', '', 'g'], ['yeast', 'Active dry', 'g'], ['salt', '', 'g']]);
-  assert.deepEqual(U.STAPLES, ['Sugar']);
-  assert.equal(U.newIngredient('other', 'Sugar').unit, 'g');
+  assert.deepEqual(rows, [['flour', 'AP', 'g'], ['water', 'Room temp', 'g'], ['yeast', 'Active dry', 'g'], ['salt', '', 'g']]);
+  assert.equal(U.newIngredient('sugar').type, 'Sugar');
+  assert.equal(U.newIngredient('sugar').unit, 'g');
+  assert.deepEqual([U.newIngredient('other', 'Egg').amount, U.newIngredient('other', 'Egg').unit], ['1', '']);
   assert.equal(U.newIngredient('dairy').type, 'Milk');
   assert.equal(U.newIngredient('dairy').unit, 'g');
-  assert.deepEqual(U.DEFAULT_TYPES.water, ['Lukewarm', 'Warm', 'Hot']);
+  assert.deepEqual(U.DEFAULT_TYPES.water, ['Room temp', 'Lukewarm', 'Warm', 'Hot']);
   assert.equal(U.UNITS[0], 'g');
 });
 
@@ -97,7 +98,7 @@ test('a stored recipe is trimmed, ordered and free of blank rows', () => {
     { group: 'other', type: 'Melted butter', amount: '', unit: '', note: '' },
     { group: 'other', type: 'Seeds', amount: '2', unit: '', note: '' }
   ], 'a row that was only offered (Sugar) and never given an amount is dropped; one she named is kept');
-  assert.deepEqual(r.bake, { programs: [1], size: '1.5', crust: '', minutes: 205, added: null, reason: '', proof: ['machine'], proofMinutes: null, ovenTemp: null, ovenMinutes: null });
+  assert.deepEqual(r.bake, { programs: [1], size: '1.5', crust: '', minutes: 205, added: null, reason: '', proof: ['machine'], proofMinutes: null, extraProofs: [], ovenTemp: null, ovenMinutes: null });
   assert.equal(r.link, 'https://example.com/recipe');
   assert.equal(r.parent, 'french bread');
 });
@@ -123,10 +124,10 @@ test('links are only ever https', () => {
 test('entries saved before programs could be combined still read correctly', () => {
   // one program, with time added by hand: that was the Bake program
   assert.deepEqual(U.cleanBake({ program: 2, size: '1.5', minutes: 255, added: 10, reason: 'too light' }),
-    { programs: [2, 12], size: '1.5', crust: '', minutes: 255, added: 10, reason: 'too light', proof: ['machine'], proofMinutes: null, ovenTemp: null, ovenMinutes: null });
+    { programs: [2, 12], size: '1.5', crust: '', minutes: 255, added: 10, reason: 'too light', proof: ['machine'], proofMinutes: null, extraProofs: [], ovenTemp: null, ovenMinutes: null });
   // a reason left behind with no added time is dropped
   assert.deepEqual(U.cleanBake({ program: 8, minutes: 90, added: null, reason: 'too light' }),
-    { programs: [8], size: '', crust: '', minutes: 90, added: null, reason: '', proof: ['machine'], proofMinutes: null, ovenTemp: null, ovenMinutes: null });
+    { programs: [8], size: '', crust: '', minutes: 90, added: null, reason: '', proof: ['machine'], proofMinutes: null, extraProofs: [], ovenTemp: null, ovenMinutes: null });
   assert.deepEqual(U.cleanBake({ program: null }).programs, []);
   assert.deepEqual(U.cleanBake({ programs: [1, 1, 99, '12'] }).programs, [1, 12], 'duplicates and unknown programs go');
   // the same bake reads the same whichever way it was stored
@@ -345,4 +346,56 @@ test('tweaks are numbered in roman numerals, from II on in a name', () => {
   assert.deepEqual([1, 2, 3, 4, 9, 14, 40].map(U.roman), ['I', 'II', 'III', 'IV', 'IX', 'XIV', 'XL']);
   assert.equal(U.tweakName('Country White Bread', 1), 'Country White Bread');
   assert.equal(U.tweakName(' Country White Bread ', 3), 'Country White Bread III');
+});
+
+test('sweeteners have their own row; some names are read the way she calls them', () => {
+  const up = (group, type) => { const i = U.upgradeIngredient({ group, type }); return [i.group, i.type]; };
+  assert.deepEqual(up('other', 'Honey'), ['sugar', 'Honey']);
+  assert.deepEqual(up('other', 'brown sugar'), ['sugar', 'Brown sugar']);
+  assert.deepEqual(up('other', 'Granulated sugar'), ['sugar', 'Granulated sugar']);
+  assert.deepEqual(up('other', 'Molasses'), ['sugar', 'Molasses']);
+  assert.deepEqual(up('yeast', 'Bread machine yeast'), ['yeast', 'Instant']);
+  assert.deepEqual(up('yeast', 'Bread machine'), ['yeast', 'Instant']);
+  assert.deepEqual(up('other', 'Canola oil'), ['other', 'Oil']);
+  assert.deepEqual(up('other', 'Olive oil'), ['other', 'Olive oil']);
+  // a recipe saved the old way is the same tweak as the same recipe saved now
+  const old = { ingredients: [{ group: 'other', type: 'Honey', amount: '2', unit: 'tbsp' }, { group: 'yeast', type: 'Bread machine yeast', amount: '3', unit: 'tsp' }] };
+  const now = { ingredients: [{ group: 'yeast', type: 'Instant', amount: '3', unit: 'tsp' }, { group: 'sugar', type: 'Honey', amount: '2', unit: 'tbsp' }] };
+  assert.equal(U.recipeKey(old), U.recipeKey(now));
+  // a row named as a count starts at 1 with no unit, unless something was entered
+  assert.deepEqual(U.countedRow({ group: 'other', type: 'Eggs', amount: '', unit: 'g' }), { group: 'other', type: 'Eggs', amount: '1', unit: '' });
+  assert.equal(U.countedRow({ group: 'other', type: 'Egg', amount: '2', unit: 'g' }).amount, '2');
+});
+
+test('dough timing and proofs follow where the dough is proofed', () => {
+  // Dough in the machine: the whole cycle, and a proof in the machine at its usual time
+  let b = U.withBake(U.cleanBake({}), { programs: [8] });
+  assert.equal(b.minutes, 90);
+  assert.equal(b.proofMinutes, 65);
+  // proofed elsewhere: the machine only kneads, and the machine's proof time goes with it
+  b = U.withBake(b, { proof: ['fridge'] });
+  assert.equal(b.minutes, 25);
+  assert.equal(b.proofMinutes, null);
+  // back in the machine
+  b = U.withBake(b, { proof: ['fridge', 'machine'] });
+  assert.equal(b.minutes, 90);
+  assert.equal(b.proofMinutes, 65);
+  // a time she typed is kept
+  b = U.withBake(b, { proofMinutes: 40 });
+  b = U.withBake(b, { proof: ['fridge'] });
+  assert.equal(b.proofMinutes, 40);
+  b = U.withBake(b, { minutes: 30 });
+  b = U.withBake(b, { proof: ['machine'] });
+  assert.equal(b.minutes, 30);
+  // other programs keep their own time; choosing one does not add a proof
+  const white = U.withBake(U.cleanBake({}), { programs: [1], size: '1.5' });
+  assert.equal(white.minutes, 205);
+  assert.equal(white.proofMinutes, null);
+  // more proofs: each with its places and time, counted in time spent
+  assert.deepEqual(U.newProof(), { proof: ['machine'], minutes: 65 });
+  const two = U.cleanBake({ programs: [8], minutes: 25, proof: ['fridge'], proofMinutes: 600, extraProofs: [{ proof: ['airfryer'], minutes: 45 }, { proof: [], minutes: null }] });
+  assert.deepEqual(two.extraProofs, [{ proof: ['airfryer'], minutes: 45 }], 'an empty one is dropped');
+  assert.equal(U.minutesSpent(two), 25 + 600 + 45);
+  assert.notEqual(U.recipeKey({ bake: two }), U.recipeKey({ bake: U.cleanBake({ programs: [8], minutes: 25, proof: ['fridge'], proofMinutes: 600 }) }), 'another proof is another tweak');
+  assert.deepEqual([2, 3, 4, 11, 21].map(U.ordinal), ['2nd', '3rd', '4th', '11th', '21st']);
 });
