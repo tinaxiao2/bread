@@ -192,111 +192,106 @@ test('an entry with no bake recorded is marked Dough in the gallery', async (t) 
   assert.equal(await page.locator('.gal .tile .flag').first().innerText(), 'Dough');
 });
 
-test('the same name is the same recipe; different ingredients become a variation inside it', async (t) => {
+test('baking a recipe again lands on its tweak or adds the next, numbered I, II', async (t) => {
   const page = await open(t);
   await logBread(page);
 
-  // typing the name again fills the recipe in, and saving joins it
-  await page.getByRole('button', { name: 'Add bread' }).click();
-  await field(page, 'Name').fill('milk  BREAD');
-  await field(page, 'Comments').click();
-  assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '400', 'filled from the saved recipe');
-  assert.equal(await line(page, 'Water').getByLabel('Amount').inputValue(), '300');
-  assert.equal(await program(page, 1, 'White').getAttribute('aria-pressed'), 'true');
+  // Bake again with more water: a new tweak, and the name follows it
+  await page.locator('.gal .tile').click();
+  await page.getByRole('button', { name: 'Bake again' }).click();
+  assert.equal(await field(page, 'Name').inputValue(), 'Milk bread');
+  await line(page, 'Water').getByLabel('Amount').fill('320');
+  assert.equal(await field(page, 'Name').inputValue(), 'Milk bread II');
   await snap(page);
   await save(page);
-  await formGone(page);
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('heading', { name: 'New bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
+  assert.deepEqual(await page.locator('.gal .tile .meta b').allInnerTexts(), ['Milk bread II', 'Milk bread']);
+
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await count(page.locator('.rc'), 1);
   assert.match(await page.locator('.rc').innerText(), /Baked 2×/);
-  assert.doesNotMatch(await page.locator('.rc').innerText(), /tweaks/);
-
-  // a third bake with more water: one recipe still, now with two variations
-  await page.getByRole('button', { name: 'Add bread' }).click();
-  await field(page, 'Name').fill('Milk bread');
-  await field(page, 'Comments').click();
-  await line(page, 'Water').getByLabel('Amount').fill('320');
-  await snap(page);
-  await save(page);
-  await formGone(page);
-  await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /Baked 3×[\s\S]*2 tweaks/);
-
   await page.locator('.rc .open').click();
-  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['TWEAK 2', 'TWEAK 1']);
-  const two = page.locator('.variation').first(), one = page.locator('.variation').nth(1);
-  assert.match(await two.locator('.vhead').innerText(), /Baked 1×/);
-  assert.match(await one.locator('.vhead').innerText(), /Baked 2×/);
+  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['I', 'II']);
+  const one = page.locator('.variation').first(), two = page.locator('.variation').nth(1);
   assert.deepEqual(await two.locator('.ings li.diff span').allInnerTexts(), ['Warm water'], 'the line that differs stands out');
   await count(one.locator('.ings li.diff'), 0);
-  await count(two.locator('.made .tile'), 1);
-  await count(one.locator('.made .tile'), 2);
 
-  // a bread page says which variation it followed
+  // the first tweak again, under a name of her own
+  await one.getByRole('button', { name: 'Bake this' }).click();
+  assert.equal(await field(page, 'Name').inputValue(), 'Milk bread');
+  await field(page, 'Name').fill('Milk bread, rainy day');
+  await snap(page);
+  await save(page);
+  await page.getByRole('heading', { name: 'New bread' }).waitFor({ state: 'detached' });
+  await count(one.locator('.made .tile'), 2);
+  await count(two.locator('.made .tile'), 1);
+  assert.match(await one.locator('.vhead').innerText(), /Baked 2×/);
+
+  // a bread page says which tweak it followed
   await two.locator('.made .tile').click();
-  assert.match(await page.locator('.screen').last().locator('.rhead').innerText(), /Tweak 2/);
+  assert.equal(await page.locator('.screen').last().locator('.rhead .pill').innerText(), 'II');
+  assert.equal(await page.locator('.screen').last().locator('.rhead h3').innerText(), 'Milk bread');
   await page.getByRole('button', { name: 'Back' }).last().click();
   await page.getByRole('button', { name: 'Back' }).click();
 
-  // another name is another recipe
-  await logBread(page, { name: 'Sandwich loaf' });
+  // typing the same name is not enough to join it: that is a recipe of its own
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('Milk bread');
+  await line(page, 'Flour').getByLabel('Amount').fill('400');
+  await snap(page);
+  await save(page);
+  await formGone(page);
   await count(page.locator('.rc'), 2);
 });
 
-test('a recipe attached to a parent shows as one of its tweaks', async (t) => {
-  const page = await open(t);
-  await logBread(page, { name: 'french bread' });
-
-  // a new name, attached to french bread
-  await page.getByRole('button', { name: 'Add bread' }).click();
-  await field(page, 'Name').fill('herb french');
-  await field(page, 'Comments').click();
-  assert.deepEqual(await field(page, 'Parent').locator('option').allInnerTexts(), ['–', 'french bread']);
-  await field(page, 'Parent').selectOption('french bread');
-  await line(page, 'Flour').getByLabel('Amount').fill('380');
-  await chip(page, 'Other').click();
-  await line(page, 'Other').getByLabel('Ingredient').fill('Rosemary');
-  await line(page, 'Other').getByLabel('Amount').fill('2');
-  await snap(page);
-  await save(page);
-  await formGone(page);
-
-  await page.getByRole('button', { name: 'Recipes' }).click();
-  await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /french bread[\s\S]*Baked 2×[\s\S]*2 tweaks/);
-  await page.locator('.rc .open').click();
-  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['TWEAK 2', 'TWEAK 1']);
-  assert.deepEqual(await page.locator('.tname').allInnerTexts(), ['herb french'], 'a tweak with its own name shows it');
+test('a label gathers recipes; arrows step between them', async (t) => {
+  const page = await open(t, { db: RANKED });
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
+  const titled = (name) => page.locator('.rc', { has: page.locator('h3', { hasText: new RegExp('^' + name + '$') }) });
+  assert.match(await titled('Mantou').innerText(), /2 recipes/);
+  await titled('Mantou').locator('.open').click();
+  assert.equal(await page.locator('.screen h2').innerText(), 'Mantou');
+  assert.equal(await page.locator('.pager h3').innerText(), 'Milk Mantou', 'opens on the one baked last');
+  assert.equal(await page.getByRole('button', { name: 'Next recipe' }).isDisabled(), true);
+  await page.getByRole('button', { name: 'Previous recipe' }).click();
+  assert.equal(await page.locator('.pager h3').innerText(), 'Mantou');
+  assert.equal(await page.getByRole('button', { name: 'Previous recipe' }).isDisabled(), true);
   await page.getByRole('button', { name: 'Back' }).click();
 
-  // baking it again by name keeps it attached
-  await page.getByRole('button', { name: 'Add bread' }).click();
-  await field(page, 'Name').fill('herb french');
-  await field(page, 'Comments').click();
-  assert.equal(await field(page, 'Parent').inputValue(), 'french bread');
-  await snap(page);
-  await save(page);
-  await formGone(page);
-  await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /Baked 3×[\s\S]*2 tweaks/);
+  // filing two new recipes under a new label
+  async function bread(name, parent) {
+    await page.getByRole('button', { name: 'Add bread' }).click();
+    await field(page, 'Name').fill(name);
+    if (parent) await parent();
+    await line(page, 'Flour').getByLabel('Amount').fill('500');
+    await snap(page);
+    await save(page);
+    await formGone(page);
+  }
+  await bread('Country White Bread', () => field(page, 'Parent').fill('White bread'));
+  await bread('Classic White Sandwich Bread', async () => {
+    await field(page, 'Parent').fill('whi');
+    await page.getByRole('button', { name: 'White bread', exact: true }).click();
+    assert.equal(await field(page, 'Parent').inputValue(), 'White bread');
+  });
+  // a recipe named like the label is not under it unless it is filed there
+  await bread('White bread');
+  await count(titled('White bread'), 2);
+  const label = titled('White bread').filter({ has: page.locator('.count') });
+  await count(label, 1);
+  assert.match(await label.innerText(), /Baked 2×[\s\S]*2 recipes/);
 
-  // renaming the parent keeps the tweak attached
-  await page.locator('.rc .open').click();
-  await page.getByRole('button', { name: 'Edit tweak 1' }).click();
-  await field(page, 'Name').fill('baguette');
-  await save(page);
-  await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
-  assert.equal(await page.locator('.screen h2').first().innerText(), 'baguette');
-  await count(page.locator('.variation'), 2);
-
-  // detaching gives it its own card again
-  await page.getByRole('button', { name: 'Edit tweak 2' }).click();
-  assert.equal(await field(page, 'Parent').inputValue(), 'baguette');
-  await field(page, 'Parent').selectOption('');
+  // taking a recipe out of a label gives it its own card
+  await label.locator('.open').click();
+  assert.equal(await page.locator('.pager h3').innerText(), 'Classic White Sandwich Bread');
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await field(page, 'Parent').fill('');
   await save(page);
   await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
-  await count(page.locator('.rc'), 2);
+  await count(titled('Classic White Sandwich Bread'), 1);
+  await count(page.locator('.rc .count'), 1);
 });
 
 test('half stars, proofing and several photos', async (t) => {
@@ -448,9 +443,10 @@ const RANKED = (() => {
     ratings: { crust: 4, crumb: 4, taste: 4 }, createdAt: n, updatedAt: n });
   return {
     'recipes/t1': r('Challah', 1), 'recipes/t2': r('Croissants', 2), 'recipes/t3': r('Donuts', 3),
-    'recipes/m1': withFlour('Mantou', 10), 'recipes/m2': withFlour('Milk Mantou', 11, { parent: 'Mantou' }),
-    'recipes/f1': withFlour('baguette', 20, { parent: 'french bread' }),
-    'recipes/f2': withFlour('baguette II', 21, { parent: 'french bread' }),
+    'recipes/m1': withFlour('Mantou', 10, { parent: 'Mantou', line: 'm1', tweak: 1 }),
+    'recipes/m2': withFlour('Milk Mantou', 11, { parent: 'Mantou', line: 'm2', tweak: 1 }),
+    'recipes/f1': withFlour('baguette', 20, { parent: 'french bread', line: 'f1', tweak: 1 }),
+    'recipes/f2': withFlour('baguette', 21, { parent: 'french bread', line: 'f1', tweak: 2 }),
     'breads/1': b('Mantou', 'm1', 10, '2026-11-20'), 'breads/2': b('Milk Mantou', 'm2', 11, '2026-11-21'),
     'breads/3': b('baguette', 'f1', 20, '2026-11-22'), 'breads/4': b('baguette II', 'f2', 21, '2026-11-23'),
     'breads/5': b('Loose loaf', null, 30, '2026-11-24')
@@ -459,7 +455,7 @@ const RANKED = (() => {
 
 test('recipes to try can be ranked by dragging, and the ranking is kept', async (t) => {
   const page = await open(t, { db: RANKED });
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await page.getByRole('tab', { name: /To try/ }).click();
   const names = () => page.locator('.list.ranked .rc h3').allInnerTexts();
   await count(page.locator('.list.ranked .rc'), 3);
@@ -492,7 +488,7 @@ test('recipes to try can be ranked by dragging, and the ranking is kept', async 
 
   // kept after a reload, and a new recipe to try joins at the end
   await page.reload();
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await page.getByRole('tab', { name: /To try/ }).click();
   assert.deepEqual(await names(), after);
   await page.getByRole('button', { name: 'Add recipe' }).click();
@@ -516,7 +512,7 @@ test('the gallery shows every entry, or one tile per parent recipe', async (t) =
   await page.getByRole('tab', { name: 'Recipes' }).click();
   await count(tiles, 2);
   assert.deepEqual((await tiles.locator('.meta b').allInnerTexts()).sort(), ['Mantou', 'french bread'],
-    'tweaks sit under their parent, even one whose own recipe was renamed away; to-try and recipe-less entries are not shown');
+    'one tile per label; to-try and recipe-less entries are not shown');
   const mantou = page.locator('.stack', { hasText: 'Mantou' });
   assert.equal(await mantou.locator('.badge').innerText(), '2', 'the count in a bubble');
   await count(mantou.locator('.layer'), 1, 'one card stacked behind for one extra entry');
@@ -531,40 +527,6 @@ test('the gallery shows every entry, or one tile per parent recipe', async (t) =
   await count(tiles, 5);
 });
 
-test('the Parent list only offers recipes with no parent, never the recipe itself', async (t) => {
-  const page = await open(t, { db: RANKED });
-  const options = () => field(page, 'Parent').locator('option').allInnerTexts();
-
-  await page.getByRole('button', { name: 'Add bread' }).click();
-  await field(page, 'Name').fill('Rolls');
-  await field(page, 'Comments').click();
-  const offered = await options();
-  assert.ok(offered.includes('Mantou') && offered.includes('french bread') && offered.includes('Challah'), offered.join(', '));
-  for (const child of ['Milk Mantou', 'baguette', 'baguette II']) assert.ok(!offered.includes(child), child + ' has a parent, so it is not offered');
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await page.getByRole('button', { name: 'Discard' }).click();
-
-  // editing a tweak: neither its own name nor its group is offered, even while renaming it
-  await page.getByRole('button', { name: 'Recipes' }).click();
-  await page.locator('.rc .open', { hasText: 'Mantou' }).click();
-  await page.getByRole('button', { name: 'Edit tweak 2' }).click();
-  assert.equal(await field(page, 'Parent').inputValue(), 'Mantou');
-  await field(page, 'Name').fill('Sweet Mantou');
-  assert.ok(!(await options()).includes('Milk Mantou'));
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await page.getByRole('button', { name: 'Discard' }).click();
-
-  // once it is detached it can be a parent again
-  await page.getByRole('button', { name: 'Edit tweak 2' }).click();
-  await field(page, 'Parent').selectOption('');
-  await save(page);
-  await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
-  await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Add bread' }).click();
-  await field(page, 'Name').fill('Rolls');
-  await field(page, 'Comments').click();
-  assert.ok((await options()).includes('Milk Mantou'));
-});
 
 test('the Stats tab adds up flour, loaves, the favourite and time', async (t) => {
   const r = (name, n, flour, bake) => ({ name, ingredients: [{ group: 'flour', type: 'AP', amount: flour[0], unit: flour[1] },
@@ -579,7 +541,7 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
     'breads/3': b('Mantou', 'a', 3, { splitFrom: '2' }),            // same dough as entry 2
     'breads/4': b('sandwich bread', 'b', 4), 'breads/5': b('Mystery', null, 5)
   } });
-  await page.getByRole('button', { name: 'Stats' }).click();
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
   const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
   // flour: 500 g twice (the split copy shares entry 2's dough) + 3 cups at 120 g
   assert.equal(await stat('Flour used').locator('b').innerText(), '1.4 kg');
@@ -591,20 +553,20 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
 
   // an undated entry adds its flour straight away, but is a loaf only once it has a date
   await page.getByRole('button', { name: 'Add bread' }).click();
-  await field(page, 'Name').fill('sandwich bread');
-  await field(page, 'Comments').click();
+  await page.getByRole('button', { name: 'Use recipe' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /sandwich bread/ }).click();
   await page.getByRole('button', { name: 'No date' }).click();
   await save(page);
   await formGone(page);
   assert.equal(await stat('Loaves').locator('b').innerText(), '5');
-  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.locator('.gal .tile').last().click();                    // undated entries come last
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await field(page, 'Date').fill('2026-11-27');
   await save(page);
   await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Stats' }).click();
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
   assert.equal(await stat('Loaves').locator('b').innerText(), '6');
   assert.equal(await stat('Flour used').locator('b').innerText(), '1.7 kg', '1,720 g');
 });
@@ -626,7 +588,7 @@ test('Split marks the copy, so its dough is not counted twice', async (t) => {
   await save(page);
   await page.getByRole('heading', { name: 'Split bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Stats' }).click();
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
   const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
   assert.equal(await stat('Loaves').locator('b').innerText(), '2');
   assert.equal(await stat('Flour used').locator('b').innerText(), '500 g');
@@ -645,25 +607,20 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await formGone(page);
   assert.equal(await page.locator('.gal .tile .fl').innerText(), FR);
 
-  // a tweak attached to it shows the parent's flag until it has its own
-  await page.getByRole('button', { name: 'Add bread' }).click();
-  await field(page, 'Name').fill('herb baguette');
-  await field(page, 'Comments').click();
-  await field(page, 'Parent').selectOption('baguette');
+  // baking it again brings the flag along, on every tweak
+  await page.locator('.gal .tile').click();
+  await page.getByRole('button', { name: 'Bake again' }).click();
+  assert.equal(await field(page, 'Flag').inputValue(), 'FR');
   await line(page, 'Flour').getByLabel('Amount').fill('480');
   await snap(page);
   await save(page);
-  await formGone(page);
+  await page.getByRole('heading', { name: 'New bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
   assert.deepEqual(await page.locator('.gal .tile .fl').allInnerTexts(), [FR, FR]);
 
-  // the same name brings its flag along; a new bread of it keeps it
   await page.getByRole('button', { name: 'Add bread' }).click();
-  await field(page, 'Name').fill('baguette');
-  await field(page, 'Comments').click();
-  assert.equal(await field(page, 'Flag').inputValue(), 'FR');
   await field(page, 'Name').fill('Mantou');
-  await field(page, 'Comments').click();
-  assert.equal(await field(page, 'Flag').inputValue(), '', 'the flag filled in from baguette goes with it');
+  assert.equal(await field(page, 'Flag').inputValue(), '');
   await field(page, 'Flag').selectOption('CN');
   await line(page, 'Flour').getByLabel('Amount').fill('500');
   await snap(page);
@@ -671,25 +628,24 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await formGone(page);
   assert.equal(await page.locator('.gal .tile', { hasText: 'Mantou' }).locator('.fl').innerText(), CN);
 
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   const cards = page.locator('.rc');
   await count(cards, 2);
   assert.equal(await cards.filter({ hasText: 'baguette' }).locator('h3 .fl').innerText(), FR);
   await cards.filter({ hasText: 'baguette' }).locator('.open').click();
   assert.equal(await page.locator('.screen h2 .fl').innerText(), FR);
-  assert.equal(await page.locator('.tname .fl').innerText(), FR, 'the tweak shows its parent’s flag');
 
-  // changing the flag on the recipe changes it on every entry
-  await page.getByRole('button', { name: 'Edit tweak 1' }).click();
+  // changing the flag on one tweak changes it on the whole recipe
+  await page.getByRole('button', { name: 'Edit I', exact: true }).click();
   await field(page, 'Flag').selectOption('');
   await save(page);
   await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
   await count(page.locator('.screen h2 .fl'), 0);
   await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await count(page.locator('.gal .tile .fl'), 1);
 
-  await page.getByRole('button', { name: 'Stats' }).click();
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
   assert.equal(await page.locator('.stat .fl').count(), 0);
 });
 
@@ -708,12 +664,12 @@ test('an entry dated "–" is a plan; giving it a date makes it baked', async (t
   await formGone(page);
   assert.match(await page.locator('.gal .tile .meta small').innerText(), /^–$/);
 
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await count(page.locator('.rc'), 0, 'not under Baked');
   await page.getByRole('tab', { name: /To try/ }).click();
   await count(page.locator('.rc'), 1);
   assert.doesNotMatch(await page.locator('.rc').innerText(), /Baked/);
-  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('tab', { name: 'Recipes' }).click();
   await count(page.locator('.gal .tile'), 0);
   await page.getByRole('tab', { name: 'All' }).click();
@@ -727,12 +683,12 @@ test('an entry dated "–" is a plan; giving it a date makes it baked', async (t
   await save(page);
   await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await page.getByRole('tab', { name: /Baked/ }).click();
   assert.match(await page.locator('.rc').innerText(), /Baked 1×/);
 
   // and "–" takes it back
-  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.locator('.gal .tile').click();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await page.getByRole('button', { name: 'No date' }).click();
@@ -740,7 +696,7 @@ test('an entry dated "–" is a plan; giving it a date makes it baked', async (t
   await save(page);
   await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await count(page.locator('.rc'), 0);
 });
 
@@ -796,13 +752,13 @@ test('typing part of a name offers the saved recipe', async (t) => {
   await page.locator('.suggest').getByRole('button', { name: 'Milk bread' }).click();
   assert.equal(await field(page, 'Name').inputValue(), 'Milk bread');
   assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '400');
-  assert.equal(await page.locator('.suggest').count(), 0);
-
-  // changing to a name with no recipe clears what was filled in, as long as she has not edited it
-  await field(page, 'Name').fill('Something new');
-  await field(page, 'Comments').click();
-  assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '');
-  assert.equal(await program(page, 1, 'White').getAttribute('aria-pressed'), 'false');
+  assert.equal(await page.locator('.suggest', { hasText: 'Milk bread' }).count(), 0);
+  await snap(page);
+  await save(page);
+  await formGone(page);
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
+  await count(page.locator('.rc'), 1);
+  assert.match(await page.locator('.rc').innerText(), /Baked 2×/);
 });
 
 test('ingredients added once are offered next time', async (t) => {
@@ -860,13 +816,13 @@ test('a bread logged with only a name makes no recipe card', async (t) => {
   await page.locator('.gal .tile').click();
   await count(page.locator('.rcard'), 0);
   await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await count(page.locator('.rc'), 0);
   await page.getByRole('tab', { name: /To try/ }).click();
   await count(page.locator('.rc'), 0);
 
   // adding details later gives it a card
-  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.locator('.gal .tile').click();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await line(page, 'Flour').getByLabel('Amount').fill('3');
@@ -887,7 +843,7 @@ test('Bake again from a bread keeps it on the same variation', async (t) => {
   await save(page);
   await page.getByRole('heading', { name: 'New bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await count(page.locator('.rc'), 1);
   assert.match(await page.locator('.rc').innerText(), /Baked 2×/);
   assert.doesNotMatch(await page.locator('.rc').innerText(), /tweaks/);
@@ -895,7 +851,7 @@ test('Bake again from a bread keeps it on the same variation', async (t) => {
 
 test('a recipe to try moves to Baked once it is baked', async (t) => {
   const page = await open(t);
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await page.getByRole('tab', { name: /To try/ }).click();
   await page.getByRole('button', { name: 'Add recipe' }).click();
   await page.getByRole('button', { name: 'Type it in' }).click();
@@ -926,7 +882,7 @@ test('a recipe to try moves to Baked once it is baked', async (t) => {
 
 test('reads a recipe from a photo; both sizes are saved as variations of one recipe', async (t) => {
   const page = await open(t);
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await page.getByRole('tab', { name: /To try/ }).click();
   await page.getByRole('button', { name: 'Add recipe' }).click();
   await field(page, 'From photo').setInputFiles(await picture(page, '#eee', 1500, 2000));
@@ -951,7 +907,6 @@ test('reads a recipe from a photo; both sizes are saved as variations of one rec
   await formGone(page);
 
   await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /Everyday white loaf[\s\S]*2 tweaks/);
   await page.locator('.rc').getByRole('button', { name: 'Bake this' }).click();     // two variations: choose on its page
   await count(page.locator('.variation'), 2);
   const text = await page.locator('.screen').innerText();
@@ -977,7 +932,7 @@ test('From photo on New bread saves a recipe to try, not a bread; Use recipe fil
   await page.locator('.screen').first().waitFor({ state: 'detached' });    // both forms close
   await count(page.locator('.screen'), 0);
   await count(page.locator('.gal .tile'), 0, 'no bread entry');
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await page.getByRole('tab', { name: /To try/ }).click();
   await count(page.locator('.rc'), 1);
   assert.match(await page.locator('.rc').innerText(), /Everyday white loaf/);
@@ -1001,7 +956,7 @@ test('From photo on New bread saves a recipe to try, not a bread; Use recipe fil
   await count(page.locator('.rc'), 0, 'baked now, so no longer to try');
   await page.getByRole('tab', { name: /Baked/ }).click();
   assert.match(await page.locator('.rc').innerText(), /Baked 1×/);
-  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await count(page.locator('.gal .tile'), 1);
 });
 
@@ -1016,7 +971,7 @@ test('edits and deletes a bread; its recipe goes back to To try', async (t) => {
   await save(page);
   await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
   assert.match(await page.locator('.screen h2').first().innerText(), /Milk bread, first try/);
-  assert.match(await page.locator('.rhead h3').innerText(), /Milk bread, first try/, 'its recipe took the new name with it');
+  assert.equal(await page.locator('.rhead h3').innerText(), 'Milk bread', 'the bread has a name of its own');
 
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await page.getByRole('button', { name: 'Delete' }).click();
@@ -1024,7 +979,7 @@ test('edits and deletes a bread; its recipe goes back to To try', async (t) => {
   await page.locator('.screen').waitFor({ state: 'detached' });
   await count(page.locator('.gal .tile'), 0);
 
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await count(page.locator('.rc'), 0);
   await page.getByRole('tab', { name: /To try/ }).click();
   await count(page.locator('.rc'), 1);
@@ -1036,19 +991,19 @@ test('edits and deletes a bread; its recipe goes back to To try', async (t) => {
   await count(page.locator('.rc'), 0);
 });
 
-test('renaming a recipe renames every variation and the breads baked from it', async (t) => {
+test('renaming a recipe renames every tweak and the breads baked from it', async (t) => {
   const page = await open(t);
   await logBread(page);
-  await page.getByRole('button', { name: 'Add bread' }).click();
-  await field(page, 'Name').fill('Milk bread');
-  await field(page, 'Comments').click();
+  await page.locator('.gal .tile').click();
+  await page.getByRole('button', { name: 'Bake again' }).click();
   await line(page, 'Water').getByLabel('Amount').fill('320');
   await save(page);
-  await formGone(page);
+  await page.getByRole('heading', { name: 'New bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
 
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await page.locator('.rc .open').click();
-  await page.getByRole('button', { name: 'Edit tweak 1' }).click();
+  await page.getByRole('button', { name: 'Edit II', exact: true }).click();
   await field(page, 'Name').fill('Soft milk loaf');
   await save(page);
   await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
@@ -1056,8 +1011,8 @@ test('renaming a recipe renames every variation and the breads baked from it', a
   await count(page.locator('.variation'), 2);
   await page.getByRole('button', { name: 'Back' }).click();
   await count(page.locator('.rc'), 1);
-  await page.getByRole('button', { name: 'Gallery' }).click();
-  assert.deepEqual(await page.locator('.gal .tile .meta b').allInnerTexts(), ['Soft milk loaf', 'Soft milk loaf']);
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
+  assert.deepEqual(await page.locator('.gal .tile .meta b').allInnerTexts(), ['Soft milk loaf II', 'Soft milk loaf']);
 });
 
 test('Split copies an entry so each half can be baked its own way', async (t) => {
@@ -1095,6 +1050,7 @@ test('Split copies an entry so each half can be baked its own way', async (t) =>
   // this half goes on to the Bake program
   await program(page, 12, 'Bake').click();
   await field(page, 'Added minutes').fill('40');
+  assert.equal(await field(page, 'Name').inputValue(), 'Country dough II');
   await save(page);
   await page.getByRole('heading', { name: 'Split bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
@@ -1102,17 +1058,20 @@ test('Split copies an entry so each half can be baked its own way', async (t) =>
   const tiles = page.locator('.gal .tile');
   await count(tiles, 2);
   await count(page.locator('.gal .tile .flag'), 1);          // the other half is still dough
-  assert.deepEqual(await tiles.locator('.meta').allInnerTexts(), ['Country dough\nNov 20', 'Country dough\nNov 20']);
+  assert.deepEqual(await tiles.locator('.meta').allInnerTexts(), ['Country dough II\nNov 20', 'Country dough\nNov 20']);
   await loaded(tiles.nth(0).locator('img'));
   await loaded(tiles.nth(1).locator('img'));
 
   // one recipe, two ways of baking it
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /Country dough[\s\S]*Baked 2×[\s\S]*2 tweaks/);
+  assert.match(await page.locator('.rc').innerText(), /Country dough[\s\S]*Baked 2×/);
+  await page.locator('.rc .open').click();
+  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['I', 'II']);
+  await page.getByRole('button', { name: 'Back' }).click();
 
   // the halves share the photo they started with: deleting one must not take it from the other
-  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.locator('.gal .tile', { hasNot: page.locator('.flag') }).click();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await page.getByRole('button', { name: 'Delete' }).click();
@@ -1156,15 +1115,15 @@ test('entries saved by the first version read correctly', async (t) => {
   const baked = page.locator('.gal .tile', { hasNot: page.locator('.flag') });
   assert.match(await baked.innerText(), /country loaf\s+Nov 20/, 'only the French bake is not dough');
 
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /country loaf[\s\S]*Baked 3×[\s\S]*3 tweaks/);
+  assert.match(await page.locator('.rc').innerText(), /country loaf[\s\S]*Baked 3×/);
   await page.locator('.rc .open').click();
-  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['TWEAK 3', 'TWEAK 2', 'TWEAK 1']);
-  const first = page.locator('.variation').nth(2);
+  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['I', 'II', 'III'], 'one recipe per name, numbered in the order made');
+  const first = page.locator('.variation').first();
   const text = await first.innerText();
   for (const want of ['2 · French', '12 · Bake', '4 h 15 min', '+10 min', 'Too pale']) assert.ok(text.includes(want), want + '\n' + text);
-  assert.doesNotMatch(await page.locator('.variation').first().innerText(), /Too pale/, 'a reason with no added time is not shown');
+  assert.doesNotMatch(await page.locator('.variation').last().innerText(), /Too pale/, 'a reason with no added time is not shown');
 
   // the earlier bake opens with Bake chosen and its added time in place
   await first.locator('.made .tile').click();
@@ -1181,7 +1140,7 @@ test('entries saved by the first version read correctly', async (t) => {
   await count(page.locator('.variation'), 3);
 
   // one of the dough entries: add the Bake program and it is no longer dough
-  await page.locator('.variation').first().locator('.made .tile').click();
+  await page.locator('.variation').last().locator('.made .tile').click();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   assert.equal(await field(page, 'Added minutes').count(), 0);
   await program(page, 12, 'Bake').click();
@@ -1190,7 +1149,7 @@ test('entries saved by the first version read correctly', async (t) => {
   await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).last().click();
   await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await count(page.locator('.gal .tile .flag'), 2);
 
   // what was used before is offered in a new bread
@@ -1245,13 +1204,13 @@ test('interface copy follows the owner\'s rules', async (t) => {
     assert.deepEqual(found.other.filter((x) => x && !/^\d+×?$/.test(x)), [], where + ': explanatory text on screen');
   }
   await audit('gallery');
-  await page.getByRole('button', { name: 'Stats' }).click();
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
   await audit('stats');
-  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.locator('.gal .tile').first().click();
   await audit('bread page');
   await page.getByRole('button', { name: 'Back' }).click();
-  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await audit('recipes, baked');
   await page.locator('.rc .open').click();
   await audit('recipe page');

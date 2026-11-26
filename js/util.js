@@ -248,32 +248,40 @@
   }
   /** Two names are the same recipe when they match apart from capitals and spacing. */
   function nameKey(s) { return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
+  /** 1 -> "I", 4 -> "IV". */
+  function roman(n) {
+    n = Math.max(1, Math.floor(n || 1));
+    var out = '', table = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+    table.forEach(function (t) { while (n >= t[0]) { out += t[1]; n -= t[0]; } });
+    return out;
+  }
+  /** What a bread of a tweak is called: the recipe's name, then the tweak's numeral from II on. */
+  function tweakName(name, n) { return n > 1 ? String(name || '').trim() + ' ' + roman(n) : String(name || '').trim(); }
+
   /**
-   * Decide where a bread's recipe goes when the bread is saved. A recipe is known by its name;
-   * within it, each distinct set of ingredients and baking details is a variation.
+   * Decide where a bread's recipe goes when the bread is saved. A recipe is a line of tweaks;
+   * the bread joins the line it was started from (Bake again, Bake this, Use recipe) or starts one.
    *   draft    the recipe as entered
-   *   family   the saved variations that share the bread's name, most recent first
-   *   current  the variation this bread is on now (when editing), or null
-   *   base     the variation the form was filled from, or null
+   *   line     the tweaks of the recipe the bread belongs to, or [] for a new recipe
+   *   current  the tweak this bread is on now (when editing), or null
+   *   base     the tweak the form was filled from, or null
    *   others   how many OTHER breads are on `current`
    * -> { action: 'none' | 'keep' | 'update' | 'create', id?, basedOn? }
    */
   function planRecipeSave(o) {
-    var family = o.family || [];
-    function byId(r) { return family.filter(function (x) { return x.id === r.id; })[0]; }
-    if (isEmptyRecipe(o.draft)) {
-      if (!family.length) return { action: 'none' };
-      return { action: 'keep', id: ((o.base && byId(o.base)) || family[0]).id };
-    }
+    var line = o.line || [];
+    var start = o.base || o.current || null;
+    if (isEmptyRecipe(o.draft)) return start ? { action: 'keep', id: start.id } : { action: 'none' };
     var key = recipeKey(o.draft);
-    var match = family.filter(function (r) { return recipeKey(r) === key; })[0];
+    var match = line.filter(function (r) { return recipeKey(r) === key; })[0];
     if (match) {
-      // Only a form that was filled from this variation may change its method or source.
-      var edited = o.base && o.base.id === match.id && !sameDetails(match, o.draft);
+      // Only a form that was filled from this tweak may change its method or source.
+      var edited = start && start.id === match.id && !sameDetails(match, o.draft);
       return { action: edited ? 'update' : 'keep', id: match.id };
     }
-    if (o.current && !o.others) return { action: 'update', id: o.current.id };
-    return { action: 'create', basedOn: (o.base && o.base.id) || (o.current && o.current.id) || null };
+    var inLine = function (r) { return r && line.some(function (t) { return t.id === r.id; }); };
+    if (o.current && !o.others && inLine(o.current)) return { action: 'update', id: o.current.id };
+    return { action: 'create', basedOn: start ? start.id : null };
   }
   function ingredientSummary(recipe) {
     return (recipe.ingredients || []).map(function (i) {
@@ -478,7 +486,7 @@
     ingredientName: ingredientName, ingredientDetail: ingredientDetail, newIngredient: newIngredient,
     cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient, changedLines: changedLines,
     emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake,
-    recipeKey: recipeKey, nameKey: nameKey, planRecipeSave: planRecipeSave, ingredientSummary: ingredientSummary,
+    recipeKey: recipeKey, nameKey: nameKey, planRecipeSave: planRecipeSave, roman: roman, tweakName: tweakName, ingredientSummary: ingredientSummary,
     FLAGS: FLAGS, cleanFlag: cleanFlag, flagEmoji: flagEmoji, flagName: flagName, cleanSource: cleanSource, photosOf: photosOf, flourGrams: flourGrams, minutesSpent: minutesSpent, fmtWeight: fmtWeight, fmtSpan: fmtSpan,
     RATINGS: RATINGS, rating: rating, fmtRating: fmtRating,
     program: program, manualProgram: manualProgram, sizesFor: sizesFor, hasCrust: hasCrust, hasDough: hasDough,

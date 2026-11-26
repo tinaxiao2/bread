@@ -61,38 +61,54 @@ Two collections and one document in the artifact database:
   `splitFrom` (id of the entry it was split from, or null), `createdAt`, `updatedAt`
 - `recipes/{id}`: `name`, `ingredients[]` (`group`, `type`, `amount`, `unit`, `note`),
   `bake` (`programs[]`, `size`, `crust`, `minutes`, `added`, `reason`, `proof[]` (places:
-  `machine`, `airfryer`, `fridge`), `proofMinutes`, `ovenTemp`, `ovenMinutes`), `method`, `source`, `link`, `parent` (name of the recipe it is attached
-  to, or ''), `flag` (ISO country code, or ''), `originals[]` (asset ids of imported images), `basedOn`, `createdAt`, `updatedAt`
-- `meta/order`: `toTry` — the owner's ranking of recipes to try, as group keys (the parent
-  recipe's name, lower-cased). Recipes not in it come last.
+  `machine`, `airfryer`, `fridge`), `proofMinutes`, `ovenTemp`, `ovenMinutes`), `method`, `source`, `link`, `parent` (the label it is filed
+  under, or ''), `flag` (ISO country code, or ''), `line` (id of the recipe's first tweak), `tweak` (its number in
+  the recipe, 1 for the first), `originals[]` (asset ids of imported images), `basedOn`, `createdAt`, `updatedAt`
+- `meta/order`: `toTry` — the owner's ranking of recipes to try, as group keys (`label:<label>` or
+  `line:<id>`; keys from before, a lower-cased name, are still read). Recipes not in it come last.
 
 Entries from the first version hold a single `bake.program` instead of `bake.programs`, and
 salt as an `other` ingredient named Salt, no `proof` (read as the bread machine), and a single
 `photo` instead of `photos`. `LGT.util.cleanBake`, `cleanIngredient` and `photosOf` read both
-shapes, so nothing is migrated. Always go through them.
+shapes, so nothing is migrated. Always go through them. Recipes saved before `line` existed are
+read as one recipe per name, numbered in the order they were made (`store.lines`); saving one
+writes its `line` and `tweak`.
 
 ## How the owner's log works
 
 These are decisions the owner made. Keep them.
 
-- **A recipe is known by its name.** Every `recipes` document with the same name (ignoring
-  capitals and spacing) is one variation of that recipe: a distinct set of ingredients
-  and baking details.
-- **A recipe can be attached to a parent recipe** (the Parent field). The parent and
-  everything attached to it form one group: one card on the Recipes tab, and every variation
-  inside it is called a **tweak** ("Tweak 1" is the oldest). The parent is stored on every
-  variation of a name and kept in step by `store.setParent`; renaming a parent updates what
-  is attached to it. A parent name with no recipe of its own still gathers what is attached
-  to it. The Parent list offers only recipes with no parent of their own, never the recipe
-  being edited or anything attached to it.
-- **Flags**: a recipe can carry a country flag, picked beside the Name field. Like the
-  parent, it is kept the same on every variation of a name (`store.setShared`). It shows
-  before the name everywhere (`ui.Named`); a recipe without its own shows its nearest
-  parent's (`store.flagFor`). Stored as the ISO code, drawn as the emoji.
+- **Three levels: label → recipe → tweak.** Example: the label "White bread" holds the recipes
+  "Country White Bread" and "Classic White Sandwich Bread"; each recipe holds its tweaks.
+  - A **label** is only the text in a recipe's Parent field (`parent`). It has no document of its
+    own. A label and a recipe may share a name (label "Mantou" holds the recipes "Mantou" and
+    "Milk Mantou").
+  - A **recipe** is a line of `recipes` documents sharing a `line`. Its name, label and flag are
+    kept the same on every tweak (`store.setShared`). Renaming it renames every tweak, and the
+    breads still called by its old name ("Old", "Old II") (`store.renameBreads`).
+  - A **tweak** is one document: a distinct set of ingredients and baking details. Tweaks are
+    numbered I, II, III in the order made (`util.roman`).
+- **Names never join anything.** A recipe goes under a label only through the Parent field. A
+  bread joins a recipe only when it was started from one (Bake again, Bake this, Use recipe, or
+  a name suggestion tapped in the bread form). Typing a saved recipe's name makes a new recipe.
+- **Where a bread's tweak goes** (`util.planRecipeSave`): on the recipe's tweak with the same
+  ingredients and baking details, else a new tweak (the next number). Editing the only bread
+  on a tweak edits the tweak in place.
+- **A bread's name defaults to its recipe's name plus the tweak's numeral from II on**
+  ("Country White Bread", "Country White Bread II") and follows the form as the baking changes
+  (`store.previewName`), until she types her own. The recipe keeps its own name.
+- **Recipes tab**: one card per label (or per recipe with no label). A label with several recipes
+  shows "N recipes" like the rating: icon and text, no background.
+- **Recipe page**: the label as the heading; arrow buttons step between its recipes (in the
+  order made; it opens on the one baked last); below, that recipe's tweaks I, II, III, with the
+  ingredient lines that differ from I highlighted.
+- **Flags**: a recipe can carry a country flag, picked beside the Name field. It is kept the
+  same on every tweak (`store.setShared`) and shows before the name everywhere (`ui.Named`).
+  A label shows the flag of its first recipe that has one. Stored as the ISO code, drawn as the emoji.
 - **Recipes to try are ranked** by dragging their rows (same hold-then-drag as photos,
   `ui.useDragOrder`).
 - **Gallery has a Recipes · All toggle** (top right, remembered on the device): All is every
-  entry; Recipes is one tile per parent recipe that has been baked. Tiles show the rating at the
+  entry; Recipes is one tile per label (or recipe with no label) that has been baked. Tiles show the rating at the
   bottom left above the name. In the Recipes view the number of baked entries is a red
   bubble at the top right, sized like an iPhone badge on an app icon (about a third of the
   tile's width, overlapping the corner; the tiles have extra side margin so it clears the
@@ -104,14 +120,9 @@ These are decisions the owner made. Keep them.
   bread form; saving closes both and the recipe goes to To try. Cancel returns to the bread form.
 - **Sources from Reddit are just "Reddit"** (`util.cleanSource`, applied on save, when
   reading a recipe in, and when showing older ones): the link carries the subreddit and user.
-- **A bread's name is its recipe's name.** Saving a bread named like a saved recipe joins
-  that recipe: the matching variation if the ingredients and baking details are the same,
-  a new variation if they differ. See `LGT.util.planRecipeSave`. Naming a new bread like a
-  saved recipe fills the form from that recipe's latest variation.
-- Renaming a recipe renames all its variations and the breads baked from them.
 - **Baked, To try and Dough are derived, never stored.** A bread counts as **baked once it
   has a date** (`store.isBakedBread`); an entry dated "–" (the button beside Date) is still a
-  plan. A recipe is baked when a baked bread points at one of its variations, and "Baked n×"
+  plan. A recipe is baked when a baked bread points at one of its tweaks, and "Baked n×"
   counts baked breads only. Photos do not decide it. (The owner chose this: recipes read in through New bread were showing as baked
   before anything was baked.) An entry is Dough until a bake is recorded: a program
   that is not a dough program, or an oven step (`LGT.util.isBaked`).
@@ -137,10 +148,10 @@ These are decisions the owner made. Keep them.
   count every entry. Flour in cups or spoons is converted at about 120 g a
   cup. Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
   (flour, machine time, proofing) is counted once, with the entry it came from. The favorite
-  is the parent recipe with the most entries.
+  is the label (or recipe with no label) with the most entries.
 - **Split** on a bread's page opens a copy of the entry (name, date, photo, ratings, comments,
   recipe) that is saved as a new bread. It is for one dough baked two ways: change the
-  baking on the copy and it becomes another variation of the same recipe. The copy records
+  baking on the copy and it becomes the recipe's next tweak, and the copy's name follows. The copy records
   `splitFrom`. The copies share
   the photo they started with, so a photo is deleted only when no bread uses it any more.
 

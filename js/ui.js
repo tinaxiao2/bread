@@ -8,6 +8,7 @@
   var ICONS = {
     plus: function () { return html`<path d="M12 5v14M5 12h14"/>`; },
     back: function () { return html`<path d="M14.5 5.5L8 12l6.5 6.5"/>`; },
+    next: function () { return html`<path d="M9.5 5.5L16 12l-6.5 6.5"/>`; },
     close: function () { return html`<path d="M6 6l12 12M18 6L6 18"/>`; },
     edit: function () { return html`<path d="M16.5 4.2a2.4 2.4 0 013.4 3.4L8 19.5l-4.5 1 1-4.5L16.5 4.2zM14.5 6.2l3.4 3.4"/>`; },
     camera: function () { return html`<path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3a1 1 0 011 1V18a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5a1 1 0 011-1z"/><circle cx="12" cy="13.3" r="3.3"/>`; },

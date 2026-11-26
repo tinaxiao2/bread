@@ -96,7 +96,7 @@
       ${props.title ? html`<div class="rhead">
         <button type="button" class="open" onClick=${props.onOpen}>
           <span class="rl"><span class="label">Recipe</span>${props.tag ? html`<span class="pill sage">${props.tag}</span>` : null}</span>
-          <h3 class="serif"><${ui.Named} flag=${store.flagFor(r.name)} name=${r.name}/></h3>
+          <h3 class="serif"><${ui.Named} flag=${store.recipeFlag(r)} name=${props.name || r.name}/></h3>
         </button>
         ${props.action ? html`<button type="button" class="btn primary sm" onClick=${props.onAction}>${props.action}</button>` : null}
       </div>` : null}
@@ -186,7 +186,7 @@
       ${g.bakedCount > 1 ? html`<span class="badge" aria-label=${g.bakedCount + ' entries'}>${g.bakedCount}</span>` : null}
       <button type="button" class=${'tile' + (cover ? ' has' : '')} onClick=${props.onOpen}>
       ${cover ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
-      <span class="meta"><${ui.Score} value=${bestRating(g.breads)}/><b><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></b><small>${U.fmtDate(last.date) || '–'}</small></span>
+      <span class="meta"><${ui.Score} value=${bestRating(g.breads)}/><b><${ui.Named} flag=${g.flag} name=${g.name}/></b><small>${U.fmtDate(last.date) || '–'}</small></span>
       </button>
     </div>`;
   }
@@ -214,7 +214,7 @@
       if (sort === 'baked') return gs.slice().sort(function (a, b) { return b.bakedCount - a.bakedCount; });
       if (sort === 'rating') return gs.slice().sort(function (a, b) { return desc(bestRating(a.breads), bestRating(b.breads)); });
       if (sort === 'az') return gs.slice().sort(function (a, b) { return byName(a.name, b.name); });
-      if (sort === 'country') return gs.slice().sort(function (a, b) { return byCountry(store.flagFor(a.name), a.name, store.flagFor(b.name), b.name); });
+      if (sort === 'country') return gs.slice().sort(function (a, b) { return byCountry(a.flag, a.name, b.flag, b.name); });
       return gs;
     }
     var count = {};
@@ -319,8 +319,8 @@
             </div>` : null}
             ${b.comments ? html`<div class="comments">${b.comments}</div>` : null}
           </div>` : null}
-          ${r ? html`<${RecipeCard} recipe=${r} title=${true} action="Bake again"
-            tag=${which.of > 1 ? 'Tweak ' + which.n : ''}
+          ${r ? html`<${RecipeCard} recipe=${r} title=${true} action="Bake again" name=${which.line ? which.line.name : r.name}
+            tag=${which.of > 1 ? U.roman(which.n) : ''}
             onOpen=${function () { nav.push({ kind: 'recipe', id: r.id }); }}
             onAction=${function () { nav.push({ kind: 'breadForm', fromRecipeId: r.id }); }}
             onView=${setView}/>` : null}
@@ -331,8 +331,7 @@
   }
 
   // ---------- Recipes ----------
-  // One card per recipe: everything saved under its name, and every recipe attached to it.
-  // Each variation inside is a tweak.
+  // One card per group: a label and the recipes filed under it, or a recipe with no label.
   function Summary(props) {
     var items = U.ingredientSummary(props.recipe), line = bakeLine(props.recipe.bake);
     if (!items.length && !line) return null;
@@ -343,8 +342,9 @@
       ${line ? html`<span class="when"><${Icon} name="clock"/>${line}</span>` : null}
     </button>`;
   }
-  function CountPill(props) {
-    return props.n > 1 ? html`<span class="pill sage">${props.n} tweaks</span>` : null;
+  /** How many recipes a label holds, shown like the rating: no background. */
+  function RecipeCount(props) {
+    return props.n > 1 ? html`<span class="count"><${Icon} name="recipes"/>${props.n} recipes</span>` : null;
   }
 
   function Recipes(props) {
@@ -373,10 +373,10 @@
               <button type="button" class="open" onClick=${open}>
                 ${last ? html`<span class="thumb">${U.photosOf(last)[0] ? html`<${ui.Photo} id=${U.photosOf(last)[0].thumb}/>` : html`<${Icon} name="loaf"/>`}</span>` : null}
                 <span>
-                  <h3 class="serif"><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></h3>
+                  <h3 class="serif"><${ui.Named} flag=${g.flag} name=${g.name}/></h3>
                   <span class="facts">
                     ${g.baked ? html`<span class="pill">Baked ${g.bakedCount}×</span>` : null}
-                    <${CountPill} n=${g.tweaks.length}/>
+                    <${RecipeCount} n=${g.lines.length}/>
                     <${ui.Score} value=${bestRating(g.breads)}/>
                     ${!g.baked && g.latest.source ? U.cleanSource(g.latest.source) : null}
                   </span>
@@ -393,18 +393,24 @@
     </div>`;
   }
 
-  // ---------- a recipe's page: every tweak in its group ----------
+  // ---------- a recipe's page: a label's recipes, one at a time, each with its tweaks ----------
+  function firstMade(l) { return l.tweaks[0].createdAt || 0; }
   function RecipePage(props) {
     var nav = props.nav;
-    var key = useRef('');
-    var found = store.groupOf(store.recipe(props.id));
-    if (found) key.current = found.key;
-    var g = found || store.groups().filter(function (x) { return x.key === key.current; })[0] || null;
+    var ls = useState(function () { var l = store.lineOf(store.recipe(props.id)); return l ? l.id : null; }), lineId = ls[0], setLineId = ls[1];
+    var gkey = useRef('');
+    var line = lineId ? store.lineById(lineId) : null;
+    var g = line ? store.groups().filter(function (x) { return x.lines.indexOf(line) >= 0; })[0] : store.groupByKey(gkey.current);
+    if (g) gkey.current = g.key;
     var v = useState(null), view = v[0], setView = v[1];
     useEffect(function () { if (!g) nav.close(props.k); }, [!g]);
     if (!g) return null;
-    var many = g.tweaks.length > 1, first = g.tweaks[0];
+    var list = g.lines.slice().sort(function (a, b) { return firstMade(a) - firstMade(b); });
+    if (!line || list.indexOf(line) < 0) line = list[0];
+    var at = list.indexOf(line), many = line.tweaks.length > 1, first = line.tweaks[0];
     function edit(rv) { nav.push({ kind: 'recipeForm', recipeId: rv.id }); }
+    function step(d) { var next = list[at + d]; if (next) setLineId(next.id); }
+    var heading = html`<${ui.Named} flag=${g.label ? g.flag : line.flag} name=${g.label ? g.name : line.name}/>`;
     return html`<div class="screen">
       <div class="floatbar solid"><div class="wrap">
         <button type="button" class="round" aria-label="Back" onClick=${function () { nav.close(props.k); }}><${Icon} name="back"/></button>
@@ -412,23 +418,26 @@
       </div></div>
       <div class="scroll">
         <div class="wrap page nohero">
-          <h2 class="serif"><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></h2>
+          <h2 class="serif">${heading}</h2>
           <div class="tags">
             ${g.baked ? html`<span class="pill">Baked ${g.bakedCount}×</span>` : html`<span class="pill sage">To try</span>`}
-            <${CountPill} n=${g.tweaks.length}/>
+            <${RecipeCount} n=${list.length}/>
             <${ui.Score} value=${bestRating(g.breads)}/>
           </div>
-          ${g.tweaks.slice().reverse().map(function (rv) {
-            var breads = store.breadsOf(rv.id), baked = store.bakedOf(breads), n = g.tweaks.indexOf(rv) + 1;
-            var own = U.nameKey(rv.name) !== g.key;
+          ${g.label ? html`<div class="pager">
+            <button type="button" class="round" aria-label="Previous recipe" disabled=${at <= 0} onClick=${function () { step(-1); }}><${Icon} name="back"/></button>
+            <h3 class="serif"><${ui.Named} flag=${line.flag} name=${line.name}/></h3>
+            <button type="button" class="round" aria-label="Next recipe" disabled=${at >= list.length - 1} onClick=${function () { step(1); }}><${Icon} name="next"/></button>
+          </div>` : null}
+          ${line.tweaks.map(function (rv) {
+            var breads = store.breadsOf(rv.id), baked = store.bakedOf(breads), n = line.numbers[rv.id] || 1;
             return html`<div class="variation" key=${rv.id}>
               ${many ? html`<div class="vhead">
-                <span class="label">Tweak ${n}</span>
+                <span class="label num serif">${U.roman(n)}</span>
                 ${baked.length ? html`<span class="pill">Baked ${baked.length}×</span>` : html`<span class="pill sage">To try</span>`}
                 <${ui.Score} value=${bestRating(breads)}/>
-                <button type="button" class="round" aria-label=${'Edit tweak ' + n} onClick=${function () { edit(rv); }}><${Icon} name="edit"/></button>
+                <button type="button" class="round" aria-label=${'Edit ' + U.roman(n)} onClick=${function () { edit(rv); }}><${Icon} name="edit"/></button>
               </div>` : null}
-              ${own ? html`<h3 class="serif tname"><${ui.Named} flag=${store.flagFor(rv.name)} name=${rv.name}/></h3>` : null}
               <${RecipeCard} recipe=${rv} against=${many && rv !== first ? first : null} onView=${setView}/>
               <div class="formend">
                 <button type="button" class="btn primary wide" onClick=${function () { nav.push({ kind: 'breadForm', fromRecipeId: rv.id }); }}>Bake this</button>
@@ -452,11 +461,11 @@
   // ---------- picking a saved recipe ----------
   function RecipePicker(props) {
     return html`<${ui.Sheet} title="Recipes" onClose=${props.onClose}>
-      ${store.families().map(function (f) {
-        var last = f.breads[0];
-        return html`<button type="button" class="opt" key=${f.key} onClick=${function () { props.onPick(f.latest); }}>
-          <span class="thumb">${U.photosOf(last)[0] ? html`<${ui.Photo} id=${U.photosOf(last)[0].thumb}/>` : html`<${Icon} name="loaf"/>`}</span>
-          <span><${ui.Named} flag=${store.flagFor(f.name)} name=${f.name}/><small>${f.baked ? 'Baked ' + f.bakedCount + '×' : 'To try'}</small></span>
+      ${store.lines().map(function (l) {
+        var last = l.breads[0];
+        return html`<button type="button" class="opt" key=${l.id} onClick=${function () { props.onPick(l.latest); }}>
+          <span class="thumb">${last && U.photosOf(last)[0] ? html`<${ui.Photo} id=${U.photosOf(last)[0].thumb}/>` : html`<${Icon} name="loaf"/>`}</span>
+          <span><${ui.Named} flag=${l.flag} name=${l.name}/><small>${l.baked ? 'Baked ' + l.bakedCount + '×' : 'To try'}</small></span>
         </button>`;
       })}
     <//>`;
@@ -472,7 +481,9 @@
       var baseId = bread ? bread.recipeId : (props.fromRecipeId || null);
       var base = baseId ? store.recipe(baseId) : null;
       init.current = {
-        name: bread ? bread.name : (base ? base.name : ''),
+        name: bread ? bread.name : '',
+        // Until she types her own, the name is the recipe's with the number of the tweak it lands in.
+        named: !!bread && (!base || U.nameKey(bread.name) !== U.nameKey(store.tweakTitle(base))),
         date: bread ? bread.date : U.today(),
         pics: U.photosOf(bread).map(function (p) { return F.pic({ photo: p }); }),
         ratings: Object.assign({ crust: 0, crumb: 0, taste: 0 }, bread && bread.ratings),
@@ -480,11 +491,7 @@
         comments: bread ? bread.comments : '',
         draft: base ? draftFromRecipe(base) : blankDraft(),
         baseRecipeId: base ? base.id : null,
-        pending: [],
-        // The recipe part is "hers" once she has edited it or chosen a recipe herself. Until
-        // then, naming the bread like a saved recipe fills it in from that recipe.
-        hers: !!(bread || base), filled: '',
-        savedName: base ? base.name : ''
+        pending: []
       };
     }
     var fs = useState(init.current), f = fs[0], setF = fs[1];
@@ -507,37 +514,23 @@
         if (added.length) set(function (cur) { return { pics: cur.pics.concat(added) }; });
       });
     }
-    /** Same name, same recipe: fill the untouched recipe part from the one saved under this name. */
-    function follow(name) {
-      return function (cur) {
-        var patch = name === undefined ? {} : { name: name };
-        if (cur.hers) return patch;
-        var key = U.nameKey(name === undefined ? cur.name : name), fam = store.familyByKey(key);
-        if (fam && cur.filled !== key) {
-          var filled = draftFromRecipe(fam.latest);
-          filled.parent = fam.parent;
-          filled.flag = fam.flag || cur.draft.flag;
-          return Object.assign(patch, { draft: filled, baseRecipeId: fam.latest.id, pending: [], filled: key });
-        }
-        if (!fam && cur.filled) return Object.assign(patch, { draft: blankDraft(), baseRecipeId: null, pending: [], filled: '' });
-        return patch;
-      };
-    }
     function useRecipe(r) {
       setOverlay(null);
-      set(function (cur) { return { draft: draftFromRecipe(r), baseRecipeId: r.id, pending: [], name: cur.name || r.name, hers: true }; });
+      set({ draft: draftFromRecipe(r), baseRecipeId: r.id, pending: [], named: false });
     }
     /** A recipe read from a photo is saved as a recipe to try, not as a bread: check it, then both forms close. */
     function useReading(result) {
       setOverlay(null);
       nav.push({ kind: 'recipeForm', reading: result.reading, originals: result.originals, closes: props.k });
     }
+    var auto = f.named ? '' : store.previewName({ id: props.breadId || null, baseRecipeId: f.baseRecipeId, recipe: recipeOf(f.draft) });
+    var name = auto || f.name;
     function save() {
-      if (!f.name.trim() || busy === 'saving') return;
+      if (!name.trim() || busy === 'saving') return;
       setBusy('saving');
       store.saveBread({
         id: props.breadId || null,
-        bread: { name: f.name, date: f.date, ratings: f.ratings, notes: f.notes, comments: f.comments },
+        bread: { name: name, date: f.date, ratings: f.ratings, notes: f.notes, comments: f.comments },
         pics: f.pics, splitFrom: splitting ? props.splitFromId : null, recipe: recipeOf(f.draft), baseRecipeId: f.baseRecipeId, originalBlobs: f.pending
       }).then(function () { nav.close(props.k); }, function () { setBusy('failed'); });
     }
@@ -548,14 +541,14 @@
     }
     function back() { if (dirty) setOverlay('discard'); else nav.close(props.k); }
 
-    var typed = U.nameKey(f.name);
-    var names = typed ? store.names().filter(function (n) {
-      var k = U.nameKey(n);
-      return k !== typed && k.indexOf(typed) >= 0;
+    // Recipes whose name holds what she typed: picking one is how a new bread joins a recipe.
+    var typed = f.named ? U.nameKey(f.name) : '', baseLine = store.lineOf(store.recipe(f.baseRecipeId));
+    var matches = typed && !editing ? store.lines().filter(function (l) {
+      return l !== baseLine && U.nameKey(l.name).indexOf(typed) >= 0;
     }).slice(0, 4) : [];
 
     return html`<${ui.Screen} title=${editing ? 'Edit bread' : splitting ? 'Split bread' : 'New bread'} onBack=${back}
-        onGo=${save} goDisabled=${!f.name.trim() || busy === 'saving'}>
+        onGo=${save} goDisabled=${!name.trim() || busy === 'saving'}>
       ${editing || splitting ? null : html`<div class="quick">
         ${store.getState().recipes.length ? html`<button type="button" onClick=${function () { setOverlay('recipes'); }}><${Icon} name="recipes"/>Use recipe</button>` : null}
         ${props.canImport ? html`<label class="filebtn"><${Icon} name="image"/>From photo
@@ -566,13 +559,12 @@
       <${Field} label="Name">
         <div class="namerow">
         <${F.FlagPicker} value=${f.draft.flag} onChange=${function (v) { set(function (cur) { return { draft: Object.assign({}, cur.draft, { flag: v }) }; }); }}/>
-        <input id="f-name" class="input" value=${f.name} aria-label="Name" autocomplete="off"
-          onInput=${function (e) { set({ name: e.target.value }); }}
-          onBlur=${function () { if (!editing) setF(function (cur) { return Object.assign({}, cur, follow()(cur)); }); }}/>
+        <input id="f-name" class="input" value=${name} aria-label="Name" autocomplete="off"
+          onInput=${function (e) { var v = e.target.value; set({ name: v, named: !!v.trim() }); }}/>
         </div>
-        ${names.length ? html`<div class="suggest">
-          ${names.map(function (n) {
-            return html`<button type="button" key=${n} onClick=${function () { set(follow(n)); }}>${n}</button>`;
+        ${matches.length ? html`<div class="suggest">
+          ${matches.map(function (l) {
+            return html`<button type="button" key=${l.id} onClick=${function () { useRecipe(l.latest); }}>${l.name}</button>`;
           })}
         </div>` : null}
       <//>
@@ -589,9 +581,9 @@
             onClick=${function () { set({ date: f.date ? '' : U.today() }); }}>–</button>
         </div>
       <//>
-      <${VariantChips} draft=${f.draft} onPick=${function (i) { set({ draft: Object.assign({}, f.draft, { index: i }), hers: true }); }}/>
-      <${F.RecipeFields} recipe=${recipeOf(f.draft)} savedName=${f.savedName} pending=${f.pending} hideSize=${sizedVariants(f.draft)}
-        onChange=${function (r) { set({ draft: withRecipe(f.draft, r), hers: true }); }}
+      <${VariantChips} draft=${f.draft} onPick=${function (i) { set({ draft: Object.assign({}, f.draft, { index: i }) }); }}/>
+      <${F.RecipeFields} recipe=${recipeOf(f.draft)} pending=${f.pending} hideSize=${sizedVariants(f.draft)}
+        onChange=${function (r) { set({ draft: withRecipe(f.draft, r) }); }}
         onPending=${function (list) { set({ pending: list }); }}
         onView=${function (x) { setOverlay({ view: x }); }}/>
       <${Field} label="Ratings">
@@ -604,7 +596,7 @@
       <div class="formend">
         ${busy === 'failed' ? html`<div class="err" role="alert">Not saved</div>` : null}
         ${busy === 'photo' ? html`<div class="err" role="alert">Photo not added</div>` : null}
-        <button type="button" class="btn primary wide" disabled=${!f.name.trim() || busy === 'saving'} onClick=${save}>Save</button>
+        <button type="button" class="btn primary wide" disabled=${!name.trim() || busy === 'saving'} onClick=${save}>Save</button>
         ${editing ? html`<button type="button" class="btn danger wide" onClick=${function () { setOverlay('delete'); }}>Delete</button>` : null}
       </div>
       ${overlay === 'recipes' ? html`<${RecipePicker} onClose=${function () { setOverlay(null); }} onPick=${useRecipe}/>` : null}
@@ -627,8 +619,7 @@
       var existing = props.recipeId ? store.recipe(props.recipeId) : null;
       init.current = {
         draft: props.reading ? draftFromReading(props.reading) : existing ? draftFromRecipe(existing) : blankDraft(),
-        pending: props.originals || [], both: false,
-        savedName: existing ? existing.name : ''
+        pending: props.originals || [], both: false
       };
     }
     var fs = useState(init.current), f = fs[0], setF = fs[1];
@@ -671,7 +662,7 @@
       <${VariantChips} draft=${d} both=${f.both}
         onPick=${function (i) { set({ draft: Object.assign({}, d, { index: i }) }); }}
         onBoth=${function (on) { set({ both: on }); }}/>
-      <${F.RecipeFields} recipe=${recipeOf(d)} savedName=${f.savedName} pending=${f.pending} hideSize=${sizedVariants(d)}
+      <${F.RecipeFields} recipe=${recipeOf(d)} pending=${f.pending} hideSize=${sizedVariants(d)}
         onChange=${function (r) { set({ draft: withRecipe(d, r) }); }}
         onPending=${function (list) { set({ pending: list }); }}
         onView=${function (x) { setOverlay({ view: x }); }}/>

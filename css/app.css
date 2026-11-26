@@ -112,6 +112,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .tile .meta small { font-size: 12px; opacity: .85; }
 .score { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 700; }
 .score svg { width: 12px; height: 12px; fill: var(--honey); }
+.count { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--ink2); white-space: nowrap; }
+.count .icon { width: 13px; height: 13px; color: var(--crust); }
 .tile .flag { position: absolute; top: 10px; left: 10px; z-index: 2; padding: 4px 10px; border-radius: 99px; background: var(--butter); color: var(--crust-d); font-size: 12.5px; font-weight: 700; }
 .tile .meta .score { margin-bottom: 6px; padding: 3px 8px 3px 6px; border-radius: 99px; background: rgba(255, 253, 248, .94); color: var(--ink); }
 
@@ -151,7 +153,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .page.nohero { padding-top: calc(var(--top) + 66px); }
 .page h2 { font-size: 27px; font-weight: 640; letter-spacing: -0.015em; line-height: 1.15; }
 .page .date { font-size: 13.5px; color: var(--ink2); margin-top: 3px; }
-.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
 
 .how { margin-top: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
 .scores { display: grid; grid-template-columns: repeat(3, 1fr); padding: 11px 4px; }
@@ -210,7 +212,11 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .variation .formend { margin-top: 12px; }
 .vhead { display: flex; align-items: center; gap: 8px; margin: 0 2px 10px; min-height: 36px; }
 .vhead .round { margin-left: auto; width: 36px; height: 36px; }
-.tname { font-size: 19px; font-weight: 620; line-height: 1.2; margin: 0 2px 10px; }
+.vhead .num { min-width: 22px; font-size: 19px; font-weight: 650; letter-spacing: .02em; text-transform: none; color: var(--crust-d); }
+.pager { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+.pager h3 { flex: 1; min-width: 0; text-align: center; font-size: 19px; font-weight: 620; line-height: 1.2; }
+.pager .round { flex: none; width: 38px; height: 38px; }
+.pager .round:disabled { opacity: .3; }
 .vhead .round .icon { width: 18px; height: 18px; }
 .made { margin-top: 18px; }
 .made .label { margin: 0 2px 8px; }

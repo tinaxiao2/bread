@@ -220,23 +220,26 @@
   }
 
   // ---------- the recipe part of a form ----------
-  /** props: recipe, savedName (its name as saved, when editing), onChange, pending (Blob[] of images not yet saved), onPending, onView, hideSize */
+  /** props: recipe, onChange, pending (Blob[] of images not yet saved), onPending, onView, hideSize */
   function RecipeFields(props) {
     var r = props.recipe;
     function set(patch) { props.onChange(Object.assign({}, r, patch)); }
     var known = LGT.store.sources().filter(function (s) { return s !== r.source; });
     var pending = props.pending || [];
     var hasOriginals = (r.originals && r.originals.length) || pending.length;
-    // Recipes this one can be attached to as a tweak.
-    var parents = LGT.store.parentChoices([r.name, props.savedName]);
-    if (r.parent && !parents.some(function (n) { return U.nameKey(n) === U.nameKey(r.parent); })) parents = [r.parent].concat(parents);
+    var typed = U.nameKey(r.parent);
+    var labels = LGT.store.labels().filter(function (n) {
+      var k = U.nameKey(n);
+      return typed ? k !== typed && k.indexOf(typed) >= 0 : true;
+    }).slice(0, 6);
     return html`
-      ${parents.length ? html`<${Field} label="Parent">
-        <select id="f-parent" class="input" aria-label="Parent" value=${r.parent || ''} onChange=${val(function (v) { set({ parent: v }); })}>
-          <option value="">–</option>
-          ${parents.map(function (n) { return html`<option key=${n} value=${n}>${n}</option>`; })}
-        </select>
-      <//>` : null}
+      <${Field} label="Parent">
+        <input id="f-parent" class="input" value=${r.parent || ''} aria-label="Parent" autocomplete="off"
+          onInput=${val(function (v) { set({ parent: v }); })}/>
+        ${labels.length ? html`<div class="suggest">
+          ${labels.map(function (n) { return html`<button type="button" key=${n} onClick=${function () { set({ parent: n }); }}>${n}</button>`; })}
+        </div>` : null}
+      <//>
       <${Field} label="Ingredients">
         <${IngredientsEditor} list=${r.ingredients} onChange=${function (list) { set({ ingredients: list }); }}/>
       <//>

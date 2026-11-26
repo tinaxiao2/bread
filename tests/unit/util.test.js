@@ -102,13 +102,13 @@ test('a stored recipe is trimmed, ordered and free of blank rows', () => {
   assert.equal(r.parent, 'french bread');
 });
 
-test('a parent is part of a recipe but not of a tweak', () => {
+test('a label is part of a recipe but does not make a new tweak', () => {
   const base = { ingredients: [{ group: 'flour', type: 'AP', amount: '400', unit: 'g' }] };
   assert.equal(U.recipeKey(Object.assign({ parent: 'french bread' }, base)), U.recipeKey(base));
   assert.equal(U.isEmptyRecipe({ parent: 'french bread' }), false, 'attaching alone is worth keeping');
   const v1 = Object.assign({ id: 'v1', name: 'herb loaf' }, U.cleanRecipe(base));
-  assert.deepEqual(U.planRecipeSave({ draft: Object.assign({ parent: 'french bread' }, base), family: [v1], base: v1, others: 0 }),
-    { action: 'update', id: 'v1' }, 'attaching from a form filled from that recipe saves it');
+  assert.deepEqual(U.planRecipeSave({ draft: Object.assign({ parent: 'french bread' }, base), line: [v1], base: v1, others: 0 }),
+    { action: 'update', id: 'v1' }, 'filing it under a label from a form filled from that recipe saves it');
 });
 
 test('links are only ever https', () => {
@@ -158,31 +158,26 @@ test('where a bread\'s recipe is saved', () => {
   }, extra)), { id });
   const v1 = make('v1', '1 1/4'), v2 = make('v2', '1 1/2');
   const copy = (r, patch) => Object.assign(JSON.parse(JSON.stringify(r)), patch);
-  const plan = (o) => U.planRecipeSave(Object.assign({ family: [], current: null, base: null, others: 0 }, o));
+  const plan = (o) => U.planRecipeSave(Object.assign({ line: [], current: null, base: null, others: 0 }, o));
 
-  assert.deepEqual(plan({ draft: copy(v1) }), { action: 'create', basedOn: null }, 'a new name: a new recipe');
-  assert.deepEqual(plan({ draft: U.emptyRecipe() }), { action: 'none' }, 'nothing entered and no such recipe: no card');
+  assert.deepEqual(plan({ draft: copy(v1) }), { action: 'create', basedOn: null }, 'started from nothing: a new recipe');
+  assert.deepEqual(plan({ draft: U.emptyRecipe() }), { action: 'none' }, 'nothing entered: no card');
 
-  // the same name finds the recipe
-  assert.deepEqual(plan({ draft: copy(v1), family: [v2, v1] }), { action: 'keep', id: 'v1' }, 'same ingredients: that variation');
-  assert.deepEqual(plan({ draft: make('x', '2'), family: [v2, v1] }), { action: 'create', basedOn: null }, 'different ingredients: a new variation');
-  assert.deepEqual(plan({ draft: U.emptyRecipe(), family: [v2, v1] }), { action: 'keep', id: 'v2' }, 'nothing entered: the latest variation');
-  assert.deepEqual(plan({ draft: U.emptyRecipe(), family: [v2, v1], base: v1 }), { action: 'keep', id: 'v1' }, 'or the one the form was filled from');
+  // started from a recipe (Bake again, Bake this, Use recipe): its tweaks are the ones to match
+  assert.deepEqual(plan({ draft: copy(v1), line: [v1, v2], base: v2 }), { action: 'keep', id: 'v1' }, 'same ingredients: that tweak');
+  assert.deepEqual(plan({ draft: make('x', '2'), line: [v1, v2], base: v2 }), { action: 'create', basedOn: 'v2' }, 'different ingredients: the next tweak');
+  assert.deepEqual(plan({ draft: U.emptyRecipe(), line: [v1, v2], base: v1 }), { action: 'keep', id: 'v1' }, 'nothing entered: the tweak it started from');
 
-  // typing the same ingredients by hand must not wipe a variation's method or source
-  assert.deepEqual(plan({ draft: copy(v1, { source: '', method: '' }), family: [v1] }), { action: 'keep', id: 'v1' });
-  // editing them in a form filled from that variation does change them
-  assert.deepEqual(plan({ draft: copy(v1, { source: 'Booklet, p. 14' }), family: [v1], base: v1 }), { action: 'update', id: 'v1' });
+  // typing the same ingredients must not wipe a tweak's method or source
+  assert.deepEqual(plan({ draft: copy(v1, { source: '', method: '' }), line: [v1, v2], base: v2 }), { action: 'keep', id: 'v1' });
+  // editing them in a form filled from that tweak does change them
+  assert.deepEqual(plan({ draft: copy(v1, { source: 'Booklet, p. 14' }), line: [v1], base: v1 }), { action: 'update', id: 'v1' });
 
   // editing a bread
-  assert.deepEqual(plan({ draft: make('x', '2'), family: [v1], current: v1, base: v1, others: 0 }),
-    { action: 'update', id: 'v1' }, 'the only bread on its variation: edit it in place');
-  assert.deepEqual(plan({ draft: make('x', '2'), family: [v1], current: v1, base: v1, others: 2 }),
-    { action: 'create', basedOn: 'v1' }, 'others share it: a new variation');
-  assert.deepEqual(plan({ draft: copy(v1), family: [], current: v1, base: v1, others: 0 }),
-    { action: 'update', id: 'v1' }, 'renamed and alone: the variation moves with it');
-  assert.deepEqual(plan({ draft: copy(v1), family: [], current: v1, base: v1, others: 1 }),
-    { action: 'create', basedOn: 'v1' }, 'renamed while others share it: a copy under the new name');
+  assert.deepEqual(plan({ draft: make('x', '2'), line: [v1], current: v1, base: v1, others: 0 }),
+    { action: 'update', id: 'v1' }, 'the only bread on its tweak: edit it in place');
+  assert.deepEqual(plan({ draft: make('x', '2'), line: [v1], current: v1, base: v1, others: 2 }),
+    { action: 'create', basedOn: 'v1' }, 'others share it: the next tweak');
 
   // a different reason for the added time is not a different bake
   const a = make('a', '1', { bake: { programs: [1, 12], size: '1.5', minutes: 205, added: 5, reason: 'crust browning' } });
@@ -344,4 +339,10 @@ test('anything from Reddit is saved as just "Reddit"', () => {
   assert.equal(U.cleanSource('  Mom  '), 'Mom');
   assert.equal(U.cleanSource('Bread & Butter, p. 3'), 'Bread & Butter, p. 3', 'not every r/ or u/ inside a word');
   assert.equal(U.cleanRecipe({ source: 'r/Breadit' }).source, 'Reddit');
+});
+
+test('tweaks are numbered in roman numerals, from II on in a name', () => {
+  assert.deepEqual([1, 2, 3, 4, 9, 14, 40].map(U.roman), ['I', 'II', 'III', 'IV', 'IX', 'XIV', 'XL']);
+  assert.equal(U.tweakName('Country White Bread', 1), 'Country White Bread');
+  assert.equal(U.tweakName(' Country White Bread ', 3), 'Country White Bread III');
 });
