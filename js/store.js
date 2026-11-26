@@ -60,8 +60,8 @@
     return null;
   }
   function bread(id) { return find(state.breads, id); }
-  /** A bread counts as baked once it has a photo. An entry without one is still a plan. */
-  function isBakedBread(b) { return U.photosOf(b).length > 0; }
+  /** A bread counts as baked once it has a date. An entry dated "–" is still a plan. */
+  function isBakedBread(b) { return !!(b && U.parseDate(b.date)); }
   function bakedOf(list) { return list.filter(isBakedBread); }
   function recipe(id) { return find(state.recipes, id); }
   function breadsOf(recipeId) { return state.breads.filter(function (b) { return b.recipeId === recipeId; }); }
@@ -235,7 +235,7 @@
         if (!b.splitFrom) (r.ingredients || []).forEach(function (i) { flour += U.flourGrams(U.upgradeIngredient(i)) || 0; });
         minutes += U.minutesSpent(r.bake, !!b.splitFrom);
       }
-      if (!isBakedBread(b)) return;                       // the favourite is the most baked: photos only
+      if (!isBakedBread(b)) return;                       // the favourite is the most baked: dated entries only
       var g = r ? groupOfRecipe[r.id] : null, key = g ? 'g:' + g.key : 'n:' + U.nameKey(b.name);
       if (!tally[key]) tally[key] = { name: g ? g.name : b.name, flag: g ? flagFor(g.name) : '', count: 0, best: 0, last: '' };
       var t = tally[key];
@@ -382,7 +382,7 @@
         var r = b.ratings || {}, n = b.notes || {};
         return ref.set({
           name: name,
-          date: b.date || U.today(),
+          date: U.parseDate(b.date) ? b.date : '',        // '' is "–": not baked yet
           recipeId: recipeId,
           photos: photos,
           photo: photos[0] || null,              // kept for entries read by older copies of the page

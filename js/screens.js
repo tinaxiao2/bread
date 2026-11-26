@@ -60,7 +60,7 @@
       ${U.photosOf(b).length > 1 ? html`<span class="many" aria-hidden="true"><${Icon} name="image"/></span>` : null}
       ${U.isBaked(r ? r.bake : null) ? null : html`<span class="flag">Dough</span>`}
       <${ui.Score} value=${U.rating(b)}/>
-      <span class="meta"><b><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></b><small>${U.fmtDate(b.date)}</small></span>
+      <span class="meta"><b><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></b><small>${U.fmtDate(b.date) || '–'}</small></span>
     </button>`;
   }
 
@@ -185,7 +185,7 @@
       ${cover ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
       ${g.bakedCount > 1 ? html`<span class="pill count">${g.bakedCount}×</span>` : null}
       <${ui.Score} value=${bestRating(g.breads)}/>
-      <span class="meta"><b><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></b><small>${U.fmtDate(last.date)}</small></span>
+      <span class="meta"><b><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></b><small>${U.fmtDate(last.date) || '–'}</small></span>
     </button>`;
   }
 
@@ -264,7 +264,7 @@
         ${photo ? html`<${Hero} photos=${photos} onView=${setView}/>` : null}
         <div class=${'wrap page' + (photo ? '' : ' nohero')}>
           <h2 class="serif"><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></h2>
-          <div class="date">${U.fmtDate(b.date, true)}</div>
+          <div class="date">${U.fmtDate(b.date, true) || '–'}</div>
           ${rated || notes.length || b.comments ? html`<div class="how">
             ${rated ? html`<div class="scores">
               ${U.RATINGS.map(function (k) {
@@ -485,7 +485,8 @@
       set(function (cur) {
         return {
           draft: draftFromReading(result.reading), baseRecipeId: null, pending: result.originals,
-          name: cur.name || result.reading.name, hers: true
+          name: cur.name || result.reading.name, hers: true,
+          date: editing ? cur.date : ''                       // a recipe read in is a plan until it is baked
         };
       });
     }
@@ -540,7 +541,11 @@
           onView=${function (x) { setOverlay({ view: x }); }}/>
       <//>` : null}
       <${Field} label="Date">
-        <input id="f-date" class="input date" type="date" value=${f.date} aria-label="Date" onInput=${function (e) { set({ date: e.target.value }); }}/>
+        <div class="daterow">
+          <input id="f-date" class="input date" type="date" value=${f.date} aria-label="Date" onInput=${function (e) { set({ date: e.target.value }); }}/>
+          <button type="button" class=${'nodate' + (f.date ? '' : ' on')} aria-label="No date" aria-pressed=${!f.date}
+            onClick=${function () { set({ date: f.date ? '' : U.today() }); }}>–</button>
+        </div>
       <//>
       <${VariantChips} draft=${f.draft} onPick=${function (i) { set({ draft: Object.assign({}, f.draft, { index: i }), hers: true }); }}/>
       <${F.RecipeFields} recipe=${recipeOf(f.draft)} savedName=${f.savedName} pending=${f.pending} hideSize=${sizedVariants(f.draft)}

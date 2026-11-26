@@ -586,17 +586,18 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
   // time: (90 + 30) twice, nothing more for the split copy, plus 205
   assert.equal(await stat('Time spent').locator('b').innerText(), '7 h 25 min');
 
-  // a new entry adds its flour straight away, but is a loaf only once it has a photo
+  // an undated entry adds its flour straight away, but is a loaf only once it has a date
   await page.getByRole('button', { name: 'Add bread' }).click();
   await field(page, 'Name').fill('sandwich bread');
   await field(page, 'Comments').click();
+  await page.getByRole('button', { name: 'No date' }).click();
   await save(page);
   await formGone(page);
   assert.equal(await stat('Loaves').locator('b').innerText(), '5');
   await page.getByRole('button', { name: 'Gallery' }).click();
-  await page.locator('.gal .tile').first().click();
+  await page.locator('.gal .tile').last().click();                    // undated entries come last
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
-  await snap(page);
+  await field(page, 'Date').fill('2026-11-27');
   await save(page);
   await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
@@ -689,15 +690,19 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   assert.equal(await page.locator('.stat .fl').count(), 0);
 });
 
-test('an entry counts as baked once it has a photo, not because its recipe has baking steps', async (t) => {
+test('an entry dated "–" is a plan; giving it a date makes it baked', async (t) => {
   const page = await open(t);
-  // a recipe read in from a photo, saved as a new bread straight away: no picture of the bake yet
+  // a recipe read in through New bread starts undated, though it has baking steps
   await page.getByRole('button', { name: 'Add bread' }).click();
   await field(page, 'From photo').setInputFiles(await picture(page, '#eee', 900, 1200));
   await page.locator('.busy').waitFor({ state: 'detached' });
   assert.equal(await program(page, 1, 'White').getAttribute('aria-pressed'), 'true', 'the recipe has baking steps');
+  assert.equal(await field(page, 'Date').inputValue(), '');
+  assert.equal(await page.getByRole('button', { name: 'No date' }).getAttribute('aria-pressed'), 'true');
+  await snap(page);                                                   // a photo alone does not make it baked
   await save(page);
   await formGone(page);
+  assert.match(await page.locator('.gal .tile .meta small').innerText(), /^–$/);
 
   await page.getByRole('button', { name: 'Recipes' }).click();
   await count(page.locator('.rc'), 0, 'not under Baked');
@@ -709,16 +714,30 @@ test('an entry counts as baked once it has a photo, not because its recipe has b
   await count(page.locator('.gal .tile'), 0);
   await page.getByRole('tab', { name: 'All' }).click();
 
-  // adding a photo to that entry makes it baked
+  // giving it a date makes it baked
   await page.locator('.gal .tile').click();
+  assert.equal(await page.locator('.screen .date').innerText(), '–');
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
-  await snap(page);
+  await field(page, 'Date').fill('2026-11-27');
+  assert.equal(await page.getByRole('button', { name: 'No date' }).getAttribute('aria-pressed'), 'false');
   await save(page);
   await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
   await page.getByRole('button', { name: 'Recipes' }).click();
   await page.getByRole('tab', { name: /Baked/ }).click();
   assert.match(await page.locator('.rc').innerText(), /Baked 1×/);
+
+  // and "–" takes it back
+  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.locator('.gal .tile').click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'No date' }).click();
+  assert.equal(await field(page, 'Date').inputValue(), '');
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Recipes' }).click();
+  await count(page.locator('.rc'), 0);
 });
 
 test('typing part of a name offers the saved recipe', async (t) => {
@@ -920,7 +939,7 @@ test('fills a new bread from a photo, and from a saved recipe', async (t) => {
   await formGone(page);
   await page.getByRole('button', { name: 'Recipes' }).click();
   await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /Baked 2×/);
+  assert.match(await page.locator('.rc').innerText(), /Baked 1×/, 'the entry read from a photo is undated, so not baked');
 });
 
 test('edits and deletes a bread; its recipe goes back to To try', async (t) => {

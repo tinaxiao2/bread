@@ -55,7 +55,7 @@ runtime.
 
 Two collections and one document in the artifact database:
 
-- `breads/{id}`: `name`, `date` (YYYY-MM-DD), `recipeId` (or null), `photos` (list of
+- `breads/{id}`: `name`, `date` (YYYY-MM-DD, or '' for "–": not baked yet), `recipeId` (or null), `photos` (list of
   `{full, thumb}` asset ids, cover first; `photo` repeats the cover), `ratings` (`crust`,
   `crumb`, `taste`, 0–5 in half steps, 0 = not rated), `notes` (one per rating), `comments`,
   `splitFrom` (id of the entry it was split from, or null), `createdAt`, `updatedAt`
@@ -99,10 +99,11 @@ These are decisions the owner made. Keep them.
   saved recipe fills the form from that recipe's latest variation.
 - Renaming a recipe renames all its variations and the breads baked from them.
 - **Baked, To try and Dough are derived, never stored.** A bread counts as **baked once it
-  has a photo** (`store.isBakedBread`); an entry without one is still a plan. A recipe is
-  baked when a baked bread points at one of its variations, and "Baked n×" counts baked
-  breads only. (The owner chose this: recipes read in through New bread were showing as
-  baked before anything was baked.) An entry is Dough until a bake is recorded: a program
+  has a date** (`store.isBakedBread`); an entry dated "–" (the button beside Date) is still a
+  plan. A recipe is baked when a baked bread points at one of its variations, and "Baked n×"
+  counts baked breads only. A bread filled in with From photo starts undated. Photos do not
+  decide it. (The owner chose this: recipes read in through New bread were showing as baked
+  before anything was baked.) An entry is Dough until a bake is recorded: a program
   that is not a dough program, or an oven step (`LGT.util.isBaked`).
 - **Programs can be combined** (for example Dough then Bake). The program marked `manual`
   in `data/machine.js` (Bake) has its time typed in as "added time", so the added time and
@@ -119,7 +120,7 @@ These are decisions the owner made. Keep them.
   through them. In the form the photos wrap in a grid with + last, and are put in order by
   dragging (mouse: drag; phone: hold briefly, then drag, so a quick swipe still scrolls).
 - **Stats** (third tab): flour used, loaves, favorite and time spent, all derived in
-  `store.stats`. Loaves and the favorite count baked entries (with a photo); flour and time
+  `store.stats`. Loaves and the favorite count baked (dated) entries; flour and time
   count every entry. Flour in cups or spoons is converted at about 120 g a
   cup. Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
   (flour, machine time, proofing) is counted once, with the entry it came from. The favorite
