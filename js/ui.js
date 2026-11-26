@@ -244,7 +244,7 @@
 
   LGT.ui = {
     moved: moved, useDragOrder: useDragOrder, Icon: Icon, Stars: Stars, Named: Named, Score: Score, Photo: Photo, BlobImage: BlobImage,
-    useObjectUrl: useObjectUrl, useStore: useStore,
+    useObjectUrl: useObjectUrl, useStore: useStore, STAR: STAR,
     Sheet: Sheet, Confirm: Confirm, Viewer: Viewer, Screen: Screen
   };
 })(typeof window !== 'undefined' ? window : globalThis);

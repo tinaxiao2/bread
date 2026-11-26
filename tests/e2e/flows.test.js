@@ -627,6 +627,8 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
   // time: (90 + 30) twice, nothing more for the split copy, plus 205
   assert.equal(await stat('Time spent').locator('b').innerText(), '7 h 25 min');
   assert.equal(await stat('Highest rated').locator('b').innerText(), 'sandwich bread');
+  // ratings: 4 on each Mantou, (5 + 4.5 + 4) / 3 = 4.5 on the sandwich bread; Mystery 4
+  assert.equal(await stat('Average rating').locator('b').innerText(), '4.1');
   assert.equal(await stat('Highest rated').locator('.score').innerText(), '4.5');
   for (const label of ['Most baked', 'Highest rated']) {
     const box = await stat(label).locator('.pick').boundingBox();

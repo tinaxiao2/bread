@@ -182,7 +182,8 @@ These are decisions the owner made. Keep them.
   the recipes baked, most baked first, with "n×"; Recipes → every recipe A to Z, baked ones in
   brown and the rest in gray. Each recipe in those lists opens its recipe page.
   Every Stats heading starts with an emoji: 🌾 Flour used, 🍞 Loaves, 📖 Recipes, 🌍 Countries,
-  ❤️ Most baked (was Favorite), ⭐ Highest rated, ⏱️ Time spent, 🗺️ Countries (the list). Highest rated is the label (or recipe) with the best-rated bake (ties: more
+  ❤️ Most baked (was Favorite), ⭐ Highest rated, 🌟 Average rating (of every rated, dated bake,
+  one decimal, with a star), ⏱️ Time spent, 🗺️ Countries (the list). Highest rated is the label (or recipe) with the best-rated bake (ties: more
   baked, then more recent). Tapping the favorite's or highest rated's name opens its recipe page
   (on the recipe of the latest or best bake), or the bread when it has no recipe. Those two names
   stay on one line and at one size: when either is too long, both are set smaller until both

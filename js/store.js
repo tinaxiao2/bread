@@ -352,6 +352,11 @@
       return (b.count - a.count) || U.flagName(a.flag).localeCompare(U.flagName(b.flag));
     });
     return {
+      // the average of every rated bake
+      average: (function () {
+        var v = bakedOf(state.breads).map(U.rating).filter(function (x) { return x !== null; });
+        return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
+      })(),
       flourGrams: flour, loaves: bakedOf(state.breads).length, minutes: minutes, countries: countries, recipes: lines().length,
       // every recipe A to Z, and the baked ones by how often they were baked
       recipeList: lines().map(function (l) {

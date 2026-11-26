@@ -862,6 +862,9 @@
         <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⭐</span>Highest rated</span>
           <${Pick} item=${st.highestRated} nav=${nav}>${st.highestRated ? html`<${ui.Score} value=${st.highestRated.rating}/>` : null}<//>
         </div>
+        <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">🌟</span>Average rating</span>
+          <b class="avg">${st.average === null ? '–' : html`${U.fmtRating(st.average)}<svg viewBox="0 0 24 24" aria-hidden="true"><path d=${ui.STAR}/></svg>`}</b>
+        </div>
         <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⏱️</span>Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
         ${st.countries.length ? html`<div class="statsort">
           <div class="sortby">
