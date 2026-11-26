@@ -17,6 +17,13 @@ async function open(t, o = {}) {
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(e.message));
+  // the app opens on Recipes by Rating; most flows look at every entry, newest first
+  if (!o.fresh) {
+    await context.addInitScript(() => {
+      if (!sessionStorage.getItem('lgt-gallery-view')) sessionStorage.setItem('lgt-gallery-view', 'all');
+      if (!sessionStorage.getItem('lgt-gallery-sort')) sessionStorage.setItem('lgt-gallery-sort', 'recent');
+    });
+  }
   if (o.flags) await context.addInitScript((f) => localStorage.setItem('lgt-dev-flags', JSON.stringify(f)), o.flags);
   if (o.db) {
     await context.addInitScript((d) => { if (!localStorage.getItem('lgt-dev-db')) localStorage.setItem('lgt-dev-db', JSON.stringify(d)); }, o.db);
@@ -909,6 +916,18 @@ test('a second proof is added with +', async (t) => {
   assert.match(card, /2ND PROOF\s+Air fryer\s+45 min/i);
 });
 
+test('the app opens on Recipes, by Rating', async (t) => {
+  const page = await open(t, { db: RANKED, fresh: true });
+  assert.equal(await page.getByRole('tab', { name: 'Recipes' }).getAttribute('aria-selected'), 'true');
+  assert.equal(await page.locator('.sortby span').innerText(), 'Rating');
+  await page.getByRole('tab', { name: 'All' }).click();
+  await field(page, 'Filter by').selectOption('az');
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
+  assert.equal(await page.getByRole('tab', { name: 'All' }).getAttribute('aria-selected'), 'true', 'kept while the app is open');
+  assert.equal(await page.locator('.sortby span').innerText(), 'A to Z');
+});
+
 test('the country list can be sorted like the gallery, and remembers it', async (t) => {
   const r = (name, n, flag) => ({ name, ingredients: [{ group: 'flour', type: 'AP', amount: '500', unit: 'g' }], bake: { programs: [1], size: '1.5', minutes: 205 },
     method: '', source: '', link: '', parent: '', flag, originals: [], basedOn: null, line: 'r' + n, tweak: 1, createdAt: n, updatedAt: n });
@@ -922,7 +941,7 @@ test('the country list can be sorted like the gallery, and remembers it', async 
   } });
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   const names = () => page.locator('.countries .cname').allInnerTexts();
-  assert.equal(await page.locator('.countries').locator('..').locator('.sortby span').innerText(), 'Most recipes');
+  assert.equal(await page.locator('.statsort .sortby span').innerText(), 'Most recipes');
   assert.deepEqual(await names(), ['China', 'France', 'Switzerland'], 'most recipes first');
   const sortBy = (v) => field(page, 'Sort countries').selectOption(v);
   await sortBy('recent');
@@ -935,7 +954,7 @@ test('the country list can be sorted like the gallery, and remembers it', async 
   assert.deepEqual(await names(), ['China', 'France', 'Switzerland']);
   await page.reload();
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
-  assert.equal(await page.locator('.countries').locator('..').locator('.sortby span').innerText(), 'A to Z', 'remembered');
+  assert.equal(await page.locator('.statsort .sortby span').innerText(), 'A to Z', 'remembered');
 
 });
 

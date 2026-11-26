@@ -198,10 +198,11 @@
   }
 
   var VIEW_KEY = 'lgt-gallery-view', SORT_KEY = 'lgt-gallery-sort';
-  function remembered(key, allowed, fallback) {
-    try { var v = localStorage.getItem(key); return allowed.indexOf(v) >= 0 ? v : fallback; } catch (e) { return fallback; }
+  /** A choice kept on the device. `session` keeps it only until the app is opened again. */
+  function remembered(key, allowed, fallback, session) {
+    try { var v = (session ? sessionStorage : localStorage).getItem(key); return allowed.indexOf(v) >= 0 ? v : fallback; } catch (e) { return fallback; }
   }
-  function remember(key, v) { try { localStorage.setItem(key, v); } catch (e) { /* a convenience only */ } }
+  function remember(key, v, session) { try { (session ? sessionStorage : localStorage).setItem(key, v); } catch (e) { /* a convenience only */ } }
 
   var SORTS = [['recent', 'Most recent'], ['baked', 'Most baked'], ['rating', 'Rating'], ['az', 'A to Z'], ['country', 'Country']];
   /** By country name, then by name; no flag last. */
@@ -253,8 +254,9 @@
   }
 
   function Gallery(props) {
-    var vs = useState(remembered(VIEW_KEY, ['recipes', 'all'], 'all')), view = vs[0], setView = vs[1];
-    var ss = useState(remembered(SORT_KEY, SORTS.map(function (o) { return o[0]; }), 'recent')), sort = ss[0], setSort = ss[1];
+    // The app opens on Recipes, by Rating; a change holds until the app is opened again.
+    var vs = useState(remembered(VIEW_KEY, ['recipes', 'all'], 'recipes', true)), view = vs[0], setView = vs[1];
+    var ss = useState(remembered(SORT_KEY, SORTS.map(function (o) { return o[0]; }), 'rating', true)), sort = ss[0], setSort = ss[1];
     var nav = props.nav;
     var label = SORTS.filter(function (o) { return o[0] === sort; })[0][1];
     return html`<div class="wrap">
@@ -264,12 +266,12 @@
           <div class="toggle" role="tablist">
             ${[['recipes', 'Recipes'], ['all', 'All']].map(function (o) {
               return html`<button type="button" role="tab" key=${o[0]} aria-selected=${view === o[0]} class=${view === o[0] ? 'on' : ''}
-                onClick=${function () { setView(o[0]); remember(VIEW_KEY, o[0]); }}>${o[1]}</button>`;
+                onClick=${function () { setView(o[0]); remember(VIEW_KEY, o[0], true); }}>${o[1]}</button>`;
             })}
           </div>
           <div class="sortby">
             <${Icon} name="sort"/><span>${label}</span>
-            <select id="f-sort" aria-label="Filter by" value=${sort} onChange=${function (e) { setSort(e.target.value); remember(SORT_KEY, e.target.value); }}>
+            <select id="f-sort" aria-label="Filter by" value=${sort} onChange=${function (e) { setSort(e.target.value); remember(SORT_KEY, e.target.value, true); }}>
               ${SORTS.map(function (o) { return html`<option key=${o[0]} value=${o[0]}>${o[1]}</option>`; })}
             </select>
           </div>
@@ -843,14 +845,16 @@
           <${Pick} item=${st.highestRated} nav=${nav}>${st.highestRated ? html`<${ui.Score} value=${st.highestRated.rating}/>` : null}<//>
         </div>
         <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⏱️</span>Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
-        ${st.countries.length ? html`<div class="stat wide"><div class="lrow"><span class="label"><span class="em" aria-hidden="true">🗺️</span>Countries</span>
-          <span class="n">${st.countries.reduce(function (n, c) { return n + c.tried; }, 0)} / ${st.countries.reduce(function (n, c) { return n + c.count; }, 0)}</span></div>
+        ${st.countries.length ? html`<div class="statsort">
           <div class="sortby">
             <${Icon} name="sort"/><span>${COUNTRY_SORTS.filter(function (o) { return o[0] === csort; })[0][1]}</span>
             <select id="f-country-sort" aria-label="Sort countries" value=${csort} onChange=${function (e) { setCsort(e.target.value); remember(COUNTRY_KEY, e.target.value); }}>
               ${COUNTRY_SORTS.map(function (o) { return html`<option key=${o[0]} value=${o[0]}>${o[1]}</option>`; })}
             </select>
           </div>
+        </div>` : null}
+        ${st.countries.length ? html`<div class="stat wide"><div class="lrow"><span class="label"><span class="em" aria-hidden="true">🗺️</span>Countries</span>
+          <span class="n">${st.countries.reduce(function (n, c) { return n + c.tried; }, 0)} / ${st.countries.reduce(function (n, c) { return n + c.count; }, 0)}</span></div>
           <ul class="countries">
             ${sortCountries(st.countries, csort).map(function (c) {
               var on = !!open[c.flag];

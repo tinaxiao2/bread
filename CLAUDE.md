@@ -117,7 +117,8 @@ These are decisions the owner made. Keep them.
   then "New…" to type a new label.
 - **Recipes to try are ranked** by dragging their rows (same hold-then-drag as photos,
   `ui.useDragOrder`).
-- **Gallery has a Recipes · All toggle** (top right, remembered on the device): All is every
+- **Gallery has a Recipes · All toggle** (top right). The app always opens on **Recipes, by
+  Rating**; a change holds while the app is open (sessionStorage), not to the next opening. All is every
   entry; Recipes is one tile per label (or recipe with no label) that has been baked. Tiles show the rating at the
   top left, where Dough shows on an entry not baked yet (dough is not rated). In the Recipes view the number of baked entries is a toffee-brown (#C27C3A)
   bubble at the top right, sized like an iPhone badge on an app icon (about a third of the
@@ -125,7 +126,7 @@ These are decisions the owner made. Keep them.
   screen edge), and one card per extra entry (up to 3) steps
   diagonally up and to the left behind the tile. Under the toggle, **Filter by** (icon +
   brown text naming the current choice; no outline when tapped) sorts either view: Most recent, Most baked,
-  Rating (unrated last), A to Z, Country (by country name, no flag last). Remembered on the device.
+  Rating (unrated last), A to Z, Country (by country name, no flag last).
   Ties: Most baked goes to the better rated, then the most recent with a photo, then those with
   none. Rating puts ties and the unrated in order of most baked, then the most recent with a
   photo, then those with none.
@@ -183,8 +184,8 @@ These are decisions the owner made. Keep them.
   flag or else its label's, most first; recipes with no flag are left out. Each row shows
   "baked / all" (no label) and taps open to list its recipes A to Z, the ones not baked yet in
   gray; tapping one opens its recipe page. At the right of the list's heading: recipes tried
-  / all recipes, across every country listed. Under it, a sort like the Gallery's (icon + brown
-  text, remembered on the device): Most recipes (the default; ties by country name), Most recent
+  / all recipes, across every country listed. Above the list's box, a sort like the Gallery's (icon +
+  brown text, remembered on the device): Most recipes (the default; ties by country name), Most recent
   bake, Most baked (loaves), Rating (best bake, unrated last), A to Z. Loaves and the favorite count baked (dated) entries; flour and time
   count every entry. Flour in cups or spoons is converted at about 120 g a
   cup, and flour is shown in pounds (`util.fmtWeight`). Time is machine programs + Bake's added time + proofing + oven. A split copy's dough

@@ -250,7 +250,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .stat .pick .score { flex: none; font-size: 15px; }
 .stat .pick .score svg { width: 14px; height: 14px; }
 .stat .lrow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.stat .lrow + .sortby { justify-content: flex-end; margin: 2px -4px 4px 0; }
+.statsort { grid-column: 1 / -1; display: flex; justify-content: flex-end; margin: 4px 0 -4px; }
 .stat .lrow .n { padding-right: 25px; font-size: 15px; font-weight: 700; color: var(--ink2); font-variant-numeric: tabular-nums; }
 .stat .tilehead { display: block; width: 100%; text-align: left; color: inherit; }
 .tlist { display: flex; flex-direction: column; margin-top: 10px; }
