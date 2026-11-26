@@ -70,12 +70,13 @@ async function logBread(page, o = {}) {
   await page.getByRole('button', { name: 'Add bread' }).click();
   await field(page, 'Name').fill(o.name || 'Milk bread');
   if (o.photo !== false) await field(page, 'Photo').setInputFiles(await picture(page, '#c98a3f'));
-  await line(page, 'Flour').getByLabel('Amount').fill('3');
-  await line(page, 'Water').getByLabel('Amount').fill(o.water || '1 1/8');
-  await line(page, 'Yeast').getByLabel('Amount').fill('1 1/4');
-  await line(page, 'Other').getByLabel('Amount').fill('1/2');                 // the Salt row it starts with
+  await line(page, 'Flour').getByLabel('Amount').fill('400');
+  await line(page, 'Water').getByLabel('Type').selectOption('Warm');
+  await line(page, 'Water').getByLabel('Amount').fill(o.water || '300');
+  await line(page, 'Yeast').getByLabel('Amount').fill('7');
+  await line(page, 'Salt').getByLabel('Amount').fill('8');
   await chip(page, 'Dairy').click();
-  await line(page, 'Dairy').getByLabel('Amount').fill('1/2');
+  await line(page, 'Dairy').getByLabel('Amount').fill('30');
   await program(page, 1, 'White').click();
   await page.getByRole('button', { name: '1½ lb' }).click();
   await program(page, 12, 'Bake').click();
@@ -101,8 +102,8 @@ test('logs a bread with every field and shows it in the gallery', async (t) => {
 
   await tile.click();
   const text = await page.locator('.screen').innerText();
-  for (const want of ['Milk bread', 'Softest one yet.', 'AP flour', '3 cups', 'Water', '1⅛ cups', 'Milk', '½ cup', 'Active dry', '1¼ tsp',
-    'Salt', '½ tbsp', '1 · White', '12 · Bake', '1½ lb', '3 h 25 min', '+5 min', 'crust browning', 'Machine booklet, p. 14']) {
+  for (const want of ['Milk bread', 'Softest one yet.', 'AP flour', '400 g', 'Warm water', '300 g', 'Milk', '30 g', 'Active dry', '7 g',
+    'Salt', '8 g', '1 · White', '12 · Bake', '1½ lb', '3 h 25 min', '+5 min', 'crust browning', 'Machine booklet, p. 14']) {
     assert.ok(text.includes(want), 'bread page shows "' + want + '"\n' + text);
   }
   await count(page.locator('.rcard'), 1);
@@ -111,19 +112,22 @@ test('logs a bread with every field and shows it in the gallery', async (t) => {
 test('a new bread starts with flour, water, yeast and salt', async (t) => {
   const page = await open(t);
   await page.getByRole('button', { name: 'Add bread' }).click();
-  assert.deepEqual(await page.locator('.grow > b').allInnerTexts(), ['Flour', 'Water', 'Yeast', 'Other'], 'no dairy row to begin with');
+  assert.deepEqual(await page.locator('.grow > b').allInnerTexts(), ['Flour', 'Water', 'Yeast', 'Salt'], 'no dairy row to begin with');
+  for (const g of ['Flour', 'Water', 'Yeast', 'Salt']) assert.equal(await line(page, g).getByLabel('Unit').inputValue(), 'g', g + ' starts in grams');
+  assert.equal(await line(page, 'Water').getByLabel('Type').inputValue(), '');
+  assert.deepEqual(await line(page, 'Water').getByLabel('Type').locator('option').allInnerTexts(), ['Type', 'Lukewarm', 'Warm', 'Hot', 'Other…']);
   assert.equal(await line(page, 'Flour').getByLabel('Type').inputValue(), 'AP');
   assert.equal(await line(page, 'Yeast').getByLabel('Type').inputValue(), 'Active dry');
-  assert.equal(await line(page, 'Other').getByLabel('Ingredient').inputValue(), 'Salt');
-  assert.equal(await line(page, 'Other').getByLabel('Unit').inputValue(), 'tbsp');
   assert.deepEqual(await page.locator('.addrow button').allInnerTexts(), ['Flour', 'Dairy', 'Sugar', 'Other']);
 
   await chip(page, 'Sugar').click();
-  assert.equal(await line(page, 'Other').getByLabel('Ingredient').nth(1).inputValue(), 'Sugar');
-  assert.equal(await line(page, 'Other').getByLabel('Unit').nth(1).inputValue(), 'tbsp');
+  assert.equal(await line(page, 'Other').getByLabel('Ingredient').inputValue(), 'Sugar');
+  assert.equal(await line(page, 'Other').getByLabel('Unit').inputValue(), 'g');
   assert.equal(await chip(page, 'Sugar').count(), 0, 'once added, it is no longer offered');
-  await line(page, 'Other').locator('.rm').first().click();
+  await line(page, 'Salt').locator('.rm').click();
   assert.equal(await chip(page, 'Salt').count(), 1, 'salt can be put back');
+  await chip(page, 'Salt').click();
+  assert.equal(await line(page, 'Salt').getByLabel('Unit').inputValue(), 'g');
 });
 
 test('several programs can be chosen; Bake brings the added time', async (t) => {
@@ -189,44 +193,98 @@ test('the same name is the same recipe; different ingredients become a variation
   await page.getByRole('button', { name: 'Add bread' }).click();
   await field(page, 'Name').fill('milk  BREAD');
   await field(page, 'Comments').click();
-  assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '3', 'filled from the saved recipe');
-  assert.equal(await line(page, 'Water').getByLabel('Amount').inputValue(), '1 1/8');
+  assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '400', 'filled from the saved recipe');
+  assert.equal(await line(page, 'Water').getByLabel('Amount').inputValue(), '300');
   assert.equal(await program(page, 1, 'White').getAttribute('aria-pressed'), 'true');
   await save(page);
   await formGone(page);
   await page.getByRole('button', { name: 'Recipes' }).click();
   await count(page.locator('.rc'), 1);
   assert.match(await page.locator('.rc').innerText(), /Baked 2×/);
-  assert.doesNotMatch(await page.locator('.rc').innerText(), /variations/);
+  assert.doesNotMatch(await page.locator('.rc').innerText(), /tweaks/);
 
   // a third bake with more water: one recipe still, now with two variations
   await page.getByRole('button', { name: 'Add bread' }).click();
   await field(page, 'Name').fill('Milk bread');
   await field(page, 'Comments').click();
-  await line(page, 'Water').getByLabel('Amount').fill('1 1/4');
+  await line(page, 'Water').getByLabel('Amount').fill('320');
   await save(page);
   await formGone(page);
   await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /Baked 3×[\s\S]*2 variations/);
+  assert.match(await page.locator('.rc').innerText(), /Baked 3×[\s\S]*2 tweaks/);
 
   await page.locator('.rc .open').click();
-  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['VARIATION 2', 'VARIATION 1']);
+  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['TWEAK 2', 'TWEAK 1']);
   const two = page.locator('.variation').first(), one = page.locator('.variation').nth(1);
   assert.match(await two.locator('.vhead').innerText(), /Baked 1×/);
   assert.match(await one.locator('.vhead').innerText(), /Baked 2×/);
-  assert.deepEqual(await two.locator('.ings li.diff span').allInnerTexts(), ['Water'], 'the line that differs stands out');
+  assert.deepEqual(await two.locator('.ings li.diff span').allInnerTexts(), ['Warm water'], 'the line that differs stands out');
   await count(one.locator('.ings li.diff'), 0);
   await count(two.locator('.made .tile'), 1);
   await count(one.locator('.made .tile'), 2);
 
   // a bread page says which variation it followed
   await two.locator('.made .tile').click();
-  assert.match(await page.locator('.screen').last().locator('.rhead').innerText(), /Variation 2/);
+  assert.match(await page.locator('.screen').last().locator('.rhead').innerText(), /Tweak 2/);
   await page.getByRole('button', { name: 'Back' }).last().click();
   await page.getByRole('button', { name: 'Back' }).click();
 
   // another name is another recipe
   await logBread(page, { name: 'Sandwich loaf', photo: false });
+  await count(page.locator('.rc'), 2);
+});
+
+test('a recipe attached to a parent shows as one of its tweaks', async (t) => {
+  const page = await open(t);
+  await logBread(page, { name: 'french bread', photo: false });
+
+  // a new name, attached to french bread
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('herb french');
+  await field(page, 'Comments').click();
+  assert.deepEqual(await field(page, 'Parent').locator('option').allInnerTexts(), ['–', 'french bread']);
+  await field(page, 'Parent').selectOption('french bread');
+  await line(page, 'Flour').getByLabel('Amount').fill('380');
+  await chip(page, 'Other').click();
+  await line(page, 'Other').getByLabel('Ingredient').fill('Rosemary');
+  await line(page, 'Other').getByLabel('Amount').fill('2');
+  await save(page);
+  await formGone(page);
+
+  await page.getByRole('button', { name: 'Recipes' }).click();
+  await count(page.locator('.rc'), 1);
+  assert.match(await page.locator('.rc').innerText(), /french bread[\s\S]*Baked 2×[\s\S]*2 tweaks/);
+  await page.locator('.rc .open').click();
+  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['TWEAK 2', 'TWEAK 1']);
+  assert.deepEqual(await page.locator('.tname').allInnerTexts(), ['herb french'], 'a tweak with its own name shows it');
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  // baking it again by name keeps it attached
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('herb french');
+  await field(page, 'Comments').click();
+  assert.equal(await field(page, 'Parent').inputValue(), 'french bread');
+  await save(page);
+  await formGone(page);
+  await count(page.locator('.rc'), 1);
+  assert.match(await page.locator('.rc').innerText(), /Baked 3×[\s\S]*2 tweaks/);
+
+  // renaming the parent keeps the tweak attached
+  await page.locator('.rc .open').click();
+  await page.getByRole('button', { name: 'Edit tweak 1' }).click();
+  await field(page, 'Name').fill('baguette');
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
+  assert.equal(await page.locator('.screen h2').first().innerText(), 'baguette');
+  await count(page.locator('.variation'), 2);
+
+  // detaching gives it its own card again
+  await page.getByRole('button', { name: 'Edit tweak 2' }).click();
+  assert.equal(await field(page, 'Parent').inputValue(), 'baguette');
+  await field(page, 'Parent').selectOption('');
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
   await count(page.locator('.rc'), 2);
 });
 
@@ -237,7 +295,7 @@ test('typing part of a name offers the saved recipe', async (t) => {
   await field(page, 'Name').fill('mil');
   await page.locator('.suggest').getByRole('button', { name: 'Milk bread' }).click();
   assert.equal(await field(page, 'Name').inputValue(), 'Milk bread');
-  assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '3');
+  assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '400');
   assert.equal(await page.locator('.suggest').count(), 0);
 
   // changing to a name with no recipe clears what was filled in, as long as she has not edited it
@@ -255,19 +313,19 @@ test('ingredients added once are offered next time', async (t) => {
   await line(page, 'Yeast').getByLabel('Amount').fill('1/2');
   await line(page, 'Yeast').getByLabel('Unit').selectOption('tbsp');
   await chip(page, 'Other').click();
-  await line(page, 'Other').getByLabel('Ingredient').nth(1).fill('Honey');
-  await line(page, 'Other').getByLabel('Amount').nth(1).fill('2');
-  await line(page, 'Other').getByLabel('Unit').nth(1).selectOption('tsp');
+  await line(page, 'Other').getByLabel('Ingredient').fill('Honey');
+  await line(page, 'Other').getByLabel('Amount').fill('2');
+  await line(page, 'Other').getByLabel('Unit').selectOption('tsp');
   await save(page);
   await formGone(page);
 
   await page.getByRole('button', { name: 'Add bread' }).click();
   assert.deepEqual(await page.locator('.addrow button').allInnerTexts(), ['Flour', 'Dairy', 'Sugar', 'Honey', 'Other']);
-  assert.equal(await line(page, 'Yeast').getByLabel('Unit').inputValue(), 'tbsp', 'and the unit used with it');
+  assert.equal(await line(page, 'Yeast').getByLabel('Unit').inputValue(), 'g', 'units always start in grams');
   await chip(page, 'Honey').click();
-  assert.equal(await line(page, 'Other').getByLabel('Ingredient').nth(1).inputValue(), 'Honey');
-  assert.equal(await line(page, 'Other').getByLabel('Unit').nth(1).inputValue(), 'tsp');
-  assert.deepEqual(await page.locator('#lgt-ingredient-names option').evaluateAll((o) => o.map((x) => x.value)), ['Salt', 'Sugar', 'Honey']);
+  assert.equal(await line(page, 'Other').getByLabel('Ingredient').inputValue(), 'Honey');
+  assert.equal(await line(page, 'Other').getByLabel('Unit').inputValue(), 'g');
+  assert.deepEqual(await page.locator('#lgt-ingredient-names option').evaluateAll((o) => o.map((x) => x.value)), ['Sugar', 'Honey']);
 });
 
 test('edits made while a photo is still loading are kept', async (t) => {
@@ -323,7 +381,7 @@ test('Bake again from a bread keeps it on the same variation', async (t) => {
   await page.locator('.gal .tile').click();
   await page.getByRole('button', { name: 'Bake again' }).click();
   assert.equal(await field(page, 'Name').inputValue(), 'Milk bread');
-  assert.equal(await line(page, 'Water').getByLabel('Amount').inputValue(), '1 1/8');
+  assert.equal(await line(page, 'Water').getByLabel('Amount').inputValue(), '300');
   assert.equal(await field(page, 'Added minutes').inputValue(), '5');
   await save(page);
   await page.getByRole('heading', { name: 'New bread' }).waitFor({ state: 'detached' });
@@ -331,7 +389,7 @@ test('Bake again from a bread keeps it on the same variation', async (t) => {
   await page.getByRole('button', { name: 'Recipes' }).click();
   await count(page.locator('.rc'), 1);
   assert.match(await page.locator('.rc').innerText(), /Baked 2×/);
-  assert.doesNotMatch(await page.locator('.rc').innerText(), /variations/);
+  assert.doesNotMatch(await page.locator('.rc').innerText(), /tweaks/);
 });
 
 test('a recipe to try moves to Baked once it is baked', async (t) => {
@@ -344,9 +402,8 @@ test('a recipe to try moves to Baked once it is baked', async (t) => {
   await line(page, 'Flour').getByLabel('Amount').fill('420');
   await line(page, 'Flour').getByLabel('Unit').selectOption('g');
   await chip(page, 'Other').click();
-  await line(page, 'Other').getByLabel('Ingredient').nth(1).fill('Raisins');
-  await line(page, 'Other').getByLabel('Amount').nth(1).fill('80');
-  await line(page, 'Other').getByLabel('Unit').nth(1).selectOption('g');
+  await line(page, 'Other').getByLabel('Ingredient').fill('Raisins');
+  await line(page, 'Other').getByLabel('Amount').fill('80');
   await field(page, 'Source').fill('Mom');
   await save(page);
   await formGone(page);
@@ -392,7 +449,7 @@ test('reads a recipe from a photo; both sizes are saved as variations of one rec
   await formGone(page);
 
   await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /Everyday white loaf[\s\S]*2 variations/);
+  assert.match(await page.locator('.rc').innerText(), /Everyday white loaf[\s\S]*2 tweaks/);
   await page.locator('.rc').getByRole('button', { name: 'Bake this' }).click();     // two variations: choose on its page
   await count(page.locator('.variation'), 2);
   const text = await page.locator('.screen').innerText();
@@ -466,13 +523,13 @@ test('renaming a recipe renames every variation and the breads baked from it', a
   await page.getByRole('button', { name: 'Add bread' }).click();
   await field(page, 'Name').fill('Milk bread');
   await field(page, 'Comments').click();
-  await line(page, 'Water').getByLabel('Amount').fill('1 1/4');
+  await line(page, 'Water').getByLabel('Amount').fill('320');
   await save(page);
   await formGone(page);
 
   await page.getByRole('button', { name: 'Recipes' }).click();
   await page.locator('.rc .open').click();
-  await page.getByRole('button', { name: 'Edit variation 1' }).click();
+  await page.getByRole('button', { name: 'Edit tweak 1' }).click();
   await field(page, 'Name').fill('Soft milk loaf');
   await save(page);
   await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
@@ -533,7 +590,7 @@ test('Split copies an entry so each half can be baked its own way', async (t) =>
   // one recipe, two ways of baking it
   await page.getByRole('button', { name: 'Recipes' }).click();
   await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /Country dough[\s\S]*Baked 2×[\s\S]*2 variations/);
+  assert.match(await page.locator('.rc').innerText(), /Country dough[\s\S]*Baked 2×[\s\S]*2 tweaks/);
 
   // the halves share the photo they started with: deleting one must not take it from the other
   await page.getByRole('button', { name: 'Gallery' }).click();
@@ -582,9 +639,9 @@ test('entries saved by the first version read correctly', async (t) => {
 
   await page.getByRole('button', { name: 'Recipes' }).click();
   await count(page.locator('.rc'), 1);
-  assert.match(await page.locator('.rc').innerText(), /country loaf[\s\S]*Baked 3×[\s\S]*3 variations/);
+  assert.match(await page.locator('.rc').innerText(), /country loaf[\s\S]*Baked 3×[\s\S]*3 tweaks/);
   await page.locator('.rc .open').click();
-  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['VARIATION 3', 'VARIATION 2', 'VARIATION 1']);
+  assert.deepEqual(await page.locator('.vhead .label').allInnerTexts(), ['TWEAK 3', 'TWEAK 2', 'TWEAK 1']);
   const first = page.locator('.variation').nth(2);
   const text = await first.innerText();
   for (const want of ['2 · French', '12 · Bake', '4 h 15 min', '+10 min', 'Too pale']) assert.ok(text.includes(want), want + '\n' + text);
@@ -619,8 +676,8 @@ test('entries saved by the first version read correctly', async (t) => {
 
   // what was used before is offered in a new bread
   await page.getByRole('button', { name: 'Add bread' }).click();
-  assert.equal(await line(page, 'Yeast').getByLabel('Unit').inputValue(), 'tbsp');
-  assert.equal(await line(page, 'Other').getByLabel('Unit').inputValue(), 'tbsp');
+  assert.equal(await line(page, 'Yeast').getByLabel('Unit').inputValue(), 'g');
+  assert.equal(await line(page, 'Salt').getByLabel('Unit').inputValue(), 'g');
 });
 
 test('keeps what was saved after a reload', async (t) => {
@@ -653,7 +710,7 @@ test('interface copy follows the owner\'s rules', async (t) => {
     const found = await page.evaluate(() => {
       const out = { headings: [], labels: [], other: [] };
       const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-      const ours = (el) => !el.closest('.tile, .rc .open, .rc .body, .opt, .suggest, .ings, .src, .method, .comments, .notes');
+      const ours = (el) => !el.closest('.tile, .rc .open, .rc .body, .opt, .suggest, .ings, .src, .method, .comments, .notes, .tname, #f-parent');
       document.querySelectorAll('h1,h2,h3').forEach((el) => { if (visible(el)) out.headings.push(el.textContent.trim()); });
       document.querySelectorAll('button, .label, .pill, .flag, option, label').forEach((el) => {
         if ((visible(el) || el.tagName === 'OPTION') && ours(el)) out.labels.push(el.textContent.trim());

@@ -51,16 +51,11 @@
   function IngredientLine(props) {
     var ing = props.ing, change = props.onChange;
     function set(patch) { change(Object.assign({}, ing, patch)); }
-    /** A new kind or name brings the unit last used with it, until an amount has been typed. */
-    function setType(type) {
-      var patch = { type: type, _auto: false };
-      if (!ing.amount) patch.unit = LGT.store.unitFor(ing.group, type);
-      set(patch);
-    }
+    function setType(type) { set({ type: type, _auto: false }); }
     var metric = ing.unit === 'g' || ing.unit === 'ml' || ing.unit === 'oz' || ing.unit === 'lb';
     var id = 'ing-' + ing._k;
     return html`<div class="line">
-      ${ing.group === 'water' ? html`<span></span>`
+      ${ing.group === 'salt' ? html`<span></span>`
         : ing.group === 'other'
           ? html`<input id=${id + '-name'} class="mini" value=${ing.type} placeholder="Ingredient" aria-label="Ingredient"
               list="lgt-ingredient-names" autocomplete="off" onInput=${val(setType)}/>`
@@ -80,13 +75,12 @@
   function IngredientsEditor(props) {
     var list = props.list;
     function add(group, name) {
-      var type = name !== undefined ? name : (U.DEFAULT_TYPES[group] || [''])[0];
-      var row = U.newIngredient(group, type, LGT.store.unitFor(group, type));
-      if (group === 'other' && !type) row._auto = false;         // a blank row is hers to name
+      var row = U.newIngredient(group, name);
+      if (group === 'other' && !name) row._auto = false;         // a blank row is hers to name
       props.onChange(list.concat(keyed([row])));
     }
     var groups = U.GROUPS.filter(function (g) { return list.some(function (i) { return i.group === g; }); });
-    var kinds = ['flour', 'water', 'dairy', 'yeast'].filter(function (g) {
+    var kinds = ['flour', 'water', 'dairy', 'yeast', 'salt'].filter(function (g) {
       return g === 'flour' || g === 'dairy' || groups.indexOf(g) < 0;
     });
     // Named ingredients one tap away: the staples, then whatever has been added before.
@@ -199,7 +193,16 @@
     var known = LGT.store.sources().filter(function (s) { return s !== r.source; });
     var pending = props.pending || [];
     var hasOriginals = (r.originals && r.originals.length) || pending.length;
+    // Recipes this one can be attached to as a tweak.
+    var parents = LGT.store.parentChoices(r.name);
+    if (r.parent && !parents.some(function (n) { return U.nameKey(n) === U.nameKey(r.parent); })) parents = [r.parent].concat(parents);
     return html`
+      ${parents.length ? html`<${Field} label="Parent">
+        <select id="f-parent" class="input" aria-label="Parent" value=${r.parent || ''} onChange=${val(function (v) { set({ parent: v }); })}>
+          <option value="">–</option>
+          ${parents.map(function (n) { return html`<option key=${n} value=${n}>${n}</option>`; })}
+        </select>
+      <//>` : null}
       <${Field} label="Ingredients">
         <${IngredientsEditor} list=${r.ingredients} onChange=${function (list) { set({ ingredients: list }); }}/>
       <//>

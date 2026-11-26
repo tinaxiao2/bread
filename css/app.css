@@ -171,6 +171,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .variation .formend { margin-top: 12px; }
 .vhead { display: flex; align-items: center; gap: 8px; margin: 0 2px 10px; min-height: 36px; }
 .vhead .round { margin-left: auto; width: 36px; height: 36px; }
+.tname { font-size: 19px; font-weight: 620; line-height: 1.2; margin: 0 2px 10px; }
 .vhead .round .icon { width: 18px; height: 18px; }
 .made { margin-top: 18px; }
 .made .label { margin: 0 2px 8px; }

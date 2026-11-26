@@ -72,7 +72,7 @@
     return isFinite(v) ? v : null;
   }
 
-  var UNITS = ['cup', 'tbsp', 'tsp', 'g', 'ml', 'oz', 'lb', ''];
+  var UNITS = ['g', 'cup', 'tbsp', 'tsp', 'ml', 'oz', 'lb', ''];
   function unitLabel(unit, amount) {
     if (unit === 'cup') { var v = parseAmount(amount); return v !== null && v > 1 ? 'cups' : 'cup'; }
     return unit || '';
@@ -83,27 +83,41 @@
   }
 
   // ---------- ingredients ----------
-  var GROUPS = ['flour', 'water', 'dairy', 'yeast', 'other'];
-  var GROUP_LABEL = { flour: 'Flour', water: 'Water', dairy: 'Dairy', yeast: 'Yeast', other: 'Other' };
-  /** The kinds offered for each group. The first is the one a new row starts with. */
+  var GROUPS = ['flour', 'water', 'dairy', 'yeast', 'salt', 'other'];
+  var GROUP_LABEL = { flour: 'Flour', water: 'Water', dairy: 'Dairy', yeast: 'Yeast', salt: 'Salt', other: 'Other' };
+  /** The kinds offered for each group. */
   var DEFAULT_TYPES = {
     flour: ['AP', 'Bread'],
+    water: ['Lukewarm', 'Warm', 'Hot'],
     dairy: ['Milk', 'Butter'],
     yeast: ['Active dry', 'Instant', 'Bread machine']
   };
-  var DEFAULT_UNIT = { flour: 'cup', water: 'cup', dairy: 'cup', yeast: 'tsp', other: 'tsp' };
-  var TYPE_UNIT = { Butter: 'tbsp', Salt: 'tbsp', Sugar: 'tbsp' };
+  /** The kind a new row starts with. */
+  var DEFAULT_TYPE = { flour: 'AP', water: '', dairy: 'Milk', yeast: 'Active dry', salt: '', other: '' };
+  /** Every measurement starts in grams. */
+  var DEFAULT_UNIT = 'g';
   /** Named ingredients that are always one tap away. */
-  var STAPLES = ['Salt', 'Sugar'];
-  /** The rows a blank recipe starts with, as [group, name]. */
-  var STARTING = [['flour'], ['water'], ['yeast'], ['other', 'Salt']];
+  var STAPLES = ['Sugar'];
+  /** The rows a blank recipe starts with. */
+  var STARTING = ['flour', 'water', 'yeast', 'salt'];
+
+  /** Salt has its own row now; the first version kept it as a named "other" ingredient. */
+  function regroup(i) {
+    var group = GROUPS.indexOf(i.group) >= 0 ? i.group : 'other';
+    var type = String(i.type || '').trim();
+    if (group === 'other' && /^salt$/i.test(type)) return { group: 'salt', type: '' };
+    return { group: group, type: group === 'salt' ? '' : type };
+  }
+  /** The same row, brought up to date, keeping anything else the form keeps on it. */
+  function upgradeIngredient(i) { return Object.assign({}, i, regroup(i)); }
 
   function ingredientName(ing) {
     var t = (ing.type || '').trim();
     if (ing.group === 'flour') return t ? (/flour/i.test(t) ? t : t + ' flour') : 'Flour';
-    if (ing.group === 'water') return 'Water';
+    if (ing.group === 'water') return t ? (/water/i.test(t) ? t : t + ' water') : 'Water';
     if (ing.group === 'dairy') return t || 'Dairy';
     if (ing.group === 'yeast') return 'Yeast';
+    if (ing.group === 'salt') return 'Salt';
     return t;
   }
   /** The small print beside an ingredient: the yeast kind and any note. */
@@ -114,18 +128,15 @@
     return parts.join(', ');
   }
   /** A new row. `_auto` marks one that was offered rather than typed: left without an amount, it is not saved. */
-  function newIngredient(group, type, unit) {
-    if (type === undefined || type === null) type = (DEFAULT_TYPES[group] || [''])[0];
-    return {
-      group: group, type: type, amount: '',
-      unit: unit !== undefined && unit !== null ? unit : (TYPE_UNIT[type] || DEFAULT_UNIT[group]),
-      note: '', _auto: true
-    };
+  function newIngredient(group, type) {
+    if (type === undefined || type === null) type = DEFAULT_TYPE[group] || '';
+    return { group: group, type: type, amount: '', unit: DEFAULT_UNIT, note: '', _auto: true };
   }
   function cleanIngredient(i) {
+    var g = regroup(i);
     return {
-      group: GROUPS.indexOf(i.group) >= 0 ? i.group : 'other',
-      type: String(i.type || '').trim(),
+      group: g.group,
+      type: g.type,
       amount: String(i.amount || '').trim(),
       unit: UNITS.indexOf(i.unit) >= 0 ? i.unit : '',
       note: String(i.note || '').trim()
@@ -154,9 +165,9 @@
   function emptyRecipe() {
     return {
       name: '',
-      ingredients: STARTING.map(function (s) { return newIngredient(s[0], s[1]); }),
+      ingredients: STARTING.map(function (g) { return newIngredient(g); }),
       bake: cleanBake({}),
-      method: '', source: '', link: '', originals: [], basedOn: null
+      method: '', source: '', link: '', parent: '', originals: [], basedOn: null
     };
   }
   /** The programs a bake used, in the order chosen. Older entries kept a single `program`. */
@@ -189,6 +200,7 @@
       method: String(r.method || '').trim(),
       source: String(r.source || '').trim(),
       link: safeLink(r.link),
+      parent: String(r.parent || '').trim(),
       originals: (r.originals || []).slice(),
       basedOn: r.basedOn || null
     };
@@ -196,7 +208,7 @@
   /** True when nothing about a recipe was entered, so there is no card to make. */
   function isEmptyRecipe(r) {
     var c = cleanRecipe(r), b = c.bake;
-    return !c.ingredients.length && !c.method && !c.source && !c.link && !c.originals.length &&
+    return !c.ingredients.length && !c.method && !c.source && !c.link && !c.parent && !c.originals.length &&
       !b.programs.length && !b.size && !b.crust && b.minutes === null && b.added === null && !b.reason &&
       b.ovenTemp === null && b.ovenMinutes === null;
   }
@@ -209,6 +221,7 @@
   function sameDetails(a, b) {
     var x = cleanRecipe(a), y = cleanRecipe(b);
     return x.method === y.method && x.source === y.source && x.link === y.link && x.bake.reason === y.bake.reason &&
+      nameKey(x.parent) === nameKey(y.parent) &&
       JSON.stringify(x.originals) === JSON.stringify(y.originals);
   }
   /** Two names are the same recipe when they match apart from capitals and spacing. */
@@ -377,7 +390,7 @@
     num: num, fmtMinutes: fmtMinutes, splitMinutes: splitMinutes, joinMinutes: joinMinutes,
     prettyAmount: prettyAmount, parseAmount: parseAmount, amountLabel: amountLabel, unitLabel: unitLabel,
     UNITS: UNITS, GROUPS: GROUPS, GROUP_LABEL: GROUP_LABEL, DEFAULT_TYPES: DEFAULT_TYPES, DEFAULT_UNIT: DEFAULT_UNIT,
-    TYPE_UNIT: TYPE_UNIT, STAPLES: STAPLES, STARTING: STARTING,
+    DEFAULT_TYPE: DEFAULT_TYPE, STAPLES: STAPLES, STARTING: STARTING, upgradeIngredient: upgradeIngredient,
     ingredientName: ingredientName, ingredientDetail: ingredientDetail, newIngredient: newIngredient,
     cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient, changedLines: changedLines,
     emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake,

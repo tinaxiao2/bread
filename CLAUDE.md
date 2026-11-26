@@ -59,19 +59,25 @@ Two collections in the artifact database:
   rating), `comments`, `createdAt`, `updatedAt`
 - `recipes/{id}`: `name`, `ingredients[]` (`group`, `type`, `amount`, `unit`, `note`),
   `bake` (`programs[]`, `size`, `crust`, `minutes`, `added`, `reason`, `ovenTemp`,
-  `ovenMinutes`), `method`, `source`, `link`, `originals[]` (asset ids of imported
-  images), `basedOn`, `createdAt`, `updatedAt`
+  `ovenMinutes`), `method`, `source`, `link`, `parent` (name of the recipe it is attached
+  to, or ''), `originals[]` (asset ids of imported images), `basedOn`, `createdAt`, `updatedAt`
 
-Entries from the first version hold a single `bake.program` instead of `bake.programs`.
-`LGT.util.cleanBake` reads both, so nothing is migrated. Always go through it.
+Entries from the first version hold a single `bake.program` instead of `bake.programs`, and
+salt as an `other` ingredient named Salt. `LGT.util.cleanBake` and `cleanIngredient` read both
+shapes, so nothing is migrated. Always go through them.
 
 ## How the owner's log works
 
 These are decisions the owner made. Keep them.
 
 - **A recipe is known by its name.** Every `recipes` document with the same name (ignoring
-  capitals and spacing) is one **variation** of that recipe: a distinct set of ingredients
-  and baking details. The Recipes tab shows one card per name, with its variations inside.
+  capitals and spacing) is one variation of that recipe: a distinct set of ingredients
+  and baking details.
+- **A recipe can be attached to a parent recipe** (the Parent field). The parent and
+  everything attached to it form one group: one card on the Recipes tab, and every variation
+  inside it is called a **tweak** ("Tweak 1" is the oldest). The parent is stored on every
+  variation of a name and kept in step by `store.setParent`; renaming a parent updates what
+  is attached to it.
 - **A bread's name is its recipe's name.** Saving a bread named like a saved recipe joins
   that recipe: the matching variation if the ingredients and baking details are the same,
   a new variation if they differ. See `LGT.util.planRecipeSave`. Naming a new bread like a
@@ -83,9 +89,10 @@ These are decisions the owner made. Keep them.
 - **Programs can be combined** (for example Dough then Bake). The program marked `manual`
   in `data/machine.js` (Bake) has its time typed in as "added time", so the added time and
   its reason only exist, and only show, when that program is chosen.
-- **A blank recipe starts with** AP flour, water, active dry yeast and salt (tbsp). Dairy
-  is added on demand. Salt and Sugar are always offered as quick-add chips, followed by
-  every named ingredient the owner has used before. Units follow what was last used.
+- **A blank recipe starts with** flour (AP), water, yeast (active dry) and salt, every
+  measurement in grams. New rows always start in grams. Salt has its own row. Water has a
+  kind: Lukewarm, Warm or Hot. Dairy is added on demand. Sugar is always a quick-add chip,
+  followed by every named ingredient the owner has used before.
 - Rows that were only offered (`_auto`) and left without an amount are not saved.
 - **Split** on a bread's page opens a copy of the entry (name, date, photo, ratings, comments,
   recipe) that is saved as a new bread. It is for one dough baked two ways: change the

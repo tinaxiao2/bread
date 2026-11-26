@@ -10,23 +10,21 @@
   // (ingredients + baking details). Only an imported recipe has more than one variant.
   function draftFromRecipe(r) {
     return {
-      name: r.name || '', method: r.method || '', source: r.source || '', link: r.link || '',
+      name: r.name || '', method: r.method || '', source: r.source || '', link: r.link || '', parent: r.parent || '',
       originals: (r.originals || []).slice(), basedOn: r.basedOn || null, index: 0,
-      variants: [{ label: '', ingredients: F.keyed(r.ingredients), bake: U.cleanBake(r.bake) }]
+      variants: [{ label: '', ingredients: F.keyed((r.ingredients || []).map(U.upgradeIngredient)), bake: U.cleanBake(r.bake) }]
     };
   }
   function blankDraft() {
-    var r = U.emptyRecipe();
-    r.ingredients.forEach(function (i) { i.unit = store.unitFor(i.group, i.type); });
-    return draftFromRecipe(r);
+    return draftFromRecipe(U.emptyRecipe());
   }
   function draftFromReading(reading) {
     return {
-      name: reading.name, method: reading.method, source: reading.source, link: '',
+      name: reading.name, method: reading.method, source: reading.source, link: '', parent: '',
       originals: [], basedOn: null, index: 0,
       variants: reading.variants.map(function (v, i) {
         var d = importer.toDraft(reading, i);
-        return { label: importer.variantLabel(v), ingredients: F.keyed(d.ingredients), bake: d.bake };
+        return { label: importer.variantLabel(v), ingredients: F.keyed(d.ingredients.map(U.upgradeIngredient)), bake: d.bake };
       })
     };
   }
@@ -34,7 +32,7 @@
     var v = d.variants[index === undefined ? d.index : index];
     return {
       name: d.name, ingredients: v.ingredients, bake: v.bake, method: d.method,
-      source: d.source, link: d.link, originals: d.originals, basedOn: d.basedOn
+      source: d.source, link: d.link, parent: d.parent, originals: d.originals, basedOn: d.basedOn
     };
   }
   /** True while the form offers the recipe's own sizes, which stand in for the loaf-size field. */
@@ -44,7 +42,7 @@
   function withRecipe(d, r) {
     var variants = d.variants.slice();
     variants[d.index] = Object.assign({}, variants[d.index], { ingredients: r.ingredients, bake: r.bake });
-    return Object.assign({}, d, { method: r.method, source: r.source, link: r.link, originals: r.originals, variants: variants });
+    return Object.assign({}, d, { method: r.method, source: r.source, link: r.link, parent: r.parent, originals: r.originals, variants: variants });
   }
 
   // ---------- shared pieces ----------
@@ -195,7 +193,7 @@
     useEffect(function () { if (!b) nav.close(props.k); }, [!b]);
     if (!b) return null;
     var r = store.recipe(b.recipeId);
-    var which = r ? store.variationOf(r) : null;
+    var which = r ? store.tweakOf(r) : null;
     var rated = U.RATINGS.some(function (k) { return (b.ratings || {})[k[0]] > 0; });
     var notes = U.RATINGS.filter(function (k) { return (b.notes || {})[k[0]]; });
     var photo = b.photo && b.photo.full;
@@ -224,7 +222,7 @@
             ${b.comments ? html`<div class="comments">${b.comments}</div>` : null}
           </div>` : null}
           ${r ? html`<${RecipeCard} recipe=${r} title=${true} action="Bake again"
-            tag=${which.of > 1 ? 'Variation ' + which.n : ''}
+            tag=${which.of > 1 ? 'Tweak ' + which.n : ''}
             onOpen=${function () { nav.push({ kind: 'recipe', id: r.id }); }}
             onAction=${function () { nav.push({ kind: 'breadForm', fromRecipeId: r.id }); }}
             onView=${setView}/>` : null}
@@ -235,7 +233,8 @@
   }
 
   // ---------- Recipes ----------
-  // A recipe is everything saved under one name. Its variations live inside it.
+  // One card per recipe: everything saved under its name, and every recipe attached to it.
+  // Each variation inside is a tweak.
   function Summary(props) {
     var items = U.ingredientSummary(props.recipe), line = bakeLine(props.recipe.bake);
     if (!items.length && !line) return null;
@@ -247,12 +246,12 @@
     </button>`;
   }
   function CountPill(props) {
-    return props.n > 1 ? html`<span class="pill sage">${props.n} variations</span>` : null;
+    return props.n > 1 ? html`<span class="pill sage">${props.n} tweaks</span>` : null;
   }
 
   function Recipes(props) {
-    var nav = props.nav, all = store.families();
-    var baked = all.filter(function (f) { return f.baked; }), toTry = all.filter(function (f) { return !f.baked; });
+    var nav = props.nav, all = store.groups();
+    var baked = all.filter(function (g) { return g.baked; }), toTry = all.filter(function (g) { return !g.baked; });
     var showBaked = props.seg === 'baked';
     return html`<div class="wrap">
       <div class="top"><h1 class="serif">Recipes</h1></div>
@@ -262,44 +261,45 @@
       </div>
       <div class="list">
         ${showBaked ? null : html`<button type="button" class="add" onClick=${props.onAdd}><${Icon} name="plus"/>Add recipe</button>`}
-        ${(showBaked ? baked : toTry).map(function (f) {
-          function open() { nav.push({ kind: 'recipe', id: f.latest.id }); }
-          var last = f.breads[0];
-          return html`<div class="rc" key=${f.key}>
+        ${(showBaked ? baked : toTry).map(function (g) {
+          function open() { nav.push({ kind: 'recipe', id: g.latest.id }); }
+          var last = g.breads[0];
+          return html`<div class="rc" key=${g.key}>
             <div class="rtop">
               <button type="button" class="open" onClick=${open}>
                 ${last ? html`<span class="thumb">${last.photo ? html`<${ui.Photo} id=${last.photo.thumb}/>` : html`<${Icon} name="loaf"/>`}</span>` : null}
                 <span>
-                  <h3 class="serif">${f.name}</h3>
+                  <h3 class="serif">${g.name}</h3>
                   <span class="facts">
-                    ${f.baked ? html`<span class="pill">Baked ${f.breads.length}×</span>` : null}
-                    <${CountPill} n=${f.variations.length}/>
-                    <${ui.Score} value=${bestRating(f.breads)}/>
-                    ${!f.baked && f.latest.source ? f.latest.source : null}
+                    ${g.baked ? html`<span class="pill">Baked ${g.breads.length}×</span>` : null}
+                    <${CountPill} n=${g.tweaks.length}/>
+                    <${ui.Score} value=${bestRating(g.breads)}/>
+                    ${!g.baked && g.latest.source ? g.latest.source : null}
                   </span>
                 </span>
               </button>
-              ${f.baked ? null : html`<button type="button" class="btn primary sm" onClick=${function () {
-                if (f.variations.length > 1) open(); else nav.push({ kind: 'breadForm', fromRecipeId: f.latest.id });
+              ${g.baked ? null : html`<button type="button" class="btn primary sm" onClick=${function () {
+                if (g.tweaks.length > 1) open(); else nav.push({ kind: 'breadForm', fromRecipeId: g.latest.id });
               }}>Bake this</button>`}
             </div>
-            <${Summary} recipe=${f.latest} onOpen=${open}/>
+            <${Summary} recipe=${g.latest} onOpen=${open}/>
           </div>`;
         })}
       </div>
     </div>`;
   }
 
-  // ---------- a recipe's page: every variation saved under its name ----------
+  // ---------- a recipe's page: every tweak in its group ----------
   function RecipePage(props) {
-    var nav = props.nav, r = store.recipe(props.id);
+    var nav = props.nav;
     var key = useRef('');
-    if (r) key.current = U.nameKey(r.name);
-    var f = store.familyByKey(key.current);
+    var found = store.groupOf(store.recipe(props.id));
+    if (found) key.current = found.key;
+    var g = found || store.groups().filter(function (x) { return x.key === key.current; })[0] || null;
     var v = useState(null), view = v[0], setView = v[1];
-    useEffect(function () { if (!f) nav.close(props.k); }, [!f]);
-    if (!f) return null;
-    var many = f.variations.length > 1, first = f.variations[0];
+    useEffect(function () { if (!g) nav.close(props.k); }, [!g]);
+    if (!g) return null;
+    var many = g.tweaks.length > 1, first = g.tweaks[0];
     function edit(rv) { nav.push({ kind: 'recipeForm', recipeId: rv.id }); }
     return html`<div class="screen">
       <div class="floatbar solid"><div class="wrap">
@@ -308,21 +308,23 @@
       </div></div>
       <div class="scroll">
         <div class="wrap page nohero">
-          <h2 class="serif">${f.name}</h2>
+          <h2 class="serif">${g.name}</h2>
           <div class="tags">
-            ${f.baked ? html`<span class="pill">Baked ${f.breads.length}×</span>` : html`<span class="pill sage">To try</span>`}
-            <${CountPill} n=${f.variations.length}/>
-            <${ui.Score} value=${bestRating(f.breads)}/>
+            ${g.baked ? html`<span class="pill">Baked ${g.breads.length}×</span>` : html`<span class="pill sage">To try</span>`}
+            <${CountPill} n=${g.tweaks.length}/>
+            <${ui.Score} value=${bestRating(g.breads)}/>
           </div>
-          ${f.variations.slice().reverse().map(function (rv) {
-            var breads = store.breadsOf(rv.id), n = f.variations.indexOf(rv) + 1;
+          ${g.tweaks.slice().reverse().map(function (rv) {
+            var breads = store.breadsOf(rv.id), n = g.tweaks.indexOf(rv) + 1;
+            var own = U.nameKey(rv.name) !== g.key;
             return html`<div class="variation" key=${rv.id}>
               ${many ? html`<div class="vhead">
-                <span class="label">Variation ${n}</span>
+                <span class="label">Tweak ${n}</span>
                 ${breads.length ? html`<span class="pill">Baked ${breads.length}×</span>` : html`<span class="pill sage">To try</span>`}
                 <${ui.Score} value=${bestRating(breads)}/>
-                <button type="button" class="round" aria-label=${'Edit variation ' + n} onClick=${function () { edit(rv); }}><${Icon} name="edit"/></button>
+                <button type="button" class="round" aria-label=${'Edit tweak ' + n} onClick=${function () { edit(rv); }}><${Icon} name="edit"/></button>
               </div>` : null}
+              ${own ? html`<h3 class="serif tname">${rv.name}</h3>` : null}
               <${RecipeCard} recipe=${rv} against=${many && rv !== first ? first : null} onView=${setView}/>
               <div class="formend">
                 <button type="button" class="btn primary wide" onClick=${function () { nav.push({ kind: 'breadForm', fromRecipeId: rv.id }); }}>Bake this</button>
@@ -401,7 +403,9 @@
         if (cur.hers) return patch;
         var key = U.nameKey(name === undefined ? cur.name : name), fam = store.familyByKey(key);
         if (fam && cur.filled !== key) {
-          return Object.assign(patch, { draft: draftFromRecipe(fam.latest), baseRecipeId: fam.latest.id, pending: [], filled: key });
+          var filled = draftFromRecipe(fam.latest);
+          filled.parent = fam.parent;
+          return Object.assign(patch, { draft: filled, baseRecipeId: fam.latest.id, pending: [], filled: key });
         }
         if (!fam && cur.filled) return Object.assign(patch, { draft: blankDraft(), baseRecipeId: null, pending: [], filled: '' });
         return patch;
@@ -526,7 +530,7 @@
     function save() {
       if (!d.name.trim() || busy === 'saving') return;
       setBusy('saving');
-      // Saving both sizes keeps one name: they are two variations of the same recipe.
+      // Saving both sizes keeps one name: they are two tweaks of the same recipe.
       var list = f.both
         ? d.variants.map(function (v, i) { return { recipe: recipeOf(d, i) }; })
         : [{ id: props.recipeId || null, recipe: recipeOf(d) }];

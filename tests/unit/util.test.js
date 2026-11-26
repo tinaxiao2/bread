@@ -47,14 +47,33 @@ test('ingredients are labelled for the recipe card', () => {
   assert.equal(U.amountLabel({ amount: '1 tbsp + 1 tsp', unit: '' }), '1 tbsp + 1 tsp');
 });
 
-test('a blank recipe starts with flour, water, yeast and salt', () => {
+test('a blank recipe starts with flour, water, yeast and salt, all in grams', () => {
   const rows = U.emptyRecipe().ingredients.map((i) => [i.group, i.type, i.unit]);
-  assert.deepEqual(rows, [['flour', 'AP', 'cup'], ['water', '', 'cup'], ['yeast', 'Active dry', 'tsp'], ['other', 'Salt', 'tbsp']]);
-  assert.equal(U.DEFAULT_TYPES.flour[0], 'AP');
-  assert.equal(U.DEFAULT_TYPES.yeast[0], 'Active dry');
-  assert.deepEqual(U.STAPLES, ['Salt', 'Sugar']);
-  assert.equal(U.newIngredient('other', 'Sugar').unit, 'tbsp');
+  assert.deepEqual(rows, [['flour', 'AP', 'g'], ['water', '', 'g'], ['yeast', 'Active dry', 'g'], ['salt', '', 'g']]);
+  assert.deepEqual(U.STAPLES, ['Sugar']);
+  assert.equal(U.newIngredient('other', 'Sugar').unit, 'g');
   assert.equal(U.newIngredient('dairy').type, 'Milk');
+  assert.equal(U.newIngredient('dairy').unit, 'g');
+  assert.deepEqual(U.DEFAULT_TYPES.water, ['Lukewarm', 'Warm', 'Hot']);
+  assert.equal(U.UNITS[0], 'g');
+});
+
+test('water can be lukewarm, warm or hot', () => {
+  assert.equal(U.ingredientName({ group: 'water', type: '' }), 'Water');
+  assert.equal(U.ingredientName({ group: 'water', type: 'Lukewarm' }), 'Lukewarm water');
+  assert.equal(U.ingredientName({ group: 'water', type: 'Hot water' }), 'Hot water');
+  const ing = (type) => ({ ingredients: [{ group: 'water', type, amount: '300', unit: 'g' }] });
+  assert.notEqual(U.recipeKey(ing('Warm')), U.recipeKey(ing('Hot')), 'a different temperature is a different tweak');
+});
+
+test('salt has its own row, and salt saved as an "other" ingredient moves into it', () => {
+  assert.equal(U.ingredientName({ group: 'salt' }), 'Salt');
+  assert.deepEqual(U.cleanIngredient({ group: 'other', type: ' salt ', amount: '1/2', unit: 'tbsp' }),
+    { group: 'salt', type: '', amount: '1/2', unit: 'tbsp', note: '' });
+  assert.deepEqual(U.cleanIngredient({ group: 'other', type: 'Sea salt flakes', amount: '1', unit: 'tsp' }).group, 'other');
+  const old = { ingredients: [{ group: 'other', type: 'Salt', amount: '8', unit: 'g' }] };
+  const now = { ingredients: [{ group: 'salt', type: '', amount: '8', unit: 'g' }] };
+  assert.equal(U.recipeKey(old), U.recipeKey(now), 'old entries still match the same tweak');
 });
 
 test('a stored recipe is trimmed, ordered and free of blank rows', () => {
@@ -65,21 +84,31 @@ test('a stored recipe is trimmed, ordered and free of blank rows', () => {
       { group: 'dairy', type: 'Milk', amount: '', unit: 'cup' },
       { group: 'flour', type: 'Bread', amount: ' 3 ', unit: 'cup' },
       { group: 'other', type: 'Melted butter', amount: '', unit: '' },
-      { group: 'other', type: 'Sugar', amount: '', unit: 'tbsp', _auto: true },
+      { group: 'other', type: 'Sugar', amount: '', unit: 'g', _auto: true },
       { group: 'nonsense', type: 'Seeds', amount: '2', unit: 'handfuls' }
     ],
     bake: { programs: ['1'], size: '1.5', minutes: '205', added: '' },
-    link: 'example.com/recipe'
+    link: 'example.com/recipe', parent: '  french bread '
   });
   assert.equal(r.name, 'Milk bread');
   assert.deepEqual(r.ingredients, [
     { group: 'flour', type: 'Bread', amount: '3', unit: 'cup', note: '' },
-    { group: 'other', type: 'Salt', amount: '1', unit: 'tsp', note: '' },
+    { group: 'salt', type: '', amount: '1', unit: 'tsp', note: '' },
     { group: 'other', type: 'Melted butter', amount: '', unit: '', note: '' },
     { group: 'other', type: 'Seeds', amount: '2', unit: '', note: '' }
   ], 'a row that was only offered (Sugar) and never given an amount is dropped; one she named is kept');
   assert.deepEqual(r.bake, { programs: [1], size: '1.5', crust: '', minutes: 205, added: null, reason: '', ovenTemp: null, ovenMinutes: null });
   assert.equal(r.link, 'https://example.com/recipe');
+  assert.equal(r.parent, 'french bread');
+});
+
+test('a parent is part of a recipe but not of a tweak', () => {
+  const base = { ingredients: [{ group: 'flour', type: 'AP', amount: '400', unit: 'g' }] };
+  assert.equal(U.recipeKey(Object.assign({ parent: 'french bread' }, base)), U.recipeKey(base));
+  assert.equal(U.isEmptyRecipe({ parent: 'french bread' }), false, 'attaching alone is worth keeping');
+  const v1 = Object.assign({ id: 'v1', name: 'herb loaf' }, U.cleanRecipe(base));
+  assert.deepEqual(U.planRecipeSave({ draft: Object.assign({ parent: 'french bread' }, base), family: [v1], base: v1, others: 0 }),
+    { action: 'update', id: 'v1' }, 'attaching from a form filled from that recipe saves it');
 });
 
 test('links are only ever https', () => {

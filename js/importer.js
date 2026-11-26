@@ -22,8 +22,8 @@
       '  { "label": string,        // e.g. "1 1/2-pound loaf". "" when there is only one list.',
       '    "size": "1" | "1.5" | "2" | "",   // loaf size in pounds, if stated',
       '    "ingredients": [',
-      '     { "group": "flour" | "water" | "dairy" | "yeast" | "other",',
-      '       "type": string,      // flour: "Bread", "AP", "Whole wheat". dairy: "Milk", "Butter". yeast: the kind if stated. other: the ingredient name, e.g. "Salt", "Honey", "Egg". water: "".',
+      '     { "group": "flour" | "water" | "dairy" | "yeast" | "salt" | "other",',
+      '       "type": string,      // flour: "Bread", "AP", "Whole wheat". water: "Lukewarm", "Warm" or "Hot" if stated, else "". dairy: "Milk", "Butter". yeast: the kind if stated. salt: "". other: the ingredient name, e.g. "Honey", "Egg".',
       '       "amount": string,    // exactly as written, with fractions as "1/2" or "2 7/8". "" if none.',
       '       "unit": "cup" | "tbsp" | "tsp" | "g" | "ml" | "oz" | "lb" | "",   // "" for counts such as 1 egg',
       '       "note": string,      // preparation or an alternative, e.g. "softened", "or 2 1/4 tsp bread machine yeast". "" if none.',
@@ -69,9 +69,10 @@
     var rawUnit = str(i.unit).toLowerCase().replace(/\.$/, '');
     var unit = UNIT[rawUnit] || '';
     if (rawUnit && !unit) amount = str(amount + ' ' + rawUnit);
+    var g = U.upgradeIngredient({ group: i.group, type: str(i.type) });
     return {
-      group: U.GROUPS.indexOf(i.group) >= 0 ? i.group : 'other',
-      type: str(i.type), amount: amount, unit: unit, note: str(i.note),
+      group: g.group,
+      type: g.type, amount: amount, unit: unit, note: str(i.note),
       unsure: !!i.unsure || shaky(amount)
     };
   }
