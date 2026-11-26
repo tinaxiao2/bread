@@ -24,10 +24,11 @@ runtime.
 
 - Artifact: "Let's Get This". Find it by title with the artifact tools; `tools/publish.md` has the steps.
 - The artifact's icon comes from a fixed set chosen by a word passed when publishing. It has no
-  bread: `bread` and `food` give a coffee cup, `recipe` gives a book, and words it does not
-  know (loaf, croissant, wheat, toast, bakery, cake, baking) are ignored, leaving the icon
-  as it was. iPhone's Add to Home Screen uses that icon, not the page's own `icons/` or
-  `thumb.png`, so the home-screen icon cannot be made bread from here. The owner knows.
+  bread: `bread` and `food` give a coffee cup, `pizza` gives a concierge bell, `recipe` gives
+  a book, and words it does not know (loaf, croissant, wheat, toast, bakery, cake, baking,
+  utensils, apple, chef) are ignored, leaving the icon as it was. iPhone's Add to Home Screen
+  uses that icon, not the page's own `icons/` or `thumb.png`. **The owner chose the book:
+  publish with `icon: "recipe"` or leave `icon` out, never another word.**
 - Capabilities declared: `db` (breads and recipes), `assets` (photos), `sample` with
   images (reading a recipe from a picture).
 - There is no build step. The files in `tools/publish.md` are published as they are.
