@@ -794,7 +794,7 @@
         <div class=${'stat' + (flourOpen ? ' wide' : '')}><span class="label"><span class="em" aria-hidden="true">🍞</span>Loaves</span><b>${st.loaves}</b></div>
         <div class="stat"><span class="label"><span class="em" aria-hidden="true">📖</span>Recipes</span><b>${st.recipes}</b></div>
         <div class="stat"><span class="label"><span class="em" aria-hidden="true">🌍</span>Countries</span><b>${st.countries.length}</b></div>
-        <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">❤️</span>Favorite</span>
+        <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">❤️</span>Most baked</span>
           <${Pick} item=${st.favorite} nav=${nav}>${st.favorite ? html`<small>${st.favorite.count}×</small>` : null}<//>
         </div>
         <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⭐</span>Highest rated</span>

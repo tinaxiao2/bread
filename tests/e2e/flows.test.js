@@ -597,13 +597,13 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
   await stat('Flour used').click();
   await count(page.locator('.flours'), 0);
   assert.equal(await stat('Loaves').locator('b').innerText(), '5');
-  assert.equal(await stat('Favorite').locator('b').innerText(), 'Mantou');
-  assert.equal(await stat('Favorite').locator('small').innerText(), '3×');
+  assert.equal(await stat('Most baked').locator('b').innerText(), 'Mantou');
+  assert.equal(await stat('Most baked').locator('small').innerText(), '3×');
   // time: (90 + 30) twice, nothing more for the split copy, plus 205
   assert.equal(await stat('Time spent').locator('b').innerText(), '7 h 25 min');
   assert.equal(await stat('Highest rated').locator('b').innerText(), 'sandwich bread');
   assert.equal(await stat('Highest rated').locator('.score').innerText(), '4.5');
-  for (const label of ['Favorite', 'Highest rated']) {
+  for (const label of ['Most baked', 'Highest rated']) {
     const box = await stat(label).locator('.pick').boundingBox();
     assert.ok(box.height < 40, label + ' fits on one line');
   }
@@ -615,7 +615,7 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
   await stat('Highest rated').locator('.pick').click();
   assert.equal(await page.locator('.screen h2').innerText(), 'sandwich bread');
   await page.getByRole('button', { name: 'Back' }).click();
-  await stat('Favorite').locator('.pick').click();
+  await stat('Most baked').locator('.pick').click();
   assert.equal(await page.locator('.screen h2').innerText(), 'Mantou');
   await page.getByRole('button', { name: 'Back' }).click();
 
