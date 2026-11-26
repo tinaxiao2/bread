@@ -197,7 +197,12 @@
   }
   function remember(key, v) { try { localStorage.setItem(key, v); } catch (e) { /* a convenience only */ } }
 
-  var SORTS = [['recent', 'Most recent'], ['baked', 'Most baked'], ['rating', 'Rating'], ['az', 'A to Z']];
+  var SORTS = [['recent', 'Most recent'], ['baked', 'Most baked'], ['rating', 'Rating'], ['az', 'A to Z'], ['country', 'Country']];
+  /** By country name, then by name; no flag last. */
+  function byCountry(fa, na, fb, nb) {
+    if (!fa !== !fb) return fa ? -1 : 1;
+    return (fa ? byName(U.flagName(fa), U.flagName(fb)) : 0) || byName(na, nb);
+  }
   function byName(a, b) { return String(a).localeCompare(String(b), undefined, { sensitivity: 'base', numeric: true }); }
   /** Higher first, with nothing (null) last. */
   function desc(x, y) { return (y === null ? -Infinity : y) - (x === null ? -Infinity : x); }
@@ -209,6 +214,7 @@
       if (sort === 'baked') return gs.slice().sort(function (a, b) { return b.bakedCount - a.bakedCount; });
       if (sort === 'rating') return gs.slice().sort(function (a, b) { return desc(bestRating(a.breads), bestRating(b.breads)); });
       if (sort === 'az') return gs.slice().sort(function (a, b) { return byName(a.name, b.name); });
+      if (sort === 'country') return gs.slice().sort(function (a, b) { return byCountry(store.flagFor(a.name), a.name, store.flagFor(b.name), b.name); });
       return gs;
     }
     var count = {};
@@ -216,6 +222,7 @@
     if (sort === 'baked') return breads.slice().sort(function (a, b) { return (count[b.id] || 0) - (count[a.id] || 0); });
     if (sort === 'rating') return breads.slice().sort(function (a, b) { return desc(U.rating(a), U.rating(b)); });
     if (sort === 'az') return breads.slice().sort(function (a, b) { return byName(a.name, b.name); });
+    if (sort === 'country') return breads.slice().sort(function (a, b) { return byCountry(store.breadFlag(a), a.name, store.breadFlag(b), b.name); });
     return breads;
   }
 
@@ -491,10 +498,14 @@
       setDirty(true);
       setBusy(function (b) { return b === 'saving' ? b : ''; });
     }
-    function pickPhoto(file) {
-      U.resizeImage(file, 1600, 0.85).then(function (blob) {
-        set(function (cur) { return { pics: cur.pics.concat([F.pic({ blob: blob })]) }; });
-      }, function () { setBusy('photo'); });
+    /** Photos picked together are added together, in the order they were picked. */
+    function pickPhotos(files) {
+      Promise.all(files.map(function (file) {
+        return U.resizeImage(file, 1600, 0.85).catch(function () { setBusy('photo'); return null; });
+      })).then(function (blobs) {
+        var added = blobs.filter(Boolean).map(function (blob) { return F.pic({ blob: blob }); });
+        if (added.length) set(function (cur) { return { pics: cur.pics.concat(added) }; });
+      });
     }
     /** Same name, same recipe: fill the untouched recipe part from the one saved under this name. */
     function follow(name) {
@@ -567,7 +578,7 @@
       <//>
       ${store.getState().canUpload || f.pics.length ? html`<${Field} label="Photos">
         <${F.PhotosField} items=${f.pics}
-          onAdd=${function (files) { files.forEach(pickPhoto); }}
+          onAdd=${pickPhotos}
           onChange=${function (pics) { set({ pics: pics }); }}
           onView=${function (x) { setOverlay({ view: x }); }}/>
       <//>` : null}

@@ -99,7 +99,7 @@ These are decisions the owner made. Keep them.
   screen edge), and one card per extra entry (up to 3) steps
   diagonally up and to the left behind the tile. Under the toggle, **Filter by** (icon +
   brown text naming the current choice) sorts either view: Most recent, Most baked,
-  Rating (unrated last), A to Z. Remembered on the device.
+  Rating (unrated last), A to Z, Country (by country name, no flag last). Remembered on the device.
 - **From photo on New bread saves a recipe, not a bread**: it opens Check recipe on top of the
   bread form; saving closes both and the recipe goes to To try. Cancel returns to the bread form.
 - **Sources from Reddit are just "Reddit"** (`util.cleanSource`, applied on save, when
@@ -129,6 +129,9 @@ These are decisions the owner made. Keep them.
 - **Several photos per bread.** The first is the cover in the Gallery; the bread page swipes
   through them. In the form the photos wrap in a grid with + last, and are put in order by
   dragging (mouse: drag; phone: hold briefly, then drag, so a quick swipe still scrolls).
+  Photos picked together are added in the order picked. iPhone always shows its own menu
+  (Photo Library / Take Photo / Choose File) for a web page's file picker; a page cannot
+  skip it, so do not try.
 - **Stats** (third tab): flour used, loaves, favorite and time spent, all derived in
   `store.stats`. Loaves and the favorite count baked (dated) entries; flour and time
   count every entry. Flour in cups or spoons is converted at about 120 g a

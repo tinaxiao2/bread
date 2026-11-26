@@ -744,17 +744,19 @@ test('an entry dated "–" is a plan; giving it a date makes it baked', async (t
   await count(page.locator('.rc'), 0);
 });
 
-test('the gallery can be sorted by most recent, most baked, rating or name', async (t) => {
+test('the gallery can be sorted by most recent, most baked, rating, name or country', async (t) => {
   const r = (name, n) => ({ name, ingredients: [{ group: 'flour', type: 'AP', amount: '500', unit: 'g' }], bake: { programs: [1], size: '1.5', minutes: 205 },
     method: '', source: '', link: '', parent: '', originals: [], basedOn: null, createdAt: n, updatedAt: n });
   const b = (name, rid, n, date, stars) => ({ name, date, recipeId: rid, photos: [{ full: 'seed' + n, thumb: 'seed' + n }], comments: '',
     notes: { crust: '', crumb: '', taste: '' }, ratings: { crust: stars, crumb: stars, taste: stars }, createdAt: n, updatedAt: n });
   const page = await open(t, { db: {
-    'recipes/a': r('apple loaf', 1), 'recipes/z': r('Zopf', 2), 'recipes/m': r('Mantou', 3),
+    'recipes/a': r('apple loaf', 1), 'recipes/z': Object.assign(r('Zopf', 2), { flag: 'CH' }), 'recipes/m': Object.assign(r('Mantou', 3), { flag: 'CN' }),
     'breads/1': b('Mantou', 'm', 1, '2026-11-10', 3), 'breads/2': b('Mantou', 'm', 2, '2026-11-12', 2),
     'breads/3': b('Zopf', 'z', 3, '2026-11-20', 5), 'breads/4': b('apple loaf', 'a', 4, '2026-11-15', 0)
   } });
-  const names = () => page.locator('.gal .tile .meta b').allInnerTexts();
+  const names = () => page.locator('.gal .tile .meta b').evaluateAll((els) => els.map((el) => {
+    const c = el.cloneNode(true); c.querySelectorAll('.fl').forEach((f) => f.remove()); return c.textContent.trim();
+  }));
   const sortBy = async (v) => { await field(page, 'Filter by').selectOption(v); };
 
   assert.equal(await page.locator('.sortby span').innerText(), 'Most recent');
@@ -773,6 +775,13 @@ test('the gallery can be sorted by most recent, most baked, rating or name', asy
   assert.deepEqual(await names(), ['Mantou', 'Zopf', 'apple loaf']);
   await sortBy('rating');
   assert.deepEqual(await names(), ['Zopf', 'Mantou', 'apple loaf']);
+
+  await sortBy('country');
+  assert.deepEqual(await names(), ['Mantou', 'Zopf', 'apple loaf'], 'China, Switzerland, then no flag');
+  await page.getByRole('tab', { name: 'All' }).click();
+  assert.deepEqual(await names(), ['Mantou', 'Mantou', 'Zopf', 'apple loaf']);
+  await page.getByRole('tab', { name: 'Recipes' }).click();
+  await sortBy('rating');
 
   await page.reload();
   assert.equal(await page.locator('.sortby span').innerText(), 'Rating', 'the choice is remembered');
