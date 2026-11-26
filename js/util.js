@@ -128,7 +128,8 @@
   function ingredientName(ing) {
     var t = (ing.type || '').trim();
     if (ing.group === 'flour') return t ? (/flour/i.test(t) ? t : t + ' flour') : 'Flour';
-    if (ing.group === 'water') return t ? (/water/i.test(t) ? t : t + ' water') : 'Water';
+    // room temperature is how water usually is, so it is just "Water"
+    if (ing.group === 'water') return t && !/^room temp/i.test(t) ? (/water/i.test(t) ? t : t + ' water') : 'Water';
     if (ing.group === 'dairy') return t || 'Dairy';
     if (ing.group === 'sugar') return t || 'Sugar';
     if (ing.group === 'yeast') return 'Yeast';

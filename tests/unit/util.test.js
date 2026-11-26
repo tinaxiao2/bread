@@ -411,3 +411,9 @@ test('a bread made everywhere is Global, drawn as a loaf', () => {
   assert.equal(U.flagName('GLOBAL'), 'Global');
   assert.equal(U.cleanFlag('XX'), '');
 });
+
+test('room temperature water is just "Water"', () => {
+  assert.equal(U.ingredientName({ group: 'water', type: 'Room temp' }), 'Water');
+  assert.equal(U.ingredientName({ group: 'water', type: 'Warm' }), 'Warm water');
+  assert.equal(U.ingredientName({ group: 'water', type: '' }), 'Water');
+});

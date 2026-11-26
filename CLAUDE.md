@@ -144,7 +144,8 @@ These are decisions the owner made. Keep them.
   its reason only exist, and only show, when that program is chosen.
 - **A blank recipe starts with** flour (AP), water (Room temp), yeast (active dry) and salt, every
   measurement in grams. New rows always start in grams, except eggs: an egg row starts at 1
-  with no unit. Salt has its own row. Water has a kind: Room temp, Lukewarm, Warm or Hot.
+  with no unit. Salt has its own row. Water has a kind: Room temp, Lukewarm, Warm or Hot; Room temp
+  water reads as just "Water" on cards (`util.ingredientName`).
   Yeast: Active dry or Instant (bread machine yeast is Instant). Dairy and Sugar (Sugar,
   Brown sugar, Honey, Molasses) are rows added on demand, several allowed. The chips offer
   Flour, Dairy, Sugar, then every named ingredient the owner has used before.
@@ -182,7 +183,9 @@ These are decisions the owner made. Keep them.
   flag or else its label's, most first; recipes with no flag are left out. Each row shows
   "baked / all" (no label) and taps open to list its recipes A to Z, the ones not baked yet in
   gray; tapping one opens its recipe page. At the right of the list's heading: recipes tried
-  / all recipes, across every country listed. Loaves and the favorite count baked (dated) entries; flour and time
+  / all recipes, across every country listed. Under it, a sort like the Gallery's (icon + brown
+  text, remembered on the device): Most recipes (the default; ties by country name), Most recent
+  bake, Most baked (loaves), Rating (best bake, unrated last), A to Z. Loaves and the favorite count baked (dated) entries; flour and time
   count every entry. Flour in cups or spoons is converted at about 120 g a
   cup, and flour is shown in pounds (`util.fmtWeight`). Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
   (flour, machine time, proofing) is counted once, with the entry it came from. The favorite

@@ -303,7 +303,15 @@
     });
     var countries = Object.keys(byFlag).map(function (f) {
       var list = byFlag[f].slice().sort(function (a, b) { return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }); });
+      var breads = bakedOf([].concat.apply([], list.map(function (l) { return l.breads; })));
+      var best = null, last = '';
+      breads.forEach(function (b) {
+        var x = U.rating(b);
+        if (x !== null && (best === null || x > best)) best = x;
+        if (String(b.date || '') > last) last = String(b.date || '');
+      });
       return { flag: f, count: list.length, tried: list.filter(function (l) { return l.baked; }).length,
+        loaves: breads.length, rating: best, last: last,
         recipes: list.map(function (l) { return { name: l.name, flag: l.flag, baked: l.baked, id: l.latest.id }; }) };
     }).sort(function (a, b) {
       return (b.count - a.count) || U.flagName(a.flag).localeCompare(U.flagName(b.flag));

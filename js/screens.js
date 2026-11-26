@@ -789,10 +789,25 @@
       })}
     </div>`;
   }
+  // How the country list can be ordered. Most recipes is how it starts.
+  var COUNTRY_KEY = 'lgt-country-sort';
+  var COUNTRY_SORTS = [['recipes', 'Most recipes'], ['recent', 'Most recent'], ['baked', 'Most baked'], ['rating', 'Rating'], ['az', 'A to Z']];
+  function sortCountries(list, sort) {
+    var name = function (c) { return U.flagName(c.flag); };
+    var tie = function (a, b) { return (b.count - a.count) || byName(name(a), name(b)); };
+    var by = {
+      recent: function (a, b) { return (!a.last !== !b.last ? (a.last ? -1 : 1) : b.last.localeCompare(a.last)) || tie(a, b); },
+      baked: function (a, b) { return (b.loaves - a.loaves) || tie(a, b); },
+      rating: function (a, b) { return desc(a.rating, b.rating) || tie(a, b); },
+      az: function (a, b) { return byName(name(a), name(b)); }
+    }[sort] || tie;
+    return list.slice().sort(by);
+  }
   function Stats(props) {
     var st = store.stats(), nav = props.nav, box = useRef(null);
     var os = useState({}), open = os[0], setOpen = os[1];
     var ts = useState(null), tile = ts[0], setTile = ts[1];     // the number tile that is open, if any
+    var cs = useState(remembered(COUNTRY_KEY, COUNTRY_SORTS.map(function (o) { return o[0]; }), 'recipes')), csort = cs[0], setCsort = cs[1];
     function toggle(name) { return function () { setTile(tile === name ? null : name); }; }
     var firstRow = tile === 'flour' || tile === 'loaves', secondRow = tile === 'recipes';
     var mostBaked = st.recipeList.filter(function (r) { return r.count > 0; }).sort(function (a, b) {
@@ -830,8 +845,14 @@
         <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⏱️</span>Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
         ${st.countries.length ? html`<div class="stat wide"><div class="lrow"><span class="label"><span class="em" aria-hidden="true">🗺️</span>Countries</span>
           <span class="n">${st.countries.reduce(function (n, c) { return n + c.tried; }, 0)} / ${st.countries.reduce(function (n, c) { return n + c.count; }, 0)}</span></div>
+          <div class="sortby">
+            <${Icon} name="sort"/><span>${COUNTRY_SORTS.filter(function (o) { return o[0] === csort; })[0][1]}</span>
+            <select id="f-country-sort" aria-label="Sort countries" value=${csort} onChange=${function (e) { setCsort(e.target.value); remember(COUNTRY_KEY, e.target.value); }}>
+              ${COUNTRY_SORTS.map(function (o) { return html`<option key=${o[0]} value=${o[0]}>${o[1]}</option>`; })}
+            </select>
+          </div>
           <ul class="countries">
-            ${st.countries.map(function (c) {
+            ${sortCountries(st.countries, csort).map(function (c) {
               var on = !!open[c.flag];
               return html`<li key=${c.flag} class=${on ? 'open' : ''}>
                 <button type="button" class="crow" aria-expanded=${on} onClick=${function () {

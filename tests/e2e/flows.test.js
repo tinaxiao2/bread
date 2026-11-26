@@ -909,6 +909,36 @@ test('a second proof is added with +', async (t) => {
   assert.match(card, /2ND PROOF\s+Air fryer\s+45 min/i);
 });
 
+test('the country list can be sorted like the gallery, and remembers it', async (t) => {
+  const r = (name, n, flag) => ({ name, ingredients: [{ group: 'flour', type: 'AP', amount: '500', unit: 'g' }], bake: { programs: [1], size: '1.5', minutes: 205 },
+    method: '', source: '', link: '', parent: '', flag, originals: [], basedOn: null, line: 'r' + n, tweak: 1, createdAt: n, updatedAt: n });
+  const b = (rid, n, date, stars) => ({ name: 'x', date, recipeId: rid, photos: [], comments: '', notes: { crust: '', crumb: '', taste: '' },
+    ratings: { crust: stars, crumb: stars, taste: stars }, createdAt: n, updatedAt: n });
+  const page = await open(t, { db: {
+    'recipes/1': r('Mantou', 1, 'CN'), 'recipes/2': r('Bao', 2, 'CN'), 'recipes/3': r('Jiaozi', 3, 'CN'),
+    'recipes/4': r('Baguette', 4, 'FR'), 'recipes/5': r('Brioche', 5, 'FR'), 'recipes/6': r('Zopf', 6, 'CH'),
+    'breads/1': b('1', 1, '2026-11-01', 3), 'breads/2': b('4', 2, '2026-11-02', 5), 'breads/3': b('4', 3, '2026-11-03', 4),
+    'breads/4': b('5', 4, '2026-11-04', 4), 'breads/5': b('6', 5, '2026-11-20', 2)
+  } });
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  const names = () => page.locator('.countries .cname').allInnerTexts();
+  assert.equal(await page.locator('.countries').locator('..').locator('.sortby span').innerText(), 'Most recipes');
+  assert.deepEqual(await names(), ['China', 'France', 'Switzerland'], 'most recipes first');
+  const sortBy = (v) => field(page, 'Sort countries').selectOption(v);
+  await sortBy('recent');
+  assert.deepEqual(await names(), ['Switzerland', 'France', 'China']);
+  await sortBy('baked');
+  assert.deepEqual(await names(), ['France', 'China', 'Switzerland'], 'loaves baked: 3, 1, 1');
+  await sortBy('rating');
+  assert.deepEqual(await names(), ['France', 'China', 'Switzerland']);
+  await sortBy('az');
+  assert.deepEqual(await names(), ['China', 'France', 'Switzerland']);
+  await page.reload();
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  assert.equal(await page.locator('.countries').locator('..').locator('.sortby span').innerText(), 'A to Z', 'remembered');
+
+});
+
 test('typing part of a name offers the saved recipe', async (t) => {
   const page = await open(t);
   await logBread(page);
