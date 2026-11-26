@@ -124,7 +124,7 @@ These are decisions the owner made. Keep them.
   tile's width, overlapping the corner; the tiles have extra side margin so it clears the
   screen edge), and one card per extra entry (up to 3) steps
   diagonally up and to the left behind the tile. Under the toggle, **Filter by** (icon +
-  brown text naming the current choice) sorts either view: Most recent, Most baked,
+  brown text naming the current choice; no outline when tapped) sorts either view: Most recent, Most baked,
   Rating (unrated last), A to Z, Country (by country name, no flag last). Remembered on the device.
   Ties: Most baked goes to the better rated, then the most recent with a photo, then those with
   none. Rating puts ties and the unrated in order of most baked, then the most recent with a
@@ -167,7 +167,9 @@ These are decisions the owner made. Keep them.
   (Photo Library / Take Photo / Choose File) for a web page's file picker; a page cannot
   skip it, so do not try.
 - **Stats** (third tab): flour used, loaves, favorite, highest rated and time spent, all derived in
-  `store.stats`. Highest rated is the label (or recipe) with the best-rated bake (ties: more
+  `store.stats`. Tapping Flour used opens it full width with the flour by kind (AP flour, Bread
+  flour…), most first; Loaves goes full width beside it while it is open. Countries has its
+  count of countries at the right of its label. Highest rated is the label (or recipe) with the best-rated bake (ties: more
   baked, then more recent). Tapping the favorite's or highest rated's name opens its recipe page
   (on the recipe of the latest or best bake), or the bread when it has no recipe. Those two names
   stay on one line and at one size: when either is too long, both are set smaller until both

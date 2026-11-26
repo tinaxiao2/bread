@@ -69,7 +69,6 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .sortby { position: relative; display: flex; align-items: center; gap: 5px; padding: 2px 4px; font-size: 13px; font-weight: 650; color: var(--crust); }
 .sortby .icon { width: 16px; height: 16px; stroke-width: 2.2; }
 .sortby select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; cursor: pointer; }
-.sortby:focus-within { outline: 2px solid var(--crust); outline-offset: 2px; border-radius: 6px; }
 .toggle button { height: 30px; padding: 0 11px; border-radius: 99px; font-size: 13px; font-weight: 650; color: var(--ink2); }
 .toggle button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(60, 40, 20, .18); }
 /* Recipes view: a card for each extra entry stacked behind the tile, and the count in a bubble */
@@ -249,13 +248,20 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .stat .pick small { flex: none; margin: 0; }
 .stat .pick .score { flex: none; font-size: 15px; }
 .stat .pick .score svg { width: 14px; height: 14px; }
+.stat .lrow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.stat .lrow .n { font-size: 12px; font-weight: 700; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.stat.tap { text-align: left; cursor: pointer; }
+.flours { margin-top: 10px; }
+.flours li { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid #EEE9E0; font-size: 15px; font-weight: 600; }
+.flours li b { font-weight: 700; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.stat .flours li b { display: inline; font-size: 15px; line-height: inherit; letter-spacing: 0; }
 .countries li { border-bottom: 1px solid #EEE9E0; }
 .countries li:last-child { border-bottom: 0; }
 .countries .crow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 0; text-align: left; font-size: 15px; font-weight: 600; color: var(--ink); }
 .countries li:last-child:not(.open) .crow { padding-bottom: 0; }
 .countries .fl { font-size: 20px; line-height: 1; }
 .countries .cname { flex: 1; min-width: 0; }
-.stat .countries .crow b { display: inline; font-size: 15px; font-weight: 700; color: var(--ink2); letter-spacing: 0; }
+.stat .countries .crow b { display: inline; font-size: 15px; line-height: inherit; font-weight: 700; color: var(--ink2); letter-spacing: 0; }
 .countries .crow .icon { width: 15px; height: 15px; color: var(--ink3); transition: transform .15s; }
 .countries li.open .crow .icon { transform: rotate(90deg); }
 .crecipes { display: flex; flex-direction: column; padding: 0 0 8px 30px; }

@@ -260,11 +260,18 @@
   function stats() {
     var groupOfRecipe = {};
     groups().forEach(function (g) { g.tweaks.forEach(function (r) { groupOfRecipe[r.id] = g; }); });
-    var flour = 0, minutes = 0, tally = {};
+    var flour = 0, minutes = 0, tally = {}, flours = {};
     state.breads.forEach(function (b) {
       var r = b.recipeId ? recipe(b.recipeId) : null;
       if (r) {
-        if (!b.splitFrom) (r.ingredients || []).forEach(function (i) { flour += U.flourGrams(U.upgradeIngredient(i)) || 0; });
+        if (!b.splitFrom) (r.ingredients || []).forEach(function (raw) {
+          var i = U.upgradeIngredient(raw), g = U.flourGrams(i);
+          if (!g) return;
+          flour += g;
+          var name = U.ingredientName(i), k = name.toLowerCase();
+          if (!flours[k]) flours[k] = { name: name, grams: 0 };
+          flours[k].grams += g;
+        });
         minutes += U.minutesSpent(r.bake, !!b.splitFrom);
       }
       if (!isBakedBread(b)) return;                       // the favourite is the most baked: dated entries only
@@ -303,6 +310,7 @@
     });
     return {
       flourGrams: flour, loaves: bakedOf(state.breads).length, minutes: minutes, countries: countries,
+      flours: Object.keys(flours).map(function (k) { return flours[k]; }).sort(function (a, b) { return b.grams - a.grams; }),
       favorite: fav ? pick(fav, fav.lastBread) : null,
       highestRated: top ? pick(top, top.bestBread) : null
     };

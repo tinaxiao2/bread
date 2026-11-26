@@ -772,6 +772,7 @@
   function Stats(props) {
     var st = store.stats(), nav = props.nav, box = useRef(null);
     var os = useState({}), open = os[0], setOpen = os[1];
+    var fo = useState(false), flourOpen = fo[0], setFlourOpen = fo[1];
     H.useLayoutEffect(function () { fitNames(box.current); });
     useEffect(function () {
       // measure again once the serif font has loaded, and when the screen changes size
@@ -783,8 +784,14 @@
     return html`<div class="wrap">
       <div class="top"><h1 class="serif">Stats</h1></div>
       <div class="stats" ref=${box}>
-        <div class="stat"><span class="label">Flour used</span><b>${U.fmtWeight(st.flourGrams)}</b></div>
-        <div class="stat"><span class="label">Loaves</span><b>${st.loaves}</b></div>
+        <button type="button" class=${'stat tap' + (flourOpen ? ' wide' : '')} aria-expanded=${flourOpen}
+          onClick=${function () { setFlourOpen(!flourOpen); }}>
+          <span class="label">Flour used</span><b>${U.fmtWeight(st.flourGrams)}</b>
+          ${flourOpen && st.flours.length ? html`<ul class="flours">
+            ${st.flours.map(function (f) { return html`<li key=${f.name}><span>${f.name}</span><b>${U.fmtWeight(f.grams)}</b></li>`; })}
+          </ul>` : null}
+        </button>
+        <div class=${'stat' + (flourOpen ? ' wide' : '')}><span class="label">Loaves</span><b>${st.loaves}</b></div>
         <div class="stat wide"><span class="label">Favorite</span>
           <${Pick} item=${st.favorite} nav=${nav}>${st.favorite ? html`<small>${st.favorite.count}×</small>` : null}<//>
         </div>
@@ -792,7 +799,7 @@
           <${Pick} item=${st.highestRated} nav=${nav}>${st.highestRated ? html`<${ui.Score} value=${st.highestRated.rating}/>` : null}<//>
         </div>
         <div class="stat wide"><span class="label">Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
-        ${st.countries.length ? html`<div class="stat wide"><span class="label">Countries</span>
+        ${st.countries.length ? html`<div class="stat wide"><div class="lrow"><span class="label">Countries</span><span class="n">${st.countries.length}</span></div>
           <ul class="countries">
             ${st.countries.map(function (c) {
               var on = !!open[c.flag];

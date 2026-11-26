@@ -590,7 +590,12 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
   // flour: 500 g twice (the split copy shares entry 2's dough) + 3 cups at 120 g
-  assert.equal(await stat('Flour used').locator('b').innerText(), '1.4 kg');
+  assert.equal(await stat('Flour used').locator('b').first().innerText(), '1.4 kg');
+  // tap it for the flour by kind
+  await stat('Flour used').click();
+  assert.deepEqual(await page.locator('.flours li').allInnerTexts(), ['AP flour\n1.4 kg']);
+  await stat('Flour used').click();
+  await count(page.locator('.flours'), 0);
   assert.equal(await stat('Loaves').locator('b').innerText(), '5');
   assert.equal(await stat('Favorite').locator('b').innerText(), 'Mantou');
   assert.equal(await stat('Favorite').locator('small').innerText(), '3×');
@@ -631,7 +636,7 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
   await page.getByRole('button', { name: 'Back' }).click();
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   assert.equal(await stat('Loaves').locator('b').innerText(), '6');
-  assert.equal(await stat('Flour used').locator('b').innerText(), '1.7 kg', '1,720 g');
+  assert.equal(await stat('Flour used').locator('b').first().innerText(), '1.7 kg', '1,720 g');
 });
 
 test('Split marks the copy, so its dough is not counted twice', async (t) => {
@@ -654,7 +659,7 @@ test('Split marks the copy, so its dough is not counted twice', async (t) => {
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
   assert.equal(await stat('Loaves').locator('b').innerText(), '2');
-  assert.equal(await stat('Flour used').locator('b').innerText(), '500 g');
+  assert.equal(await stat('Flour used').locator('b').first().innerText(), '500 g');
   assert.equal(await stat('Time spent').locator('b').innerText(), '2 h 10 min', '25 min of kneading and 65 in the machine once, plus 40 min of Bake');
 });
 
@@ -711,6 +716,7 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   assert.equal(await page.locator('.pick .fl').count(), 0);
   assert.deepEqual(await page.locator('.countries .crow').allInnerTexts(), ['\u{1F1E8}\u{1F1F3}\nChina\n1 / 1'], 'recipes baked, of each country\'s recipes');
+  assert.equal(await page.locator('.stat .lrow .n').innerText(), '1', 'how many countries');
 
   // a recipe not baked yet counts too, and shows in gray
   await page.getByRole('button', { name: 'Recipes', exact: true }).click();
