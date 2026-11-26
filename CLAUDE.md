@@ -110,8 +110,8 @@ These are decisions the owner made. Keep them.
   A label can have its own flag, picked beside the Parent field (`store.setLabelFlag`, kept in
   `meta/labels`); without one it shows the flag of its first recipe that has one. Stored as the
   ISO code, drawn as the emoji.
-- **Parent is a dropdown**: "–", every label and every recipe name, A to Z, then "New…" to type
-  a new label.
+- **Parent is a dropdown**: "–", the labels already in use (never the recipe names), A to Z,
+  then "New…" to type a new label.
 - **Recipes to try are ranked** by dragging their rows (same hold-then-drag as photos,
   `ui.useDragOrder`).
 - **Gallery has a Recipes · All toggle** (top right, remembered on the device): All is every

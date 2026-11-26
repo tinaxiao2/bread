@@ -196,14 +196,9 @@
     set({ labelFlags: next });
     return db.doc('meta/labels').set({ flags: next });
   }
-  /** What the Parent list offers: every label, and every recipe's name, A to Z. */
+  /** What the Parent list offers: the labels already in use, A to Z. A new one is typed in. */
   function parentChoices() {
-    var seen = {}, out = [];
-    labels().concat(lines().map(function (l) { return l.name; })).forEach(function (n) {
-      var k = U.nameKey(n);
-      if (k && !seen[k]) { seen[k] = true; out.push(n); }
-    });
-    return out.sort(function (a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }); });
+    return labels().slice().sort(function (a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }); });
   }
   /** Labels already used, most recent first. */
   function labels() {

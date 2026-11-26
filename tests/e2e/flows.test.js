@@ -280,7 +280,7 @@ test('a label gathers recipes; arrows step between them', async (t) => {
   }
   await bread('Country White Bread', async () => {
     assert.deepEqual(await field(page, 'Parent').locator('option').allInnerTexts(),
-      ['–', 'baguette', 'Challah', 'Croissants', 'Donuts', 'french bread', 'Mantou', 'Milk Mantou', 'New…'], 'labels and recipes, A to Z');
+      ['–', 'french bread', 'Mantou', 'New…'], 'only the parents in use, A to Z');
     await field(page, 'Parent').selectOption('__new');
     await field(page, 'Parent').fill('White bread');
     // a label can have its own flag
