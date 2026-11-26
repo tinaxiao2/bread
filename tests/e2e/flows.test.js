@@ -519,6 +519,8 @@ test('the gallery shows every entry, or one tile per parent recipe', async (t) =
   await count(page.locator('.stack', { hasText: 'french bread' }).locator('.layer'), 1);
   await tiles.filter({ hasText: 'french bread' }).click();
   await count(page.locator('.variation'), 2);
+  await count(page.locator('.pager'), 0, 'one recipe under the label: no arrows');
+  assert.equal(await page.locator('.pname').innerText(), 'baguette');
   await page.getByRole('button', { name: 'Back' }).click();
 
   await page.reload();

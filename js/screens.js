@@ -424,7 +424,9 @@
             <${RecipeCount} n=${list.length}/>
             <${ui.Score} value=${bestRating(g.breads)}/>
           </div>
-          ${g.label ? html`<div class="pager">
+          ${g.label && list.length === 1 && U.nameKey(line.name) !== U.nameKey(g.name)
+            ? html`<h3 class="serif tname pname"><${ui.Named} flag=${line.flag} name=${line.name}/></h3>` : null}
+          ${g.label && list.length > 1 ? html`<div class="pager">
             <button type="button" class="round" aria-label="Previous recipe" disabled=${at <= 0} onClick=${function () { step(-1); }}><${Icon} name="back"/></button>
             <h3 class="serif"><${ui.Named} flag=${line.flag} name=${line.name}/></h3>
             <button type="button" class="round" aria-label="Next recipe" disabled=${at >= list.length - 1} onClick=${function () { step(1); }}><${Icon} name="next"/></button>
