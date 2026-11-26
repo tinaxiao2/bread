@@ -65,6 +65,13 @@ async function count(locator, n) {
   assert.equal(got, n);
 }
 
+/** Add a photo in the open bread form, so the entry counts as baked. */
+async function snap(page) {
+  const before = await page.locator('.photos .photo.has').count();
+  await field(page, 'Photo').setInputFiles(await picture(page, '#c98a3f'));
+  await page.locator('.photos .photo.has').nth(before).waitFor();
+}
+
 /** Log a bread on a fresh name, filling every part of the form. */
 async function logBread(page, o = {}) {
   await page.getByRole('button', { name: 'Add bread' }).click();
@@ -187,7 +194,7 @@ test('an entry with no bake recorded is marked Dough in the gallery', async (t) 
 
 test('the same name is the same recipe; different ingredients become a variation inside it', async (t) => {
   const page = await open(t);
-  await logBread(page, { photo: false });
+  await logBread(page);
 
   // typing the name again fills the recipe in, and saving joins it
   await page.getByRole('button', { name: 'Add bread' }).click();
@@ -196,6 +203,7 @@ test('the same name is the same recipe; different ingredients become a variation
   assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '400', 'filled from the saved recipe');
   assert.equal(await line(page, 'Water').getByLabel('Amount').inputValue(), '300');
   assert.equal(await program(page, 1, 'White').getAttribute('aria-pressed'), 'true');
+  await snap(page);
   await save(page);
   await formGone(page);
   await page.getByRole('button', { name: 'Recipes' }).click();
@@ -208,6 +216,7 @@ test('the same name is the same recipe; different ingredients become a variation
   await field(page, 'Name').fill('Milk bread');
   await field(page, 'Comments').click();
   await line(page, 'Water').getByLabel('Amount').fill('320');
+  await snap(page);
   await save(page);
   await formGone(page);
   await count(page.locator('.rc'), 1);
@@ -230,13 +239,13 @@ test('the same name is the same recipe; different ingredients become a variation
   await page.getByRole('button', { name: 'Back' }).click();
 
   // another name is another recipe
-  await logBread(page, { name: 'Sandwich loaf', photo: false });
+  await logBread(page, { name: 'Sandwich loaf' });
   await count(page.locator('.rc'), 2);
 });
 
 test('a recipe attached to a parent shows as one of its tweaks', async (t) => {
   const page = await open(t);
-  await logBread(page, { name: 'french bread', photo: false });
+  await logBread(page, { name: 'french bread' });
 
   // a new name, attached to french bread
   await page.getByRole('button', { name: 'Add bread' }).click();
@@ -248,6 +257,7 @@ test('a recipe attached to a parent shows as one of its tweaks', async (t) => {
   await chip(page, 'Other').click();
   await line(page, 'Other').getByLabel('Ingredient').fill('Rosemary');
   await line(page, 'Other').getByLabel('Amount').fill('2');
+  await snap(page);
   await save(page);
   await formGone(page);
 
@@ -264,6 +274,7 @@ test('a recipe attached to a parent shows as one of its tweaks', async (t) => {
   await field(page, 'Name').fill('herb french');
   await field(page, 'Comments').click();
   assert.equal(await field(page, 'Parent').inputValue(), 'french bread');
+  await snap(page);
   await save(page);
   await formGone(page);
   await count(page.locator('.rc'), 1);
@@ -433,7 +444,7 @@ const RANKED = (() => {
   const r = (name, n, extra) => Object.assign({ name, ingredients: [], bake: {}, method: '', source: '', link: '', parent: '',
     originals: [], basedOn: null, createdAt: n, updatedAt: n }, extra);
   const withFlour = (name, n, extra) => r(name, n, Object.assign({ ingredients: [{ group: 'flour', type: 'AP', amount: String(400 + n), unit: 'g' }] }, extra));
-  const b = (name, recipeId, n, date) => ({ name, date, recipeId, photos: [], photo: null, comments: '', notes: { crust: '', crumb: '', taste: '' },
+  const b = (name, recipeId, n, date) => ({ name, date, recipeId, photos: [{ full: 'seed' + n, thumb: 'seed' + n }], photo: null, comments: '', notes: { crust: '', crumb: '', taste: '' },
     ratings: { crust: 4, crumb: 4, taste: 4 }, createdAt: n, updatedAt: n });
   return {
     'recipes/t1': r('Challah', 1), 'recipes/t2': r('Croissants', 2), 'recipes/t3': r('Donuts', 3),
@@ -556,7 +567,7 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
   const r = (name, n, flour, bake) => ({ name, ingredients: [{ group: 'flour', type: 'AP', amount: flour[0], unit: flour[1] },
     { group: 'water', type: '', amount: '300', unit: 'g' }], bake, method: '', source: '', link: '', parent: '', originals: [],
     basedOn: null, createdAt: n, updatedAt: n });
-  const b = (name, recipeId, n, extra) => Object.assign({ name, date: '2026-11-2' + n, recipeId, photos: [], photo: null, comments: '',
+  const b = (name, recipeId, n, extra) => Object.assign({ name, date: '2026-11-2' + n, recipeId, photos: [{ full: 'seed' + n, thumb: 'seed' + n }], photo: null, comments: '',
     notes: { crust: '', crumb: '', taste: '' }, ratings: { crust: 4, crumb: 4, taste: 4 }, createdAt: n, updatedAt: n }, extra);
   const page = await open(t, { db: {
     'recipes/a': r('Mantou', 1, ['500', 'g'], { programs: [8], minutes: 90, proofMinutes: 30 }),
@@ -575,12 +586,21 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
   // time: (90 + 30) twice, nothing more for the split copy, plus 205
   assert.equal(await stat('Time spent').locator('b').innerText(), '7 h 25 min');
 
-  // a new bread changes the numbers straight away
+  // a new entry adds its flour straight away, but is a loaf only once it has a photo
   await page.getByRole('button', { name: 'Add bread' }).click();
   await field(page, 'Name').fill('sandwich bread');
   await field(page, 'Comments').click();
   await save(page);
   await formGone(page);
+  assert.equal(await stat('Loaves').locator('b').innerText(), '5');
+  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.locator('.gal .tile').first().click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await snap(page);
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Stats' }).click();
   assert.equal(await stat('Loaves').locator('b').innerText(), '6');
   assert.equal(await stat('Flour used').locator('b').innerText(), '1.7 kg', '1,720 g');
 });
@@ -591,12 +611,14 @@ test('Split marks the copy, so its dough is not counted twice', async (t) => {
   await field(page, 'Name').fill('Two ways');
   await line(page, 'Flour').getByLabel('Amount').fill('500');
   await program(page, 8, 'Dough').click();
+  await snap(page);
   await save(page);
   await formGone(page);
   await page.locator('.gal .tile').click();
   await page.getByRole('button', { name: 'Split' }).click();
   await program(page, 12, 'Bake').click();
   await field(page, 'Added minutes').fill('40');
+  await snap(page);
   await save(page);
   await page.getByRole('heading', { name: 'Split bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
@@ -614,6 +636,7 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await field(page, 'Flag').selectOption('FR');
   await field(page, 'Name').fill('baguette');
   await line(page, 'Flour').getByLabel('Amount').fill('500');
+  await snap(page);
   await save(page);
   await formGone(page);
   assert.equal(await page.locator('.gal .tile .fl').innerText(), FR);
@@ -624,6 +647,7 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await field(page, 'Comments').click();
   await field(page, 'Parent').selectOption('baguette');
   await line(page, 'Flour').getByLabel('Amount').fill('480');
+  await snap(page);
   await save(page);
   await formGone(page);
   assert.deepEqual(await page.locator('.gal .tile .fl').allInnerTexts(), [FR, FR]);
@@ -638,6 +662,7 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   assert.equal(await field(page, 'Flag').inputValue(), '', 'the flag filled in from baguette goes with it');
   await field(page, 'Flag').selectOption('CN');
   await line(page, 'Flour').getByLabel('Amount').fill('500');
+  await snap(page);
   await save(page);
   await formGone(page);
   assert.equal(await page.locator('.gal .tile', { hasText: 'Mantou' }).locator('.fl').innerText(), CN);
@@ -664,9 +689,41 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   assert.equal(await page.locator('.stat .fl').count(), 0);
 });
 
+test('an entry counts as baked once it has a photo, not because its recipe has baking steps', async (t) => {
+  const page = await open(t);
+  // a recipe read in from a photo, saved as a new bread straight away: no picture of the bake yet
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'From photo').setInputFiles(await picture(page, '#eee', 900, 1200));
+  await page.locator('.busy').waitFor({ state: 'detached' });
+  assert.equal(await program(page, 1, 'White').getAttribute('aria-pressed'), 'true', 'the recipe has baking steps');
+  await save(page);
+  await formGone(page);
+
+  await page.getByRole('button', { name: 'Recipes' }).click();
+  await count(page.locator('.rc'), 0, 'not under Baked');
+  await page.getByRole('tab', { name: /To try/ }).click();
+  await count(page.locator('.rc'), 1);
+  assert.doesNotMatch(await page.locator('.rc').innerText(), /Baked/);
+  await page.getByRole('button', { name: 'Gallery' }).click();
+  await page.getByRole('tab', { name: 'Recipes' }).click();
+  await count(page.locator('.gal .tile'), 0);
+  await page.getByRole('tab', { name: 'All' }).click();
+
+  // adding a photo to that entry makes it baked
+  await page.locator('.gal .tile').click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await snap(page);
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('tab', { name: /Baked/ }).click();
+  assert.match(await page.locator('.rc').innerText(), /Baked 1×/);
+});
+
 test('typing part of a name offers the saved recipe', async (t) => {
   const page = await open(t);
-  await logBread(page, { photo: false });
+  await logBread(page);
   await page.getByRole('button', { name: 'Add bread' }).click();
   await field(page, 'Name').fill('mil');
   await page.locator('.suggest').getByRole('button', { name: 'Milk bread' }).click();
@@ -753,12 +810,13 @@ test('a bread logged with only a name makes no recipe card', async (t) => {
 
 test('Bake again from a bread keeps it on the same variation', async (t) => {
   const page = await open(t);
-  await logBread(page, { photo: false });
+  await logBread(page);
   await page.locator('.gal .tile').click();
   await page.getByRole('button', { name: 'Bake again' }).click();
   assert.equal(await field(page, 'Name').inputValue(), 'Milk bread');
   assert.equal(await line(page, 'Water').getByLabel('Amount').inputValue(), '300');
   assert.equal(await field(page, 'Added minutes').inputValue(), '5');
+  await snap(page);
   await save(page);
   await page.getByRole('heading', { name: 'New bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
@@ -791,6 +849,7 @@ test('a recipe to try moves to Baked once it is baked', async (t) => {
 
   await card.getByRole('button', { name: 'Bake this' }).click();
   assert.equal(await field(page, 'Name').inputValue(), 'Cinnamon raisin');
+  await snap(page);
   await save(page);
   await formGone(page);
   await count(page.locator('.rc'), 0);
@@ -846,6 +905,7 @@ test('fills a new bread from a photo, and from a saved recipe', async (t) => {
   await page.locator('.busy').waitFor({ state: 'detached' });
   assert.equal(await field(page, 'Name').inputValue(), 'Everyday white loaf');
   assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '2 7/8');
+  await snap(page);
   await save(page);
   await formGone(page);
   await count(page.locator('.gal .tile'), 1);
@@ -855,6 +915,7 @@ test('fills a new bread from a photo, and from a saved recipe', async (t) => {
   await page.getByRole('dialog').getByRole('button', { name: /Everyday white loaf/ }).click();
   assert.equal(await field(page, 'Name').inputValue(), 'Everyday white loaf');
   assert.equal(await line(page, 'Flour').getByLabel('Amount').inputValue(), '2 7/8');
+  await snap(page);
   await save(page);
   await formGone(page);
   await page.getByRole('button', { name: 'Recipes' }).click();
@@ -864,7 +925,7 @@ test('fills a new bread from a photo, and from a saved recipe', async (t) => {
 
 test('edits and deletes a bread; its recipe goes back to To try', async (t) => {
   const page = await open(t);
-  await logBread(page, { photo: false });
+  await logBread(page);
   await page.locator('.gal .tile').click();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   assert.equal(await program(page, 12, 'Bake').getAttribute('aria-pressed'), 'true');
@@ -895,7 +956,7 @@ test('edits and deletes a bread; its recipe goes back to To try', async (t) => {
 
 test('renaming a recipe renames every variation and the breads baked from it', async (t) => {
   const page = await open(t);
-  await logBread(page, { photo: false });
+  await logBread(page);
   await page.getByRole('button', { name: 'Add bread' }).click();
   await field(page, 'Name').fill('Milk bread');
   await field(page, 'Comments').click();
@@ -993,7 +1054,7 @@ const R = (name, flour, water, bake, extra) => Object.assign({
   method: '', source: 'Booklet', link: '', originals: [], basedOn: null
 }, extra);
 const B = (name, date, recipeId, n, ratings) => ({
-  name, date, recipeId, photo: null, comments: '', notes: { crust: '', crumb: '', taste: '' },
+  name, date, recipeId, photo: { full: 'seed' + n, thumb: 'seed' + n }, comments: '', notes: { crust: '', crumb: '', taste: '' },
   ratings: ratings || { crust: 0, crumb: 0, taste: 0 }, createdAt: n, updatedAt: n
 });
 const EARLIER = {
@@ -1058,7 +1119,7 @@ test('entries saved by the first version read correctly', async (t) => {
 
 test('keeps what was saved after a reload', async (t) => {
   const page = await open(t);
-  await logBread(page, { photo: false });
+  await logBread(page);
   await page.reload();
   assert.match(await page.locator('.gal .tile').innerText(), /Milk bread/);
 });

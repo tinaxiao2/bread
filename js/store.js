@@ -60,6 +60,9 @@
     return null;
   }
   function bread(id) { return find(state.breads, id); }
+  /** A bread counts as baked once it has a photo. An entry without one is still a plan. */
+  function isBakedBread(b) { return U.photosOf(b).length > 0; }
+  function bakedOf(list) { return list.filter(isBakedBread); }
   function recipe(id) { return find(state.recipes, id); }
   function breadsOf(recipeId) { return state.breads.filter(function (b) { return b.recipeId === recipeId; }); }
 
@@ -105,7 +108,8 @@
       var newest = f.variations.slice().sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })[0];
       f.parent = String(newest.parent || '').trim();
       f.flag = U.cleanFlag(newest.flag);
-      f.baked = f.breads.length > 0;
+      f.bakedCount = bakedOf(f.breads).length;
+      f.baked = f.bakedCount > 0;
     });
     return out.sort(function (a, b) { return mostRecentFirst(a.latest, b.latest); });
   }
@@ -145,7 +149,8 @@
         return String(b.date || '').localeCompare(String(a.date || '')) || (b.createdAt || 0) - (a.createdAt || 0);
       });
       g.latest = g.tweaks.slice().sort(mostRecentFirst)[0];
-      g.baked = g.breads.length > 0;
+      g.bakedCount = bakedOf(g.breads).length;
+      g.baked = g.bakedCount > 0;
     });
     return out.sort(function (a, b) { return mostRecentFirst(a.latest, b.latest); });
   }
@@ -230,6 +235,7 @@
         if (!b.splitFrom) (r.ingredients || []).forEach(function (i) { flour += U.flourGrams(U.upgradeIngredient(i)) || 0; });
         minutes += U.minutesSpent(r.bake, !!b.splitFrom);
       }
+      if (!isBakedBread(b)) return;                       // the favourite is the most baked: photos only
       var g = r ? groupOfRecipe[r.id] : null, key = g ? 'g:' + g.key : 'n:' + U.nameKey(b.name);
       if (!tally[key]) tally[key] = { name: g ? g.name : b.name, flag: g ? flagFor(g.name) : '', count: 0, best: 0, last: '' };
       var t = tally[key];
@@ -240,7 +246,7 @@
     var favorite = Object.keys(tally).map(function (k) { return tally[k]; }).sort(function (a, b) {
       return (b.count - a.count) || (b.best - a.best) || b.last.localeCompare(a.last);
     })[0] || null;
-    return { flourGrams: flour, loaves: state.breads.length, favorite: favorite, minutes: minutes };
+    return { flourGrams: flour, loaves: bakedOf(state.breads).length, favorite: favorite, minutes: minutes };
   }
 
   /** Recipe names, most recently used first. */
@@ -473,7 +479,7 @@
   LGT.store = {
     init: init, subscribe: subscribe, getState: getState,
     bread: bread, recipe: recipe, breadsOf: breadsOf,
-    family: family, families: families, familyByKey: familyByKey, groups: groups, groupOf: groupOf, tweakOf: tweakOf, toTry: toTry, setToTryOrder: setToTryOrder, stats: stats,
+    family: family, families: families, familyByKey: familyByKey, groups: groups, groupOf: groupOf, tweakOf: tweakOf, toTry: toTry, setToTryOrder: setToTryOrder, stats: stats, isBakedBread: isBakedBread, bakedOf: bakedOf,
     flagFor: flagFor, breadFlag: breadFlag, flagsUsed: flagsUsed,
     parentChoices: parentChoices, names: names, otherNames: otherNames, types: types, sources: sources,
     saveBread: saveBread, deleteBread: deleteBread, saveRecipes: saveRecipes, deleteRecipe: deleteRecipe

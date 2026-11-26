@@ -98,8 +98,11 @@ These are decisions the owner made. Keep them.
   a new variation if they differ. See `LGT.util.planRecipeSave`. Naming a new bread like a
   saved recipe fills the form from that recipe's latest variation.
 - Renaming a recipe renames all its variations and the breads baked from them.
-- **Baked, To try and Dough are derived, never stored.** A recipe is baked when a bread
-  points at one of its variations. An entry is Dough until a bake is recorded: a program
+- **Baked, To try and Dough are derived, never stored.** A bread counts as **baked once it
+  has a photo** (`store.isBakedBread`); an entry without one is still a plan. A recipe is
+  baked when a baked bread points at one of its variations, and "Baked n×" counts baked
+  breads only. (The owner chose this: recipes read in through New bread were showing as
+  baked before anything was baked.) An entry is Dough until a bake is recorded: a program
   that is not a dough program, or an oven step (`LGT.util.isBaked`).
 - **Programs can be combined** (for example Dough then Bake). The program marked `manual`
   in `data/machine.js` (Bake) has its time typed in as "added time", so the added time and
@@ -116,7 +119,8 @@ These are decisions the owner made. Keep them.
   through them. In the form the photos wrap in a grid with + last, and are put in order by
   dragging (mouse: drag; phone: hold briefly, then drag, so a quick swipe still scrolls).
 - **Stats** (third tab): flour used, loaves, favorite and time spent, all derived in
-  `store.stats`. Every entry is a loaf. Flour in cups or spoons is converted at about 120 g a
+  `store.stats`. Loaves and the favorite count baked entries (with a photo); flour and time
+  count every entry. Flour in cups or spoons is converted at about 120 g a
   cup. Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
   (flour, machine time, proofing) is counted once, with the entry it came from. The favorite
   is the parent recipe with the most entries.

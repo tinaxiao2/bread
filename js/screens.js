@@ -183,7 +183,7 @@
     var g = props.group, last = g.breads[0], cover = U.photosOf(g.breads.filter(function (b) { return U.photosOf(b).length; })[0])[0];
     return html`<button type="button" class=${'tile' + (cover ? ' has' : '')} onClick=${props.onOpen}>
       ${cover ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
-      ${g.breads.length > 1 ? html`<span class="pill count">${g.breads.length}×</span>` : null}
+      ${g.bakedCount > 1 ? html`<span class="pill count">${g.bakedCount}×</span>` : null}
       <${ui.Score} value=${bestRating(g.breads)}/>
       <span class="meta"><b><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></b><small>${U.fmtDate(last.date)}</small></span>
     </button>`;
@@ -332,7 +332,7 @@
                 <span>
                   <h3 class="serif"><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></h3>
                   <span class="facts">
-                    ${g.baked ? html`<span class="pill">Baked ${g.breads.length}×</span>` : null}
+                    ${g.baked ? html`<span class="pill">Baked ${g.bakedCount}×</span>` : null}
                     <${CountPill} n=${g.tweaks.length}/>
                     <${ui.Score} value=${bestRating(g.breads)}/>
                     ${!g.baked && g.latest.source ? g.latest.source : null}
@@ -371,17 +371,17 @@
         <div class="wrap page nohero">
           <h2 class="serif"><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></h2>
           <div class="tags">
-            ${g.baked ? html`<span class="pill">Baked ${g.breads.length}×</span>` : html`<span class="pill sage">To try</span>`}
+            ${g.baked ? html`<span class="pill">Baked ${g.bakedCount}×</span>` : html`<span class="pill sage">To try</span>`}
             <${CountPill} n=${g.tweaks.length}/>
             <${ui.Score} value=${bestRating(g.breads)}/>
           </div>
           ${g.tweaks.slice().reverse().map(function (rv) {
-            var breads = store.breadsOf(rv.id), n = g.tweaks.indexOf(rv) + 1;
+            var breads = store.breadsOf(rv.id), baked = store.bakedOf(breads), n = g.tweaks.indexOf(rv) + 1;
             var own = U.nameKey(rv.name) !== g.key;
             return html`<div class="variation" key=${rv.id}>
               ${many ? html`<div class="vhead">
                 <span class="label">Tweak ${n}</span>
-                ${breads.length ? html`<span class="pill">Baked ${breads.length}×</span>` : html`<span class="pill sage">To try</span>`}
+                ${baked.length ? html`<span class="pill">Baked ${baked.length}×</span>` : html`<span class="pill sage">To try</span>`}
                 <${ui.Score} value=${bestRating(breads)}/>
                 <button type="button" class="round" aria-label=${'Edit tweak ' + n} onClick=${function () { edit(rv); }}><${Icon} name="edit"/></button>
               </div>` : null}
@@ -413,7 +413,7 @@
         var last = f.breads[0];
         return html`<button type="button" class="opt" key=${f.key} onClick=${function () { props.onPick(f.latest); }}>
           <span class="thumb">${U.photosOf(last)[0] ? html`<${ui.Photo} id=${U.photosOf(last)[0].thumb}/>` : html`<${Icon} name="loaf"/>`}</span>
-          <span><${ui.Named} flag=${store.flagFor(f.name)} name=${f.name}/><small>${f.baked ? 'Baked ' + f.breads.length + '×' : 'To try'}</small></span>
+          <span><${ui.Named} flag=${store.flagFor(f.name)} name=${f.name}/><small>${f.baked ? 'Baked ' + f.bakedCount + '×' : 'To try'}</small></span>
         </button>`;
       })}
     <//>`;

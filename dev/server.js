@@ -9,6 +9,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const ROOT = path.resolve(__dirname, '..');
+// 2x2 warm-brown PNG for photos that tests seed without uploading
+const SEED_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGPceNSKgYGBiYGBgYGBAQAWmgGBN6TQVQAAAABJRU5ErkJggg==', 'base64');
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml',
@@ -39,6 +41,10 @@ function start(port = 4173) {
         const id = url.pathname.slice(7);
         if (req.method === 'DELETE') { blobs.delete(id); res.writeHead(204); return res.end(); }
         const blob = blobs.get(id);
+        if (!blob && id.startsWith('seed')) {                  // photos named in test fixtures: a plain picture
+          res.writeHead(200, { 'content-type': 'image/png' });
+          return res.end(SEED_PNG);
+        }
         if (!blob) { res.writeHead(404); return res.end(); }
         res.writeHead(200, { 'content-type': blob.type, 'cache-control': 'no-store' });
         return res.end(blob.data);
