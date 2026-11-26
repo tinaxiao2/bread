@@ -342,6 +342,92 @@ test('half stars, proofing and several photos', async (t) => {
   await loaded(page.locator('.hero-row .hero img'));
 });
 
+test('photos are put in order by dragging; the + stays at the end', async (t) => {
+  const page = await open(t);
+  // Which colour is each photo? (red, green or blue pictures)
+  const colours = (sel) => page.locator(sel).evaluateAll((imgs) => imgs.map((img) => {
+    const c = document.createElement('canvas'); c.width = 8; c.height = 8;
+    const x = c.getContext('2d'); x.drawImage(img, 0, 0, 8, 8);
+    const d = x.getImageData(0, 0, 1, 1).data;
+    return d[0] > 150 ? 'red' : d[1] > 150 ? 'green' : 'blue';
+  }));
+  async function settled(sel, n) {
+    await count(page.locator(sel), n);
+    for (let i = 0; i < n; i++) await loaded(page.locator(sel).nth(i));
+  }
+  const tiles = page.locator('.photos .photo.has');
+  async function mouseDrag(from, to) {
+    const a = await tiles.nth(from).boundingBox(), b = await tiles.nth(to).boundingBox();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(a.x + a.width / 2 + 10, a.y + a.height / 2, { steps: 3 });
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 });
+    await page.mouse.up();
+  }
+  async function touchDrag(from, to) {
+    const cdp = await page.context().newCDPSession(page);
+    const a = await tiles.nth(from).boundingBox(), b = await tiles.nth(to).boundingBox();
+    const pt = (x, y) => ({ touchPoints: [{ x, y }] });
+    await cdp.send('Input.dispatchTouchEvent', Object.assign({ type: 'touchStart' }, pt(a.x + a.width / 2, a.y + a.height / 2)));
+    await new Promise((r) => setTimeout(r, 400));                     // hold
+    for (let i = 1; i <= 8; i++) {
+      const x = a.x + a.width / 2 + (b.x - a.x) * i / 8, y = a.y + a.height / 2 + (b.y - a.y) * i / 8;
+      await cdp.send('Input.dispatchTouchEvent', Object.assign({ type: 'touchMove' }, pt(x, y)));
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('Ordered loaf');
+  await field(page, 'Photo').setInputFiles([await picture(page, '#e00000'), await picture(page, '#00d000'), await picture(page, '#0000e0')]);
+  await settled('.photos .photo.has img', 3);
+  assert.deepEqual(await colours('.photos .photo.has img'), ['red', 'green', 'blue']);
+  assert.equal(await page.locator('.photos > *').last().getAttribute('class'), 'photo add', 'the + is last');
+
+  await mouseDrag(2, 0);
+  assert.deepEqual(await colours('.photos .photo.has img'), ['blue', 'red', 'green'], 'dragged to the front');
+  await count(page.locator('.viewer'), 0, 'letting go does not open the photo');
+
+  await touchDrag(1, 2);
+  assert.deepEqual(await colours('.photos .photo.has img'), ['blue', 'green', 'red'], 'held and dragged with a finger');
+
+  // a quick swipe across the photos scrolls; it does not move one
+  {
+    const cdp = await page.context().newCDPSession(page);
+    const a = await tiles.nth(0).boundingBox(), b = await tiles.nth(2).boundingBox();
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: a.x + 20, y: a.y + 20 }] });
+    for (let i = 1; i <= 6; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: a.x + 20 + (b.x - a.x) * i / 6, y: a.y + 20 }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    assert.deepEqual(await colours('.photos .photo.has img'), ['blue', 'green', 'red']);
+  }
+
+  // a quick tap still opens the photo
+  await tiles.first().getByRole('button', { name: 'Photo 1' }).click();
+  await page.locator('.viewer').waitFor();
+  await page.locator('.viewer').click();
+
+  await save(page);
+  await formGone(page);
+  await settled('.gal .tile img', 1);
+  assert.deepEqual(await colours('.gal .tile img'), ['blue'], 'the first photo is the cover');
+  await page.locator('.gal .tile').click();
+  await settled('.hero-row .hero img', 3);
+  assert.deepEqual(await colours('.hero-row .hero img'), ['blue', 'green', 'red']);
+
+  // reorder saved photos together with a new one
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await field(page, 'Photo').setInputFiles(await picture(page, '#e00000'));
+  await settled('.photos .photo.has img', 4);
+  await mouseDrag(3, 1);
+  assert.deepEqual(await colours('.photos .photo.has img'), ['blue', 'red', 'green', 'red']);
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
+  await settled('.hero-row .hero img', 4);
+  assert.deepEqual(await colours('.hero-row .hero img'), ['blue', 'red', 'green', 'red']);
+});
+
 test('typing part of a name offers the saved recipe', async (t) => {
   const page = await open(t);
   await logBread(page, { photo: false });

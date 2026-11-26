@@ -231,7 +231,7 @@
   /**
    * Save a bread together with the recipe it followed. The bread's name is the recipe's name:
    * a bread named like a saved recipe joins it, as an existing variation or a new one.
-   * input: { id?, bread: {name, date, photos, ratings, notes, comments}, photoBlobs?,
+   * input: { id?, bread: {name, date, ratings, notes, comments}, pics: [{photo} | {blob}] in order,
    *          recipe, baseRecipeId?, originalBlobs? }
    */
   function saveBread(input) {
@@ -243,10 +243,10 @@
     var name = String(b.name || '').trim();
 
     return Promise.all([
-      Promise.all((input.photoBlobs || []).map(putPhoto)),
+      Promise.all((input.pics || []).map(function (p) { return p.blob ? putPhoto(p.blob) : Promise.resolve(p.photo); })),
       putOriginals(input.originalBlobs)
     ]).then(function (up) {
-      var photos = U.photosOf(b).concat(up[0]);
+      var photos = up[0].filter(function (p) { return p && p.full; });
       var draft = U.cleanRecipe(input.recipe);
       draft.originals = draft.originals.concat(up[1]);
       var fam = familyByKey(U.nameKey(name));

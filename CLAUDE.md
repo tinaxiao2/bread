@@ -101,7 +101,8 @@ These are decisions the owner made. Keep them.
   long. A different place is a different tweak.
 - **Ratings** go in half stars: the left half of a star picks the half.
 - **Several photos per bread.** The first is the cover in the Gallery; the bread page swipes
-  through them.
+  through them. In the form the photos wrap in a grid with + last, and are put in order by
+  dragging (mouse: drag; phone: hold briefly, then drag, so a quick swipe still scrolls).
 - **Split** on a bread's page opens a copy of the entry (name, date, photo, ratings, comments,
   recipe) that is saved as a new bread. It is for one dough baked two ways: change the
   baking on the copy and it becomes another variation of the same recipe. The copies share

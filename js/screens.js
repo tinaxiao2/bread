@@ -396,7 +396,7 @@
       init.current = {
         name: bread ? bread.name : (base ? base.name : ''),
         date: bread ? bread.date : U.today(),
-        photos: U.photosOf(bread), photoBlobs: [],
+        pics: U.photosOf(bread).map(function (p) { return F.pic({ photo: p }); }),
         ratings: Object.assign({ crust: 0, crumb: 0, taste: 0 }, bread && bread.ratings),
         notes: Object.assign({ crust: '', crumb: '', taste: '' }, bread && bread.notes),
         comments: bread ? bread.comments : '',
@@ -421,7 +421,7 @@
     }
     function pickPhoto(file) {
       U.resizeImage(file, 1600, 0.85).then(function (blob) {
-        set(function (cur) { return { photoBlobs: cur.photoBlobs.concat([blob]) }; });
+        set(function (cur) { return { pics: cur.pics.concat([F.pic({ blob: blob })]) }; });
       }, function () { setBusy('photo'); });
     }
     /** Same name, same recipe: fill the untouched recipe part from the one saved under this name. */
@@ -457,8 +457,8 @@
       setBusy('saving');
       store.saveBread({
         id: props.breadId || null,
-        bread: { name: f.name, date: f.date, photos: f.photos, ratings: f.ratings, notes: f.notes, comments: f.comments },
-        photoBlobs: f.photoBlobs, recipe: recipeOf(f.draft), baseRecipeId: f.baseRecipeId, originalBlobs: f.pending
+        bread: { name: f.name, date: f.date, ratings: f.ratings, notes: f.notes, comments: f.comments },
+        pics: f.pics, recipe: recipeOf(f.draft), baseRecipeId: f.baseRecipeId, originalBlobs: f.pending
       }).then(function () { nav.close(props.k); }, function () { setBusy('failed'); });
     }
     function remove() {
@@ -493,11 +493,10 @@
           })}
         </div>` : null}
       <//>
-      ${store.getState().canUpload || f.photos.length ? html`<${Field} label="Photos">
-        <${F.PhotosField} photos=${f.photos} blobs=${f.photoBlobs}
+      ${store.getState().canUpload || f.pics.length ? html`<${Field} label="Photos">
+        <${F.PhotosField} items=${f.pics}
           onAdd=${function (files) { files.forEach(pickPhoto); }}
-          onRemove=${function (p) { set(function (cur) { return { photos: cur.photos.filter(function (x) { return x !== p; }) }; }); }}
-          onRemoveBlob=${function (blob) { set(function (cur) { return { photoBlobs: cur.photoBlobs.filter(function (x) { return x !== blob; }) }; }); }}
+          onChange=${function (pics) { set({ pics: pics }); }}
           onView=${function (x) { setOverlay({ view: x }); }}/>
       <//>` : null}
       <${Field} label="Date">
