@@ -53,7 +53,7 @@ runtime.
 
 ## Data
 
-Two collections in the artifact database:
+Two collections and one document in the artifact database:
 
 - `breads/{id}`: `name`, `date` (YYYY-MM-DD), `recipeId` (or null), `photos` (list of
   `{full, thumb}` asset ids, cover first; `photo` repeats the cover), `ratings` (`crust`,
@@ -63,6 +63,8 @@ Two collections in the artifact database:
   `bake` (`programs[]`, `size`, `crust`, `minutes`, `added`, `reason`, `proof[]` (places:
   `machine`, `airfryer`, `fridge`), `proofMinutes`, `ovenTemp`, `ovenMinutes`), `method`, `source`, `link`, `parent` (name of the recipe it is attached
   to, or ''), `originals[]` (asset ids of imported images), `basedOn`, `createdAt`, `updatedAt`
+- `meta/order`: `toTry` — the owner's ranking of recipes to try, as group keys (the parent
+  recipe's name, lower-cased). Recipes not in it come last.
 
 Entries from the first version hold a single `bake.program` instead of `bake.programs`, and
 salt as an `other` ingredient named Salt, no `proof` (read as the bread machine), and a single
@@ -80,7 +82,13 @@ These are decisions the owner made. Keep them.
   everything attached to it form one group: one card on the Recipes tab, and every variation
   inside it is called a **tweak** ("Tweak 1" is the oldest). The parent is stored on every
   variation of a name and kept in step by `store.setParent`; renaming a parent updates what
-  is attached to it.
+  is attached to it. A parent name with no recipe of its own still gathers what is attached
+  to it. The Parent list offers only recipes with no parent of their own, never the recipe
+  being edited or anything attached to it.
+- **Recipes to try are ranked** by dragging their rows (same hold-then-drag as photos,
+  `ui.useDragOrder`).
+- **Gallery has a Recipes · All toggle** (top right, remembered on the device): All is every
+  entry; Recipes is one tile per parent recipe that has been baked.
 - **A bread's name is its recipe's name.** Saving a bread named like a saved recipe joins
   that recipe: the matching variation if the ingredients and baking details are the same,
   a new variation if they differ. See `LGT.util.planRecipeSave`. Naming a new bread like a

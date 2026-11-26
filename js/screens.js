@@ -178,13 +178,42 @@
   }
 
   // ---------- Gallery ----------
+  /** One tile per parent recipe: its latest bread's photo, its best rating. */
+  function RecipeTile(props) {
+    var g = props.group, last = g.breads[0], cover = U.photosOf(g.breads.filter(function (b) { return U.photosOf(b).length; })[0])[0];
+    return html`<button type="button" class=${'tile' + (cover ? ' has' : '')} onClick=${props.onOpen}>
+      ${cover ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
+      ${g.breads.length > 1 ? html`<span class="pill count">${g.breads.length}×</span>` : null}
+      <${ui.Score} value=${bestRating(g.breads)}/>
+      <span class="meta"><b>${g.name}</b><small>${U.fmtDate(last.date)}</small></span>
+    </button>`;
+  }
+
+  var VIEW_KEY = 'lgt-gallery-view';
+  function savedView() { try { return localStorage.getItem(VIEW_KEY) === 'recipes' ? 'recipes' : 'all'; } catch (e) { return 'all'; } }
+
   function Gallery(props) {
+    var vs = useState(savedView()), view = vs[0], setView = vs[1];
+    function pick(v) { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch (e) { /* a convenience only */ } }
+    var nav = props.nav;
     return html`<div class="wrap">
-      <div class="top"><h1 class="serif">Let's Get This</h1><img class="mark" src="icons/icon.svg" alt=""/></div>
+      <div class="top">
+        <h1 class="serif">Let's Get This</h1><img class="mark" src="icons/icon.svg" alt=""/>
+        <div class="toggle" role="tablist">
+          ${[['recipes', 'Recipes'], ['all', 'All']].map(function (o) {
+            return html`<button type="button" role="tab" key=${o[0]} aria-selected=${view === o[0]} class=${view === o[0] ? 'on' : ''}
+              onClick=${function () { pick(o[0]); }}>${o[1]}</button>`;
+          })}
+        </div>
+      </div>
       <div class="gal">
-        ${props.state.breads.map(function (b) {
-          return html`<${Tile} key=${b.id} bread=${b} onOpen=${function () { props.nav.push({ kind: 'bread', id: b.id }); }}/>`;
-        })}
+        ${view === 'recipes'
+          ? store.groups().filter(function (g) { return g.baked; }).map(function (g) {
+            return html`<${RecipeTile} key=${g.key} group=${g} onOpen=${function () { nav.push({ kind: 'recipe', id: g.latest.id }); }}/>`;
+          })
+          : props.state.breads.map(function (b) {
+            return html`<${Tile} key=${b.id} bread=${b} onOpen=${function () { nav.push({ kind: 'bread', id: b.id }); }}/>`;
+          })}
       </div>
     </div>`;
   }
@@ -277,8 +306,12 @@
 
   function Recipes(props) {
     var nav = props.nav, all = store.groups();
-    var baked = all.filter(function (g) { return g.baked; }), toTry = all.filter(function (g) { return !g.baked; });
+    var baked = all.filter(function (g) { return g.baked; }), toTry = store.toTry();
     var showBaked = props.seg === 'baked';
+    var byKey = {};
+    toTry.forEach(function (g) { byKey[g.key] = g; });
+    var d = ui.useDragOrder(toTry.map(function (g) { return g.key; }), store.setToTryOrder);
+    var shown = showBaked ? baked : d.order.map(function (k) { return byKey[k]; }).filter(Boolean);
     return html`<div class="wrap">
       <div class="top"><h1 class="serif">Recipes</h1></div>
       <div class="seg" role="tablist">
@@ -287,10 +320,12 @@
       </div>
       <div class="list">
         ${showBaked ? null : html`<button type="button" class="add" onClick=${props.onAdd}><${Icon} name="plus"/>Add recipe</button>`}
-        ${(showBaked ? baked : toTry).map(function (g) {
+      </div>
+      <div class=${'list' + (showBaked ? '' : ' ranked') + (d.dragging ? ' dragging' : '')} ref=${showBaked ? null : d.box}>
+        ${shown.map(function (g) {
           function open() { nav.push({ kind: 'recipe', id: g.latest.id }); }
           var last = g.breads[0];
-          return html`<div class="rc" key=${g.key}>
+          return html`<div class=${'rc' + (d.dragging === g.key ? ' lifted' : '')} key=${g.key} ...${showBaked ? {} : d.item(g.key)}>
             <div class="rtop">
               <button type="button" class="open" onClick=${open}>
                 ${last ? html`<span class="thumb">${U.photosOf(last)[0] ? html`<${ui.Photo} id=${U.photosOf(last)[0].thumb}/>` : html`<${Icon} name="loaf"/>`}</span>` : null}
@@ -405,7 +440,8 @@
         pending: [],
         // The recipe part is "hers" once she has edited it or chosen a recipe herself. Until
         // then, naming the bread like a saved recipe fills it in from that recipe.
-        hers: !!(bread || base), filled: ''
+        hers: !!(bread || base), filled: '',
+        savedName: base ? base.name : ''
       };
     }
     var fs = useState(init.current), f = fs[0], setF = fs[1];
@@ -503,7 +539,7 @@
         <input id="f-date" class="input date" type="date" value=${f.date} aria-label="Date" onInput=${function (e) { set({ date: e.target.value }); }}/>
       <//>
       <${VariantChips} draft=${f.draft} onPick=${function (i) { set({ draft: Object.assign({}, f.draft, { index: i }), hers: true }); }}/>
-      <${F.RecipeFields} recipe=${recipeOf(f.draft)} pending=${f.pending} hideSize=${sizedVariants(f.draft)}
+      <${F.RecipeFields} recipe=${recipeOf(f.draft)} savedName=${f.savedName} pending=${f.pending} hideSize=${sizedVariants(f.draft)}
         onChange=${function (r) { set({ draft: withRecipe(f.draft, r), hers: true }); }}
         onPending=${function (list) { set({ pending: list }); }}
         onView=${function (x) { setOverlay({ view: x }); }}/>
@@ -540,7 +576,8 @@
       var existing = props.recipeId ? store.recipe(props.recipeId) : null;
       init.current = {
         draft: props.reading ? draftFromReading(props.reading) : existing ? draftFromRecipe(existing) : blankDraft(),
-        pending: props.originals || [], both: false
+        pending: props.originals || [], both: false,
+        savedName: existing ? existing.name : ''
       };
     }
     var fs = useState(init.current), f = fs[0], setF = fs[1];
@@ -580,7 +617,7 @@
       <${VariantChips} draft=${d} both=${f.both}
         onPick=${function (i) { set({ draft: Object.assign({}, d, { index: i }) }); }}
         onBoth=${function (on) { set({ both: on }); }}/>
-      <${F.RecipeFields} recipe=${recipeOf(d)} pending=${f.pending} hideSize=${sizedVariants(d)}
+      <${F.RecipeFields} recipe=${recipeOf(d)} savedName=${f.savedName} pending=${f.pending} hideSize=${sizedVariants(d)}
         onChange=${function (r) { set({ draft: withRecipe(d, r) }); }}
         onPending=${function (list) { set({ pending: list }); }}
         onView=${function (x) { setOverlay({ view: x }); }}/>

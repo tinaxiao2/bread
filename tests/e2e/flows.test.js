@@ -428,6 +428,130 @@ test('photos are put in order by dragging; the + stays at the end', async (t) =>
   assert.deepEqual(await colours('.hero-row .hero img'), ['blue', 'red', 'green', 'red']);
 });
 
+// Recipes made the way the owner's are: some to try, a family whose parent was renamed away.
+const RANKED = (() => {
+  const r = (name, n, extra) => Object.assign({ name, ingredients: [], bake: {}, method: '', source: '', link: '', parent: '',
+    originals: [], basedOn: null, createdAt: n, updatedAt: n }, extra);
+  const withFlour = (name, n, extra) => r(name, n, Object.assign({ ingredients: [{ group: 'flour', type: 'AP', amount: String(400 + n), unit: 'g' }] }, extra));
+  const b = (name, recipeId, n, date) => ({ name, date, recipeId, photos: [], photo: null, comments: '', notes: { crust: '', crumb: '', taste: '' },
+    ratings: { crust: 4, crumb: 4, taste: 4 }, createdAt: n, updatedAt: n });
+  return {
+    'recipes/t1': r('Challah', 1), 'recipes/t2': r('Croissants', 2), 'recipes/t3': r('Donuts', 3),
+    'recipes/m1': withFlour('Mantou', 10), 'recipes/m2': withFlour('Milk Mantou', 11, { parent: 'Mantou' }),
+    'recipes/f1': withFlour('baguette', 20, { parent: 'french bread' }),
+    'recipes/f2': withFlour('baguette II', 21, { parent: 'french bread' }),
+    'breads/1': b('Mantou', 'm1', 10, '2026-11-20'), 'breads/2': b('Milk Mantou', 'm2', 11, '2026-11-21'),
+    'breads/3': b('baguette', 'f1', 20, '2026-11-22'), 'breads/4': b('baguette II', 'f2', 21, '2026-11-23'),
+    'breads/5': b('Loose loaf', null, 30, '2026-11-24')
+  };
+})();
+
+test('recipes to try can be ranked by dragging, and the ranking is kept', async (t) => {
+  const page = await open(t, { db: RANKED });
+  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('tab', { name: /To try/ }).click();
+  const names = () => page.locator('.list.ranked .rc h3').allInnerTexts();
+  await count(page.locator('.list.ranked .rc'), 3);
+  const start = await names();
+  const rows = page.locator('.list.ranked .rc');
+  async function mouseDrag(from, to) {
+    const a = await rows.nth(from).boundingBox(), b = await rows.nth(to).boundingBox();
+    await page.mouse.move(a.x + 40, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(a.x + 40, a.y + a.height / 2 + 10, { steps: 3 });
+    await page.mouse.move(b.x + 40, b.y + b.height / 2, { steps: 10 });
+    await page.mouse.up();
+  }
+  await mouseDrag(2, 0);
+  const ranked = [start[2], start[0], start[1]];
+  assert.deepEqual(await names(), ranked);
+  await count(page.locator('.screen'), 0, 'letting go does not open the recipe');
+
+  // with a finger: hold, then drag
+  const cdp = await page.context().newCDPSession(page);
+  const a = await rows.nth(0).boundingBox(), b = await rows.nth(2).boundingBox();
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: a.x + 40, y: a.y + a.height / 2 }] });
+  await new Promise((r) => setTimeout(r, 400));
+  for (let i = 1; i <= 10; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: a.x + 40, y: a.y + a.height / 2 + (b.y - a.y) * i / 10 }] });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  const after = [ranked[1], ranked[2], ranked[0]];
+  assert.deepEqual(await names(), after);
+
+  // kept after a reload, and a new recipe to try joins at the end
+  await page.reload();
+  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.getByRole('tab', { name: /To try/ }).click();
+  assert.deepEqual(await names(), after);
+  await page.getByRole('button', { name: 'Add recipe' }).click();
+  await page.getByRole('button', { name: 'Type it in' }).click();
+  await field(page, 'Name').fill('Pizza');
+  await save(page);
+  await formGone(page);
+  assert.deepEqual(await names(), after.concat(['Pizza']));
+
+  // a tap still opens a recipe
+  await rows.first().locator('.open').click();
+  await page.locator('.screen h2').waitFor();
+  assert.equal(await page.locator('.screen h2').innerText(), after[0]);
+});
+
+test('the gallery shows every entry, or one tile per parent recipe', async (t) => {
+  const page = await open(t, { db: RANKED });
+  const tiles = page.locator('.gal .tile');
+  assert.equal(await page.getByRole('tab', { name: 'All' }).getAttribute('aria-selected'), 'true');
+  await count(tiles, 5);
+  await page.getByRole('tab', { name: 'Recipes' }).click();
+  await count(tiles, 2);
+  assert.deepEqual((await tiles.locator('.meta b').allInnerTexts()).sort(), ['Mantou', 'french bread'],
+    'tweaks sit under their parent, even one whose own recipe was renamed away; to-try and recipe-less entries are not shown');
+  assert.match(await tiles.filter({ hasText: 'Mantou' }).innerText(), /2×/);
+  await tiles.filter({ hasText: 'french bread' }).click();
+  await count(page.locator('.variation'), 2);
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  await page.reload();
+  assert.equal(await page.getByRole('tab', { name: 'Recipes' }).getAttribute('aria-selected'), 'true', 'the choice is remembered');
+  await page.getByRole('tab', { name: 'All' }).click();
+  await count(tiles, 5);
+});
+
+test('the Parent list only offers recipes with no parent, never the recipe itself', async (t) => {
+  const page = await open(t, { db: RANKED });
+  const options = () => field(page, 'Parent').locator('option').allInnerTexts();
+
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('Rolls');
+  await field(page, 'Comments').click();
+  const offered = await options();
+  assert.ok(offered.includes('Mantou') && offered.includes('french bread') && offered.includes('Challah'), offered.join(', '));
+  for (const child of ['Milk Mantou', 'baguette', 'baguette II']) assert.ok(!offered.includes(child), child + ' has a parent, so it is not offered');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Discard' }).click();
+
+  // editing a tweak: neither its own name nor its group is offered, even while renaming it
+  await page.getByRole('button', { name: 'Recipes' }).click();
+  await page.locator('.rc .open', { hasText: 'Mantou' }).click();
+  await page.getByRole('button', { name: 'Edit tweak 2' }).click();
+  assert.equal(await field(page, 'Parent').inputValue(), 'Mantou');
+  await field(page, 'Name').fill('Sweet Mantou');
+  assert.ok(!(await options()).includes('Milk Mantou'));
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Discard' }).click();
+
+  // once it is detached it can be a parent again
+  await page.getByRole('button', { name: 'Edit tweak 2' }).click();
+  await field(page, 'Parent').selectOption('');
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('Rolls');
+  await field(page, 'Comments').click();
+  assert.ok((await options()).includes('Milk Mantou'));
+});
+
 test('typing part of a name offers the saved recipe', async (t) => {
   const page = await open(t);
   await logBread(page, { photo: false });

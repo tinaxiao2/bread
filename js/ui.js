@@ -133,8 +133,107 @@
     </div>`;
   }
 
+  /** `list` with the item at `from` moved to `to`. */
+  function moved(list, from, to) {
+    var out = list.slice(), item = out.splice(from, 1)[0];
+    out.splice(to, 0, item);
+    return out;
+  }
+
+  /**
+   * Reorder a list by dragging. With a mouse, drag; on a phone, hold an item a moment, then
+   * drag, so a quick swipe still scrolls the page. The new order is reported once, on letting go.
+   *   keys      the items' keys, in their saved order
+   *   onCommit  called with the new order of keys
+   * Returns { box, order, dragging, item(key) }: put `box` on the container as its ref, spread
+   * `item(key)` on each item, and render in `order`.
+   */
+  function useDragOrder(keys, onCommit) {
+    var ts = useState(null), temp = ts[0], setTemp = ts[1];
+    var ds = useState(null), dragging = ds[0], setDragging = ds[1];
+    var el = H.useRef(null), live = H.useRef({}), latest = H.useRef(null), box = H.useRef(null);
+    var order = temp || keys;
+    latest.current = { order: order, keys: keys, onCommit: onCommit };
+
+    // Once the saved order catches up, stop showing the dragged one.
+    var sig = keys.join('\n');
+    useEffect(function () { setTemp(null); }, [sig]);
+
+    // The container can come and go (a tab switched off and on), so listen on whichever is there.
+    if (!box.current) {
+      var block = function (e) { if (live.current.key) e.preventDefault(); };      // no scrolling while moving one
+      var swallow = function (e) {                                                  // the click that ends a drag
+        if (live.current.justDragged) { live.current.justDragged = false; e.stopPropagation(); e.preventDefault(); }
+      };
+      box.current = function (node) {
+        if (el.current === node) return;
+        if (el.current) { el.current.removeEventListener('touchmove', block); el.current.removeEventListener('click', swallow, true); }
+        el.current = node;
+        if (node) { node.addEventListener('touchmove', block, { passive: false }); node.addEventListener('click', swallow, true); }
+      };
+    }
+
+    function start(key) {
+      try { live.current.el.setPointerCapture(live.current.id); } catch (e) { /* already released */ }
+      live.current.key = key;
+      setDragging(key);
+    }
+    function end() {
+      var L = live.current;
+      clearTimeout(L.timer);
+      live.current = { justDragged: !!L.key };
+      setDragging(null);
+      if (!L.key) return;
+      var now = latest.current.order, was = latest.current.keys;
+      if (now.join('\n') !== was.join('\n')) {
+        latest.current.onCommit(now);
+        setTimeout(function () { setTemp(null); }, 4000);   // in case the save never comes back
+      } else setTemp(null);
+    }
+    function down(e, key) {
+      if (e.button > 0 || e.target.closest('.x, input, select, textarea')) return;
+      live.current = { x: e.clientX, y: e.clientY, pending: key, id: e.pointerId, el: e.currentTarget };
+      if (e.pointerType !== 'mouse') {
+        live.current.timer = setTimeout(function () { if (live.current.pending === key) start(key); }, 260);
+      }
+    }
+    function move(e) {
+      var L = live.current;
+      if (!L.key) {
+        if (!L.pending) return;
+        var far = Math.abs(e.clientX - L.x) + Math.abs(e.clientY - L.y);
+        if (e.pointerType === 'mouse' && far > 5) start(L.pending);
+        else if (e.pointerType !== 'mouse' && far > 8) { clearTimeout(L.timer); L.pending = null; return; }
+        else return;
+      }
+      if (!el.current) return;
+      var items = el.current.querySelectorAll('[data-drag]'), list = latest.current.order;
+      for (var n = 0; n < items.length; n++) {
+        var r = items[n].getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+          var to = list.indexOf(items[n].getAttribute('data-drag')), from = list.indexOf(live.current.key);
+          if (to >= 0 && from >= 0 && to !== from) {
+            var next = moved(list, from, to);
+            latest.current.order = next;
+            setTemp(next);
+          }
+          break;
+        }
+      }
+    }
+    function item(key) {
+      return {
+        'data-drag': key,
+        onPointerDown: function (e) { down(e, key); }, onPointerMove: move,
+        onPointerUp: end, onPointerCancel: end,
+        onContextMenu: function (e) { e.preventDefault(); }
+      };
+    }
+    return { box: box.current, order: order, dragging: dragging, item: item };
+  }
+
   LGT.ui = {
-    Icon: Icon, Stars: Stars, Score: Score, Photo: Photo, BlobImage: BlobImage,
+    moved: moved, useDragOrder: useDragOrder, Icon: Icon, Stars: Stars, Score: Score, Photo: Photo, BlobImage: BlobImage,
     useObjectUrl: useObjectUrl, useStore: useStore,
     Sheet: Sheet, Confirm: Confirm, Viewer: Viewer, Screen: Screen
   };

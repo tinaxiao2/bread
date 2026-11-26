@@ -203,7 +203,7 @@
   }
 
   // ---------- the recipe part of a form ----------
-  /** props: recipe, onChange, pending (Blob[] of images not yet saved), onPending, onView, hideSize */
+  /** props: recipe, savedName (its name as saved, when editing), onChange, pending (Blob[] of images not yet saved), onPending, onView, hideSize */
   function RecipeFields(props) {
     var r = props.recipe;
     function set(patch) { props.onChange(Object.assign({}, r, patch)); }
@@ -211,7 +211,7 @@
     var pending = props.pending || [];
     var hasOriginals = (r.originals && r.originals.length) || pending.length;
     // Recipes this one can be attached to as a tweak.
-    var parents = LGT.store.parentChoices(r.name);
+    var parents = LGT.store.parentChoices([r.name, props.savedName]);
     if (r.parent && !parents.some(function (n) { return U.nameKey(n) === U.nameKey(r.parent); })) parents = [r.parent].concat(parents);
     return html`
       ${parents.length ? html`<${Field} label="Parent">
@@ -284,94 +284,32 @@
   /** A photo in the form: one already saved ({photo}) or one just picked ({blob}). */
   function pic(x) { return Object.assign({ key: 'p' + (++picSeq) }, x); }
 
-  /** Move the item at `from` to `to`. */
-  function moved(list, from, to) {
-    var out = list.slice(), item = out.splice(from, 1)[0];
-    out.splice(to, 0, item);
-    return out;
-  }
-
   /**
-   * The bread's photos in order, cover first, with + at the end.
-   * Drag a photo to move it: with a mouse, just drag; on a phone, hold it a moment, then drag.
+   * The bread's photos in order, cover first, with + at the end. Drag a photo to move it.
    * props: items ([{key, photo} | {key, blob}]), onChange(items), onAdd(files), onView({id} | {blob})
    */
   function PhotosField(props) {
-    var items = props.items || [];
-    var ds = useState(null), drag = ds[0], setDrag = ds[1];          // key of the photo being moved
-    var box = useRef(null), live = useRef({}), latest = useRef(props);
-    latest.current = props;
-
-    // While a photo is being moved, a finger on the screen must not scroll the page.
-    useEffect(function () {
-      var el = box.current;
-      if (!el) return undefined;
-      function block(e) { if (live.current.key) e.preventDefault(); }
-      el.addEventListener('touchmove', block, { passive: false });
-      return function () { el.removeEventListener('touchmove', block); };
-    }, []);
-
-    function start(key) { live.current.key = key; setDrag(key); }
-    function end() {
-      clearTimeout(live.current.timer);
-      var was = live.current.key;
-      live.current = { justDragged: !!was };
-      setDrag(null);
-    }
-    function down(e, key) {
-      if (e.button > 0 || e.target.closest('.x')) return;
-      live.current = { x: e.clientX, y: e.clientY, pending: key, id: e.pointerId, el: e.currentTarget };
-      if (e.pointerType !== 'mouse') {
-        live.current.timer = setTimeout(function () {
-          if (live.current.pending !== key) return;
-          try { live.current.el.setPointerCapture(live.current.id); } catch (err) { /* already released */ }
-          start(key);
-        }, 260);
-      }
-    }
-    function move(e) {
-      var L = live.current;
-      if (!L.key) {
-        if (!L.pending) return;
-        var far = Math.abs(e.clientX - L.x) + Math.abs(e.clientY - L.y);
-        if (e.pointerType === 'mouse' && far > 5) {
-          try { L.el.setPointerCapture(L.id); } catch (err) { /* ignore */ }
-          start(L.pending);
-        } else if (e.pointerType !== 'mouse' && far > 8) {
-          clearTimeout(L.timer); L.pending = null;                 // a swipe: let the page scroll
-          return;
-        } else return;
-      }
-      // Which tile is the pointer over? Move the dragged photo there.
-      var tiles = Array.prototype.slice.call(box.current.querySelectorAll('.photo.has'));
-      var list = latest.current.items, from = list.findIndex(function (i) { return i.key === live.current.key; });
-      for (var n = 0; n < tiles.length; n++) {
-        var r = tiles[n].getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-          if (n !== from && from >= 0) latest.current.onChange(moved(list, from, n));
-          break;
-        }
-      }
-    }
-    function view(it) {
-      if (live.current.justDragged) { live.current.justDragged = false; return; }   // the click that ends a drag
-      props.onView(it.photo ? { id: it.photo.full } : { blob: it.blob });
-    }
+    var items = props.items || [], byKey = {};
+    items.forEach(function (it) { byKey[it.key] = it; });
+    var d = ui.useDragOrder(items.map(function (it) { return it.key; }), function (keys) {
+      props.onChange(keys.map(function (k) { return byKey[k]; }).filter(Boolean));
+    });
     function pick(e) {
       var files = Array.prototype.slice.call(e.target.files || []);
       e.target.value = '';
       if (files.length) props.onAdd(files);
     }
-    return html`<div class=${'photos' + (drag ? ' dragging' : '')} ref=${box}>
-      ${items.map(function (it, n) {
-        return html`<div class=${'photo has' + (drag === it.key ? ' lifted' : '')} key=${it.key}
-            onPointerDown=${function (e) { down(e, it.key); }} onPointerMove=${move}
-            onPointerUp=${end} onPointerCancel=${end} onContextMenu=${function (e) { e.preventDefault(); }}>
-          <button type="button" class="view" aria-label=${'Photo ' + (n + 1)} onClick=${function () { view(it); }}>
+    return html`<div class=${'photos' + (d.dragging ? ' dragging' : '')} ref=${d.box}>
+      ${d.order.map(function (k, n) {
+        var it = byKey[k];
+        if (!it) return null;
+        return html`<div class=${'photo has' + (d.dragging === k ? ' lifted' : '')} key=${k} ...${d.item(k)}>
+          <button type="button" class="view" aria-label=${'Photo ' + (n + 1)}
+            onClick=${function () { props.onView(it.photo ? { id: it.photo.full } : { blob: it.blob }); }}>
             ${it.photo ? html`<${ui.Photo} id=${it.photo.thumb || it.photo.full}/>` : html`<${ui.BlobImage} blob=${it.blob}/>`}
           </button>
           <button type="button" class="x" aria-label="Remove photo"
-            onClick=${function () { props.onChange(items.filter(function (x) { return x.key !== it.key; })); }}><${Icon} name="close"/></button>
+            onClick=${function () { props.onChange(items.filter(function (x) { return x.key !== k; })); }}><${Icon} name="close"/></button>
         </div>`;
       })}
       <div class="photo add">
@@ -383,6 +321,6 @@
 
   LGT.fields = {
     keyed: keyed, Field: Field, Area: Area, IngredientsEditor: IngredientsEditor, BakeEditor: BakeEditor,
-    RecipeFields: RecipeFields, RatingsEditor: RatingsEditor, PhotosField: PhotosField, pic: pic, moved: moved, Chips: Chips
+    RecipeFields: RecipeFields, RatingsEditor: RatingsEditor, PhotosField: PhotosField, pic: pic, Chips: Chips
   };
 })(typeof window !== 'undefined' ? window : globalThis);

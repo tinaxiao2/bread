@@ -4,7 +4,7 @@
   var LGT = root.LGT = root.LGT || {};
   var U = LGT.util, P = LGT.platform;
 
-  var state = { phase: 'loading', slow: false, breads: [], recipes: [], canUpload: false };
+  var state = { phase: 'loading', slow: false, breads: [], recipes: [], toTryOrder: [], canUpload: false };
   var listeners = [];
   var db = null, assets = null, timer = null;
   var got = { breads: false, recipes: false };
@@ -46,6 +46,11 @@
       set({ canUpload: !!assets });
       listen('breads', byDate);
       listen('recipes', byUpdated);
+      // How she has ranked the recipes to try: one small document, written once per drag.
+      db.doc('meta/order').onSnapshot(function (snap) {
+        var d = snap.exists ? snap.data() : null;
+        set({ toTryOrder: d && Array.isArray(d.toTry) ? d.toTry.map(String) : [] });
+      }, function () {});
     });
   }
 
@@ -101,27 +106,30 @@
 
   // A recipe can be attached to a parent recipe. A parent and everything attached to it
   // (at any depth) form one group, shown as one card; each variation in it is a "tweak".
-  function rootKey(f, byKey) {
-    var key = f.key, seen = {};
+  /** The top of a recipe's chain of parents. A parent that no longer exists still names the group. */
+  function rootOf(f, byKey) {
+    var key = f.key, name = f.name, seen = {};
     for (var i = 0; i < 20; i++) {
       seen[key] = true;
-      var up = U.nameKey(byKey[key].parent);
-      if (!up || !byKey[up] || seen[up]) return key;
-      key = up;
+      var fam = byKey[key];
+      if (!fam) return { key: key, name: name };                        // a parent with no recipe of its own
+      var up = U.nameKey(fam.parent);
+      if (!up || seen[up]) return { key: key, name: fam.name };
+      name = fam.parent; key = up;
     }
-    return key;
+    return { key: key, name: name };
   }
   /** Every group: { key, name, root, families, tweaks (oldest first), latest, breads, baked }, most recent first. */
   function groups() {
     var fams = families(), byKey = {}, map = {}, out = [];
     fams.forEach(function (f) { byKey[f.key] = f; });
     fams.forEach(function (f) {
-      var k = rootKey(f, byKey);
-      if (!map[k]) { map[k] = { key: k, root: byKey[k], families: [] }; out.push(map[k]); }
-      map[k].families.push(f);
+      var top = rootOf(f, byKey);
+      if (!map[top.key]) { map[top.key] = { key: top.key, name: top.name, root: byKey[top.key] || null, families: [] }; out.push(map[top.key]); }
+      map[top.key].families.push(f);
     });
     out.forEach(function (g) {
-      g.name = g.root.name;
+      if (g.root) g.name = g.root.name;
       g.tweaks = [].concat.apply([], g.families.map(function (f) { return f.variations; })).sort(byCreated);
       g.breads = [].concat.apply([], g.families.map(function (f) { return f.breads; })).sort(function (a, b) {
         return String(b.date || '').localeCompare(String(a.date || '')) || (b.createdAt || 0) - (a.createdAt || 0);
@@ -130,6 +138,24 @@
       g.baked = g.breads.length > 0;
     });
     return out.sort(function (a, b) { return mostRecentFirst(a.latest, b.latest); });
+  }
+  /** Recipes to try, in the order she ranked them; ones not ranked yet come last, newest first. */
+  function toTry() {
+    var list = groups().filter(function (g) { return !g.baked; }), rank = {};
+    state.toTryOrder.forEach(function (k, i) { if (!(k in rank)) rank[k] = i; });
+    return list.map(function (g, i) { return [g, i]; }).sort(function (a, b) {
+      var x = a[0].key in rank ? rank[a[0].key] : Infinity, y = b[0].key in rank ? rank[b[0].key] : Infinity;
+      return x === y ? a[1] - b[1] : x - y;
+    }).map(function (x) { return x[0]; });
+  }
+  function setToTryOrder(keys) {
+    // keep the place of anything ranked that is not on the list right now (being baked, say)
+    var shown = {}, kept = [];
+    keys.forEach(function (k) { shown[k] = true; });
+    state.toTryOrder.forEach(function (k) { if (!shown[k]) kept.push(k); });
+    var next = keys.concat(kept);
+    set({ toTryOrder: next });
+    return db.doc('meta/order').set({ toTry: next });
   }
   /** The group a saved recipe belongs to. */
   function groupOf(r) {
@@ -143,12 +169,17 @@
     for (var i = 0; i < g.tweaks.length; i++) if (g.tweaks[i].id === r.id) return { n: i + 1, of: g.tweaks.length };
     return { n: 1, of: 1 };
   }
-  /** Recipes a recipe of this name can be attached to: every group but its own. */
-  function parentChoices(name) {
-    var key = U.nameKey(name), own = null;
+  /**
+   * Recipes a recipe can be attached to: those with no parent of their own, other than itself
+   * and anything already attached to it. `names` are the recipe's names (as typed, and as saved).
+   */
+  function parentChoices(names) {
+    var keys = (Array.isArray(names) ? names : [names]).map(U.nameKey).filter(Boolean), own = {};
     var all = groups();
-    all.forEach(function (g) { if (g.families.some(function (f) { return f.key === key; })) own = g.key; });
-    return all.filter(function (g) { return g.key !== own && g.key !== key; }).map(function (g) { return g.name; });
+    all.forEach(function (g) {
+      if (keys.indexOf(g.key) >= 0 || g.families.some(function (f) { return keys.indexOf(f.key) >= 0; })) own[g.key] = true;
+    });
+    return all.filter(function (g) { return !own[g.key]; }).map(function (g) { return g.name; });
   }
 
   /** Recipe names, most recently used first. */
@@ -352,6 +383,12 @@
     state.recipes.forEach(function (r) {
       if (!ids[r.id] && U.nameKey(r.parent) === key) jobs.push(db.collection('recipes').doc(r.id).update({ parent: newName }));
     });
+    var at = state.toTryOrder.indexOf(key);
+    if (at >= 0) {
+      var order = state.toTryOrder.slice();
+      order[at] = U.nameKey(newName);
+      jobs.push(setToTryOrder(order));
+    }
     return Promise.all(jobs);
   }
 
@@ -367,7 +404,7 @@
   LGT.store = {
     init: init, subscribe: subscribe, getState: getState,
     bread: bread, recipe: recipe, breadsOf: breadsOf,
-    family: family, families: families, familyByKey: familyByKey, groups: groups, groupOf: groupOf, tweakOf: tweakOf,
+    family: family, families: families, familyByKey: familyByKey, groups: groups, groupOf: groupOf, tweakOf: tweakOf, toTry: toTry, setToTryOrder: setToTryOrder,
     parentChoices: parentChoices, names: names, otherNames: otherNames, types: types, sources: sources,
     saveBread: saveBread, deleteBread: deleteBread, saveRecipes: saveRecipes, deleteRecipe: deleteRecipe
   };
