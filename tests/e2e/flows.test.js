@@ -719,6 +719,7 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   const tile = (label) => page.locator('.stat', { has: page.locator('> .label', { hasText: new RegExp('^[^A-Za-z]*' + label + '$', 'i') }) }).locator('> b');
   assert.equal(await tile('Recipes').innerText(), '2', 'every recipe, baked or to try');
   assert.equal(await tile('Countries').first().innerText(), '1');
+  assert.equal(await page.locator('.lrow .n').innerText(), '1 / 1', 'countries baked from, of all');
 
   // a recipe not baked yet counts too, and shows in gray
   await page.getByRole('button', { name: 'Recipes', exact: true }).click();
@@ -731,6 +732,7 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await formGone(page);
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   assert.match(await page.locator('.countries .crow').innerText(), /China\s+1 \/ 2/);
+  assert.equal(await page.locator('.lrow .n').innerText(), '1 / 1');
   await page.locator('.countries .crow').click();
   assert.deepEqual(await page.locator('.crecipes button').allInnerTexts(), ['Bao', 'Mantou']);
   assert.deepEqual(await page.locator('.crecipes .untried').allInnerTexts(), ['Bao']);

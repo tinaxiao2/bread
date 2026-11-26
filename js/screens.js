@@ -801,7 +801,8 @@
           <${Pick} item=${st.highestRated} nav=${nav}>${st.highestRated ? html`<${ui.Score} value=${st.highestRated.rating}/>` : null}<//>
         </div>
         <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⏱️</span>Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
-        ${st.countries.length ? html`<div class="stat wide"><span class="label"><span class="em" aria-hidden="true">🗺️</span>Countries</span>
+        ${st.countries.length ? html`<div class="stat wide"><div class="lrow"><span class="label"><span class="em" aria-hidden="true">🗺️</span>Countries</span>
+          <span class="n">${st.countries.filter(function (c) { return c.tried; }).length} / ${st.countries.length}</span></div>
           <ul class="countries">
             ${st.countries.map(function (c) {
               var on = !!open[c.flag];
