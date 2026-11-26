@@ -241,6 +241,11 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .stat b { display: block; font-size: 34px; font-weight: 650; line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .stat b.serif { font-size: 28px; font-weight: 640; }
 .stat small { display: block; margin-top: 4px; font-size: 14px; font-weight: 650; color: var(--ink2); }
+.stat .pick { display: flex; align-items: baseline; gap: 10px; width: 100%; min-width: 0; text-align: left; }
+.stat .pick b.serif { flex: 0 1 auto; min-width: 0; font-size: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.stat .pick small { flex: none; margin: 0; }
+.stat .pick .score { flex: none; font-size: 15px; }
+.stat .pick .score svg { width: 14px; height: 14px; }
 .list + .list { margin-top: 11px; }
 .list.ranked .rc { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .list.ranked.dragging .rc { transition: transform .12s; }

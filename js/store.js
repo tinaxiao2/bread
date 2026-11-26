@@ -248,16 +248,29 @@
       }
       if (!isBakedBread(b)) return;                       // the favourite is the most baked: dated entries only
       var g = r ? groupOfRecipe[r.id] : null, key = g ? 'g:' + g.key : 'n:' + U.nameKey(b.name);
-      if (!tally[key]) tally[key] = { name: g ? g.name : b.name, flag: groupFlag(g), count: 0, best: 0, last: '' };
-      var t = tally[key];
+      if (!tally[key]) tally[key] = { name: g ? g.name : b.name, flag: groupFlag(g), count: 0, best: 0, last: '', lastBread: null, bestBread: null };
+      var t = tally[key], x = U.rating(b) || 0;
       t.count++;
-      t.best = Math.max(t.best, U.rating(b) || 0);
-      if (String(b.date || '') > t.last) t.last = String(b.date || '');
+      if (x > t.best || !t.bestBread) { t.best = x; t.bestBread = b; }
+      if (String(b.date || '') > t.last || !t.lastBread) { t.last = String(b.date || ''); t.lastBread = b; }
     });
-    var favorite = Object.keys(tally).map(function (k) { return tally[k]; }).sort(function (a, b) {
+    var all = Object.keys(tally).map(function (k) { return tally[k]; });
+    /** Where tapping it goes: the recipe's page, on the recipe of that bake, or the bread's own page. */
+    function pick(t, b) {
+      return t ? { name: t.name, flag: t.flag, count: t.count, rating: t.best || null,
+        open: b.recipeId && recipe(b.recipeId) ? { kind: 'recipe', id: b.recipeId } : { kind: 'bread', id: b.id } } : null;
+    }
+    var fav = all.slice().sort(function (a, b) {
       return (b.count - a.count) || (b.best - a.best) || b.last.localeCompare(a.last);
-    })[0] || null;
-    return { flourGrams: flour, loaves: bakedOf(state.breads).length, favorite: favorite, minutes: minutes };
+    })[0];
+    var top = all.filter(function (t) { return t.best > 0; }).sort(function (a, b) {
+      return (b.best - a.best) || (b.count - a.count) || b.last.localeCompare(a.last);
+    })[0];
+    return {
+      flourGrams: flour, loaves: bakedOf(state.breads).length, minutes: minutes,
+      favorite: fav ? pick(fav, fav.lastBread) : null,
+      highestRated: top ? pick(top, top.bestBread) : null
+    };
   }
 
   /** Recipe names, most recently used first. */

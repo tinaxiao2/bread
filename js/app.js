@@ -64,7 +64,7 @@
 
     return html`<div class="shell">
       <div class="main" ref=${mainRef}>
-        ${tab === 'stats' ? html`<${S.Stats} state=${st}/>` : tab === 'recipes'
+        ${tab === 'stats' ? html`<${S.Stats} state=${st} nav=${nav}/>` : tab === 'recipes'
           ? html`<${S.Recipes} state=${st} nav=${nav} seg=${seg} onSeg=${setSeg} onAdd=${function () { setAdding('sheet'); }}/>`
           : html`<${S.Gallery} state=${st} nav=${nav}/>`}
       </div>

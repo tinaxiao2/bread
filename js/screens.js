@@ -723,15 +723,43 @@
   }
 
   // ---------- Stats ----------
+  /**
+   * A named stat: tap the name to open its recipe (or the bread, when it has no recipe).
+   * The name stays on one line: a long one is set smaller until it fits.
+   */
+  function Pick(props) {
+    var x = props.item, ref = useRef(null);
+    function fit() {
+      var el = ref.current;
+      if (!el) return;
+      el.style.fontSize = '';
+      var size = parseFloat(getComputedStyle(el).fontSize);
+      while (el.scrollWidth > el.clientWidth + 1 && size > 15) { size -= 1; el.style.fontSize = size + 'px'; }
+    }
+    H.useLayoutEffect(fit);
+    useEffect(function () {
+      // measure again once the serif font has loaded, and when the screen changes size
+      if (root.document.fonts && root.document.fonts.ready) root.document.fonts.ready.then(fit);
+      root.addEventListener('resize', fit);
+      return function () { root.removeEventListener('resize', fit); };
+    }, []);
+    if (!x) return html`<b>–</b>`;
+    return html`<button type="button" class="pick" onClick=${function () { props.nav.push(x.open); }}>
+      <b class="serif" ref=${ref}><${ui.Named} flag=${x.flag} name=${x.name}/></b>${props.children}
+    </button>`;
+  }
   function Stats(props) {
-    var st = store.stats(), fav = st.favorite;
+    var st = store.stats(), nav = props.nav;
     return html`<div class="wrap">
       <div class="top"><h1 class="serif">Stats</h1></div>
       <div class="stats">
         <div class="stat"><span class="label">Flour used</span><b>${U.fmtWeight(st.flourGrams)}</b></div>
         <div class="stat"><span class="label">Loaves</span><b>${st.loaves}</b></div>
         <div class="stat wide"><span class="label">Favorite</span>
-          ${fav ? html`<b class="serif"><${ui.Named} flag=${fav.flag} name=${fav.name}/></b><small>${fav.count}×</small>` : html`<b>–</b>`}
+          <${Pick} item=${st.favorite} nav=${nav}>${st.favorite ? html`<small>${st.favorite.count}×</small>` : null}<//>
+        </div>
+        <div class="stat wide"><span class="label">Highest rated</span>
+          <${Pick} item=${st.highestRated} nav=${nav}>${st.highestRated ? html`<${ui.Score} value=${st.highestRated.rating}/>` : null}<//>
         </div>
         <div class="stat wide"><span class="label">Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
       </div>

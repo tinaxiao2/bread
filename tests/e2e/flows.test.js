@@ -558,7 +558,7 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
     'recipes/b': r('sandwich bread', 2, ['3', 'cup'], { program: 1, size: '1.5', minutes: 205 }),
     'breads/1': b('Mantou', 'a', 1), 'breads/2': b('Mantou', 'a', 2),
     'breads/3': b('Mantou', 'a', 3, { splitFrom: '2' }),            // same dough as entry 2
-    'breads/4': b('sandwich bread', 'b', 4), 'breads/5': b('Mystery', null, 5)
+    'breads/4': b('sandwich bread', 'b', 4, { ratings: { crust: 5, crumb: 4.5, taste: 4 } }), 'breads/5': b('Mystery', null, 5)
   } });
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
@@ -569,6 +569,20 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
   assert.equal(await stat('Favorite').locator('small').innerText(), '3×');
   // time: (90 + 30) twice, nothing more for the split copy, plus 205
   assert.equal(await stat('Time spent').locator('b').innerText(), '7 h 25 min');
+  assert.equal(await stat('Highest rated').locator('b').innerText(), 'sandwich bread');
+  assert.equal(await stat('Highest rated').locator('.score').innerText(), '4.5');
+  for (const label of ['Favorite', 'Highest rated']) {
+    const box = await stat(label).locator('.pick').boundingBox();
+    assert.ok(box.height < 40, label + ' fits on one line');
+  }
+
+  // tapping a name opens its recipe
+  await stat('Highest rated').locator('.pick').click();
+  assert.equal(await page.locator('.screen h2').innerText(), 'sandwich bread');
+  await page.getByRole('button', { name: 'Back' }).click();
+  await stat('Favorite').locator('.pick').click();
+  assert.equal(await page.locator('.screen h2').innerText(), 'Mantou');
+  await page.getByRole('button', { name: 'Back' }).click();
 
   // an undated entry adds its flour straight away, but is a loaf only once it has a date
   await page.getByRole('button', { name: 'Add bread' }).click();

@@ -163,8 +163,11 @@ These are decisions the owner made. Keep them.
   Photos picked together are added in the order picked. iPhone always shows its own menu
   (Photo Library / Take Photo / Choose File) for a web page's file picker; a page cannot
   skip it, so do not try.
-- **Stats** (third tab): flour used, loaves, favorite and time spent, all derived in
-  `store.stats`. Loaves and the favorite count baked (dated) entries; flour and time
+- **Stats** (third tab): flour used, loaves, favorite, highest rated and time spent, all derived in
+  `store.stats`. Highest rated is the label (or recipe) with the best-rated bake (ties: more
+  baked, then more recent). Tapping the favorite's or highest rated's name opens its recipe page
+  (on the recipe of the latest or best bake), or the bread when it has no recipe. Those names
+  stay on one line: a long one is set smaller until it fits. Loaves and the favorite count baked (dated) entries; flour and time
   count every entry. Flour in cups or spoons is converted at about 120 g a
   cup. Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
   (flour, machine time, proofing) is counted once, with the entry it came from. The favorite
