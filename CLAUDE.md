@@ -178,10 +178,10 @@ These are decisions the owner made. Keep them.
   fit. **Countries** lists where the recipes are from: every recipe once (baked or to try), by its
   flag or else its label's, most first; recipes with no flag are left out. Each row shows
   "baked / all" (no label) and taps open to list its recipes A to Z, the ones not baked yet in
-  gray; tapping one opens its recipe page. At the right of the list's heading: countries with a
-  baked recipe / all countries. Loaves and the favorite count baked (dated) entries; flour and time
+  gray; tapping one opens its recipe page. At the right of the list's heading: recipes tried
+  / all recipes, across every country listed. Loaves and the favorite count baked (dated) entries; flour and time
   count every entry. Flour in cups or spoons is converted at about 120 g a
-  cup. Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
+  cup, and flour is shown in pounds (`util.fmtWeight`). Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
   (flour, machine time, proofing) is counted once, with the entry it came from. The favorite
   is the label (or recipe with no label) with the most entries.
 - **Split** on a bread's page opens a copy of the entry (name, date, photo, ratings, comments,

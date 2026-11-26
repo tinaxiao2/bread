@@ -327,8 +327,10 @@ test('stats arithmetic: flour in grams, time spent, and how they read', () => {
   assert.equal(U.minutesSpent({ programs: [8], minutes: 90, proofMinutes: 45, ovenMinutes: 20 }), 155);
   assert.equal(U.minutesSpent({ programs: [8], minutes: 90, proofMinutes: 45, ovenMinutes: 20 }, true), 20, 'a split copy: only its own baking');
   assert.equal(U.minutesSpent(null), 0);
-  assert.equal(U.fmtWeight(850), '850 g');
-  assert.equal(U.fmtWeight(4385), '4.4 kg');
+  assert.equal(U.fmtWeight(850), '1.9 lb');
+  assert.equal(U.fmtWeight(1360), '3 lb');
+  assert.equal(U.fmtWeight(57000), '126 lb');
+  assert.equal(U.fmtWeight(0), '0 lb');
   assert.equal(U.fmtSpan(0), '0 min');
   assert.equal(U.fmtSpan(205), '3 h 25 min');
   assert.equal(U.fmtSpan(3000), '2 d 2 h');

@@ -376,10 +376,10 @@
     }
     return sum + (b.added || 0) + (b.ovenMinutes || 0);
   }
-  /** "850 g" or "2.4 kg". */
+  /** Grams as pounds, the way the owner reads weight: "1.9 lb", "3 lb", "126 lb". */
   function fmtWeight(g) {
-    g = Math.round(g || 0);
-    return g < 1000 ? g + ' g' : (Math.round(g / 100) / 10) + ' kg';
+    var lb = (g || 0) / 453.592;
+    return (lb >= 100 ? Math.round(lb) : Math.round(lb * 10) / 10) + ' lb';
   }
   /** "45 min", "3 h 25 min", "2 d 4 h". */
   function fmtSpan(min) {

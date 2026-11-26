@@ -802,7 +802,7 @@
         </div>
         <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⏱️</span>Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
         ${st.countries.length ? html`<div class="stat wide"><div class="lrow"><span class="label"><span class="em" aria-hidden="true">🗺️</span>Countries</span>
-          <span class="n">${st.countries.filter(function (c) { return c.tried; }).length} / ${st.countries.length}</span></div>
+          <span class="n">${st.countries.reduce(function (n, c) { return n + c.tried; }, 0)} / ${st.countries.reduce(function (n, c) { return n + c.count; }, 0)}</span></div>
           <ul class="countries">
             ${st.countries.map(function (c) {
               var on = !!open[c.flag];
