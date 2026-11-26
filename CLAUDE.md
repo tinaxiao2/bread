@@ -103,7 +103,8 @@ These are decisions the owner made. Keep them.
 - **Recipes tab**: one card per label (or per recipe with no label). A label with several recipes
   shows "N recipes" like the rating: icon and text, no background.
 - **Recipe page**: at the top, a carousel of every photo of every bake under the label (newest
-  bake first; dots, or "3 / 14" past 10 photos); the label as the heading; arrow buttons step between its recipes (in the
+  bake first; dots, or "3 / 14" past 10 photos); the label as the heading, with a pencil to rename
+  it ("Edit parent": every recipe under it, its flag and its To try place follow, `store.renameLabel`); arrow buttons step between its recipes (in the
   order made; it opens on the one baked last); below, that recipe's tweaks I, II, III, with the
   ingredient lines that differ from I highlighted.
 - **Flags**: a recipe can carry a country flag, picked beside the Name field. It is kept the
@@ -171,7 +172,9 @@ These are decisions the owner made. Keep them.
   (on the recipe of the latest or best bake), or the bread when it has no recipe. Those two names
   stay on one line and at one size: when either is too long, both are set smaller until both
   fit. **Countries** lists where the recipes are from: every recipe once (baked or to try), by its
-  flag or else its label's, most first; recipes with no flag are left out. Loaves and the favorite count baked (dated) entries; flour and time
+  flag or else its label's, most first; recipes with no flag are left out. Each row shows
+  "baked / all" (no label) and taps open to list its recipes A to Z, the ones not baked yet in
+  gray; tapping one opens its recipe page. Loaves and the favorite count baked (dated) entries; flour and time
   count every entry. Flour in cups or spoons is converted at about 120 g a
   cup. Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
   (flour, machine time, proofing) is counted once, with the entry it came from. The favorite

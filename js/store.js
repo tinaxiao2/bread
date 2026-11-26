@@ -196,6 +196,32 @@
     set({ labelFlags: next });
     return db.doc('meta/labels').set({ flags: next });
   }
+  /**
+   * Rename a label: every recipe filed under it moves to the new name, with its flag and its
+   * place in the To try ranking.
+   */
+  function renameLabel(oldName, newName) {
+    var from = U.nameKey(oldName), to = String(newName || '').trim();
+    if (!from || !to || to === String(oldName).trim()) return Promise.resolve();
+    var jobs = lines().filter(function (l) { return U.nameKey(l.parent) === from; }).map(function (l) {
+      return setShared(l, { parent: to });
+    });
+    var flag = labelFlag(oldName);
+    if (flag && U.nameKey(to) !== from) {
+      var flags = Object.assign({}, state.labelFlags);
+      delete flags[from];
+      if (!flags[U.nameKey(to)]) flags[U.nameKey(to)] = flag;
+      set({ labelFlags: flags });
+      jobs.push(db.doc('meta/labels').set({ flags: flags }));
+    }
+    var oldKey = 'label:' + from, newKey = 'label:' + U.nameKey(to);
+    if (oldKey !== newKey && state.toTryOrder.indexOf(oldKey) >= 0) {
+      var order = state.toTryOrder.map(function (k) { return k === oldKey ? newKey : k; });
+      set({ toTryOrder: order });
+      jobs.push(db.doc('meta/order').set({ toTry: order }));
+    }
+    return Promise.all(jobs);
+  }
   /** What the Parent list offers: the labels already in use, A to Z. A new one is typed in. */
   function parentChoices() {
     return labels().slice().sort(function (a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }); });
@@ -262,12 +288,17 @@
       return (b.best - a.best) || (b.count - a.count) || b.last.localeCompare(a.last);
     })[0];
     // Where the recipes are from: every recipe once, baked or to try, by its flag or its label's.
+    // Each country lists its recipes A to Z, and how many of them have been baked.
     var byFlag = {};
     lines().forEach(function (l) {
       var f = l.flag || (l.parent ? labelFlag(l.parent) : '');
-      if (f) byFlag[f] = (byFlag[f] || 0) + 1;
+      if (f) (byFlag[f] = byFlag[f] || []).push(l);
     });
-    var countries = Object.keys(byFlag).map(function (f) { return { flag: f, count: byFlag[f] }; }).sort(function (a, b) {
+    var countries = Object.keys(byFlag).map(function (f) {
+      var list = byFlag[f].slice().sort(function (a, b) { return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }); });
+      return { flag: f, count: list.length, tried: list.filter(function (l) { return l.baked; }).length,
+        recipes: list.map(function (l) { return { name: l.name, flag: l.flag, baked: l.baked, id: l.latest.id }; }) };
+    }).sort(function (a, b) {
       return (b.count - a.count) || U.flagName(a.flag).localeCompare(U.flagName(b.flag));
     });
     return {
@@ -531,7 +562,7 @@
     groups: groups, groupOf: groupOf, groupByKey: groupByKey, toTry: toTry, setToTryOrder: setToTryOrder,
     stats: stats, isBakedBread: isBakedBread, bakedOf: bakedOf,
     recipeFlag: recipeFlag, breadFlag: breadFlag, groupFlag: groupFlag, flagsUsed: flagsUsed, labels: labels,
-    labelFlag: labelFlag, parentChoices: parentChoices,
+    labelFlag: labelFlag, parentChoices: parentChoices, renameLabel: renameLabel,
     names: names, otherNames: otherNames, types: types, sources: sources,
     saveBread: saveBread, deleteBread: deleteBread, saveRecipes: saveRecipes, deleteRecipe: deleteRecipe
   };

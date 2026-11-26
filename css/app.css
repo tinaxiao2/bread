@@ -155,6 +155,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .hero img { width: 100%; height: 100%; object-fit: cover; }
 .page { padding: 16px 20px calc(var(--bottom) + 40px); }
 .page.nohero { padding-top: calc(var(--top) + 66px); }
+.page h2 .round.sm { display: inline-grid; width: 34px; height: 34px; margin-left: 10px; vertical-align: 4px; }
+.page h2 .round.sm .icon { width: 16px; height: 16px; }
 .page h2 { font-size: 27px; font-weight: 640; letter-spacing: -0.015em; line-height: 1.15; }
 .page .date { font-size: 13.5px; color: var(--ink2); margin-top: 3px; }
 .tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
@@ -235,7 +237,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(60, 40, 20, .18); }
 .seg small { font-size: 12px; font-weight: 650; color: var(--ink3); }
 .list { padding: 0 16px; display: grid; gap: 11px; }
-.stats { padding: 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stats { padding: 0 16px 96px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .stat { min-width: 0; padding: 14px 16px 16px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 8px 18px -15px rgba(90, 60, 25, .55); }
 .stat.wide { grid-column: 1 / -1; }
 .stat .label { margin-bottom: 6px; }
@@ -247,11 +249,18 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .stat .pick small { flex: none; margin: 0; }
 .stat .pick .score { flex: none; font-size: 15px; }
 .stat .pick .score svg { width: 14px; height: 14px; }
-.countries li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #EEE9E0; font-size: 15px; font-weight: 600; }
-.countries li:last-child { border-bottom: 0; padding-bottom: 0; }
-.countries li .fl { font-size: 20px; line-height: 1; }
-.countries li span:not(.fl) { flex: 1; min-width: 0; }
-.stat .countries li b { display: inline; font-size: 15px; font-weight: 700; color: var(--ink2); letter-spacing: 0; }
+.countries li { border-bottom: 1px solid #EEE9E0; }
+.countries li:last-child { border-bottom: 0; }
+.countries .crow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 0; text-align: left; font-size: 15px; font-weight: 600; color: var(--ink); }
+.countries li:last-child:not(.open) .crow { padding-bottom: 0; }
+.countries .fl { font-size: 20px; line-height: 1; }
+.countries .cname { flex: 1; min-width: 0; }
+.stat .countries .crow b { display: inline; font-size: 15px; font-weight: 700; color: var(--ink2); letter-spacing: 0; }
+.countries .crow .icon { width: 15px; height: 15px; color: var(--ink3); transition: transform .15s; }
+.countries li.open .crow .icon { transform: rotate(90deg); }
+.crecipes { display: flex; flex-direction: column; padding: 0 0 8px 30px; }
+.crecipes button { text-align: left; padding: 6px 0; font-size: 14.5px; font-weight: 600; color: var(--crust-d); }
+.crecipes button.untried { color: var(--ink3); font-weight: 500; }
 .list + .list { margin-top: 11px; }
 .list.ranked .rc { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .list.ranked.dragging .rc { transition: transform .12s; }

@@ -304,6 +304,28 @@ test('a label gathers recipes; arrows step between them', async (t) => {
   await count(titled('White bread').filter({ hasNot: page.locator('.count') }).locator('h3 .fl'), 0);
   assert.match(await label.innerText(), /Baked 2×[\s\S]*2 recipes/);
 
+  // where they are from: tap a country for its recipes, the ones not baked yet in gray
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  const us = page.locator('.countries li', { hasText: 'United States' });
+  assert.match(await us.locator('.crow').innerText(), /United States\s+2 \/ 2/, 'the label\'s flag counts for its recipes');
+  await us.locator('.crow').click();
+  assert.deepEqual(await us.locator('.crecipes button').allInnerTexts(), ['Classic White Sandwich Bread', 'Country White Bread']);
+  await us.locator('.crecipes button', { hasText: 'Country White Bread' }).click();
+  assert.match(await page.locator('.pager h3').innerText(), /Country White Bread/);
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
+
+  // the parent's name can be edited on its page; everything under it follows
+  await titled('Mantou').locator('.open').click();
+  await page.getByRole('button', { name: 'Edit parent' }).click();
+  await field(page, 'Parent name').fill('Chinese steamed buns');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+  await page.locator('.screen h2', { hasText: 'Chinese steamed buns' }).waitFor();
+  await count(page.locator('.pager'), 1);
+  await page.getByRole('button', { name: 'Back' }).click();
+  await count(titled('Mantou'), 0);
+  assert.match(await titled('Chinese steamed buns').innerText(), /2 recipes/);
+
   // taking a recipe out of a label gives it its own card
   await label.locator('.open').click();
   assert.equal(await page.locator('.pager h3').innerText(), 'Classic White Sandwich Bread');
@@ -688,7 +710,24 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
 
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   assert.equal(await page.locator('.pick .fl').count(), 0);
-  assert.deepEqual(await page.locator('.countries li').allInnerTexts(), ['\u{1F1E8}\u{1F1F3}\nChina\n1'], 'each recipe once, by its flag');
+  assert.deepEqual(await page.locator('.countries .crow').allInnerTexts(), ['\u{1F1E8}\u{1F1F3}\nChina\n1 / 1'], 'recipes baked, of each country\'s recipes');
+
+  // a recipe not baked yet counts too, and shows in gray
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
+  await page.getByRole('tab', { name: /To try/ }).click();
+  await page.getByRole('button', { name: 'Add recipe' }).click();
+  await page.getByRole('button', { name: 'Type it in' }).click();
+  await field(page, 'Flag').selectOption('CN');
+  await field(page, 'Name').fill('Bao');
+  await save(page);
+  await formGone(page);
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  assert.match(await page.locator('.countries .crow').innerText(), /China\s+1 \/ 2/);
+  await page.locator('.countries .crow').click();
+  assert.deepEqual(await page.locator('.crecipes button').allInnerTexts(), ['Bao', 'Mantou']);
+  assert.deepEqual(await page.locator('.crecipes .untried').allInnerTexts(), ['Bao']);
+  await page.locator('.crecipes .untried').click();
+  assert.match(await page.locator('.screen h2').innerText(), /Bao$/);
 });
 
 test('an entry dated "–" is a plan; giving it a date makes it baked', async (t) => {

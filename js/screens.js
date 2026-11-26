@@ -430,8 +430,14 @@
     var g = line ? store.groups().filter(function (x) { return x.lines.indexOf(line) >= 0; })[0] : store.groupByKey(gkey.current);
     if (g) gkey.current = g.key;
     var v = useState(null), view = v[0], setView = v[1];
+    var rn = useState(null), renaming = rn[0], setRenaming = rn[1];       // the label's name while it is being edited
     useEffect(function () { if (!g) nav.close(props.k); }, [!g]);
     if (!g) return null;
+    function rename() {
+      var to = String(renaming || '').trim();
+      setRenaming(null);
+      if (to) store.renameLabel(g.name, to);
+    }
     var list = g.lines.slice().sort(function (a, b) { return firstMade(a) - firstMade(b); });
     if (!line || list.indexOf(line) < 0) line = list[0];
     var at = list.indexOf(line), many = line.tweaks.length > 1, first = line.tweaks[0];
@@ -451,7 +457,8 @@
       <div class="scroll">
         ${photos.length ? html`<${Hero} photos=${photos} onView=${setView}/>` : null}
         <div class=${'wrap page' + (photos.length ? '' : ' nohero')}>
-          <h2 class="serif">${heading}</h2>
+          <h2 class="serif">${heading}${g.label ? html`<button type="button" class="round sm" aria-label="Edit parent"
+            onClick=${function () { setRenaming(g.name); }}><${Icon} name="edit"/></button>` : null}</h2>
           <div class="tags">
             ${g.baked ? html`<span class="pill">Baked ${g.bakedCount}×</span>` : html`<span class="pill sage">To try</span>`}
             <${RecipeCount} n=${list.length}/>
@@ -490,6 +497,14 @@
         </div>
       </div>
       ${view ? html`<${ui.Viewer} id=${view.id} blob=${view.blob} onClose=${function () { setView(null); }}/>` : null}
+      ${renaming !== null ? html`<${ui.Sheet} title="Edit parent" onClose=${function () { setRenaming(null); }}>
+        <input id="f-parent-name" class="input" value=${renaming} aria-label="Parent name" autocomplete="off" autoFocus
+          onInput=${function (e) { setRenaming(e.target.value); }}
+          onKeyDown=${function (e) { if (e.key === 'Enter') rename(); }}/>
+        <div class="formend">
+          <button type="button" class="btn primary wide" disabled=${!String(renaming).trim()} onClick=${rename}>Save</button>
+        </div>
+      <//>` : null}
     </div>`;
   }
 
@@ -756,6 +771,7 @@
   }
   function Stats(props) {
     var st = store.stats(), nav = props.nav, box = useRef(null);
+    var os = useState({}), open = os[0], setOpen = os[1];
     H.useLayoutEffect(function () { fitNames(box.current); });
     useEffect(function () {
       // measure again once the serif font has loaded, and when the screen changes size
@@ -779,7 +795,21 @@
         ${st.countries.length ? html`<div class="stat wide"><span class="label">Countries</span>
           <ul class="countries">
             ${st.countries.map(function (c) {
-              return html`<li key=${c.flag}><span class="fl" aria-hidden="true">${U.flagEmoji(c.flag)}</span><span>${U.flagName(c.flag)}</span><b>${c.count}</b></li>`;
+              var on = !!open[c.flag];
+              return html`<li key=${c.flag} class=${on ? 'open' : ''}>
+                <button type="button" class="crow" aria-expanded=${on} onClick=${function () {
+                  var next = Object.assign({}, open); next[c.flag] = !on; setOpen(next);
+                }}>
+                  <span class="fl" aria-hidden="true">${U.flagEmoji(c.flag)}</span><span class="cname">${U.flagName(c.flag)}</span>
+                  <b>${c.tried} / ${c.count}</b><${Icon} name="next"/>
+                </button>
+                ${on ? html`<div class="crecipes">
+                  ${c.recipes.map(function (r) {
+                    return html`<button type="button" key=${r.id} class=${r.baked ? '' : 'untried'}
+                      onClick=${function () { nav.push({ kind: 'recipe', id: r.id }); }}>${r.name}</button>`;
+                  })}
+                </div>` : null}
+              </li>`;
             })}
           </ul>
         </div>` : null}
