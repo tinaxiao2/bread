@@ -402,3 +402,10 @@ test('dough timing and proofs follow where the dough is proofed', () => {
   assert.notEqual(U.recipeKey({ bake: two }), U.recipeKey({ bake: U.cleanBake({ programs: [8], minutes: 25, proof: ['fridge'], proofMinutes: 600 }) }), 'another proof is another tweak');
   assert.deepEqual([2, 3, 4, 11, 21].map(U.ordinal), ['2nd', '3rd', '4th', '11th', '21st']);
 });
+
+test('a bread made everywhere is Global, drawn as a loaf', () => {
+  assert.equal(U.cleanFlag('global'), 'GLOBAL');
+  assert.equal(U.flagEmoji('GLOBAL'), '\u{1F35E}');
+  assert.equal(U.flagName('GLOBAL'), 'Global');
+  assert.equal(U.cleanFlag('XX'), '');
+});

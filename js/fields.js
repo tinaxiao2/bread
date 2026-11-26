@@ -34,7 +34,7 @@
   /** A flag for the recipe: a small button showing it, over the phone's own list of countries. */
   function FlagPicker(props) {
     var used = LGT.store.flagsUsed(), seen = {}, list = [];
-    used.concat(U.FLAGS.slice().sort(function (a, b) { return U.flagName(a).localeCompare(U.flagName(b)); })).forEach(function (c) {
+    [U.GLOBAL].concat(used).concat(U.FLAGS.slice().sort(function (a, b) { return U.flagName(a).localeCompare(U.flagName(b)); })).forEach(function (c) {
       if (!seen[c]) { seen[c] = true; list.push(c); }
     });
     var e = U.flagEmoji(props.value);

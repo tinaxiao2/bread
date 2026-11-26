@@ -283,7 +283,10 @@ test('a label gathers recipes; arrows step between them', async (t) => {
       ['–', 'french bread', 'Mantou', 'New…'], 'only the parents in use, A to Z');
     await field(page, 'Parent').selectOption('__new');
     await field(page, 'Parent').fill('White bread');
-    // a label can have its own flag
+    // a label can have its own flag, or the loaf for a bread made everywhere
+    assert.deepEqual((await field(page, 'Parent flag').locator('option').allInnerTexts()).slice(0, 2), ['–', '\u{1F35E} Global']);
+    await field(page, 'Parent flag').selectOption('GLOBAL');
+    assert.equal(await page.locator('.flagpick .fl').last().innerText(), '\u{1F35E}');
     await field(page, 'Parent flag').selectOption('US');
   });
   await bread('Classic White Sandwich Bread', async () => {

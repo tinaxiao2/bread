@@ -329,17 +329,21 @@
     'LT LU LV LY MA MC MD ME MG MH MK ML MM MN MO MR MT MU MV MW MX MY MZ NA NE NG NI NL NO NP NR NZ OM PA PE PG PH PK ' +
     'PL PR PS PT PW PY QA RO RS RU RW SA SB SC SD SE SG SI SK SL SM SN SO SR SS ST SV SY SZ TD TG TH TJ TL TM TN TO TR ' +
     'TT TV TW TZ UA UG US UY UZ VA VC VE VN VU WS XK YE ZA ZM ZW').split(' ');
+  /** Not a country: for breads made everywhere (white bread, say). Drawn as a loaf. */
+  var GLOBAL = 'GLOBAL';
   function cleanFlag(code) {
     code = String(code || '').trim().toUpperCase();
-    return FLAGS.indexOf(code) >= 0 ? code : '';
+    return code === GLOBAL || FLAGS.indexOf(code) >= 0 ? code : '';
   }
   /** The flag emoji for a country code: two regional-indicator letters. */
   function flagEmoji(code) {
     code = cleanFlag(code);
+    if (code === GLOBAL) return '\u{1F35E}';
     return code ? String.fromCodePoint(0x1F1E6 + code.charCodeAt(0) - 65, 0x1F1E6 + code.charCodeAt(1) - 65) : '';
   }
   var regionNames = null;
   function flagName(code) {
+    if (code === GLOBAL) return 'Global';
     try { regionNames = regionNames || new Intl.DisplayNames(['en'], { type: 'region' }); return regionNames.of(code); } catch (e) { return code; }
   }
 
@@ -543,7 +547,7 @@
     cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient, changedLines: changedLines,
     emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake,
     recipeKey: recipeKey, nameKey: nameKey, planRecipeSave: planRecipeSave, roman: roman, tweakName: tweakName, ingredientSummary: ingredientSummary,
-    FLAGS: FLAGS, cleanFlag: cleanFlag, flagEmoji: flagEmoji, flagName: flagName, cleanSource: cleanSource, photosOf: photosOf, flourGrams: flourGrams, minutesSpent: minutesSpent, fmtWeight: fmtWeight, fmtSpan: fmtSpan,
+    FLAGS: FLAGS, GLOBAL: GLOBAL, cleanFlag: cleanFlag, flagEmoji: flagEmoji, flagName: flagName, cleanSource: cleanSource, photosOf: photosOf, flourGrams: flourGrams, minutesSpent: minutesSpent, fmtWeight: fmtWeight, fmtSpan: fmtSpan,
     RATINGS: RATINGS, rating: rating, fmtRating: fmtRating,
     program: program, manualProgram: manualProgram, sizesFor: sizesFor, hasCrust: hasCrust, hasDough: hasDough,
     hasManual: hasManual, programMinutes: programMinutes, totalMinutes: totalMinutes, programLabels: programLabels,

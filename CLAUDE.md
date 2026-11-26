@@ -109,7 +109,8 @@ These are decisions the owner made. Keep them.
   same on every tweak (`store.setShared`) and shows before the name everywhere (`ui.Named`).
   A label can have its own flag, picked beside the Parent field (`store.setLabelFlag`, kept in
   `meta/labels`); without one it shows the flag of its first recipe that has one. Stored as the
-  ISO code, drawn as the emoji.
+  ISO code, drawn as the emoji. The first choice after "–" is **Global** (`GLOBAL`, drawn as 🍞)
+  for breads made everywhere; it sorts and counts like a country named "Global".
 - **Parent is a dropdown**: "–", the labels already in use (never the recipe names), A to Z,
   then "New…" to type a new label.
 - **Recipes to try are ranked** by dragging their rows (same hold-then-drag as photos,
