@@ -769,10 +769,35 @@
       els.forEach(function (el) { el.style.fontSize = size + 'px'; });
     }
   }
+  /** A number tile. Tapping its heading opens it full width with the list behind the number. */
+  function NumberTile(props) {
+    var tappable = !!props.onToggle;
+    var head = html`<span class="label"><span class="em" aria-hidden="true">${props.emoji}</span>${props.label}</span><b>${props.value}</b>`;
+    return html`<div class=${'stat' + (props.wide ? ' wide' : '')}>
+      ${tappable ? html`<button type="button" class="tilehead" aria-expanded=${!!props.open} onClick=${props.onToggle}>${head}</button>` : head}
+      ${props.open ? props.children : null}
+    </div>`;
+  }
+  /** Recipes in a tile's list: each opens its recipe page. */
+  function RecipeLinks(props) {
+    return html`<div class="tlist">
+      ${props.items.map(function (r) {
+        return html`<button type="button" key=${r.id} class=${props.gray && !r.baked ? 'untried' : ''}
+          onClick=${function () { props.nav.push({ kind: 'recipe', id: r.id }); }}>
+          <span><${ui.Named} flag=${r.flag} name=${r.name}/></span>${props.counts ? html`<b>${r.count}×</b>` : null}
+        </button>`;
+      })}
+    </div>`;
+  }
   function Stats(props) {
     var st = store.stats(), nav = props.nav, box = useRef(null);
     var os = useState({}), open = os[0], setOpen = os[1];
-    var fo = useState(false), flourOpen = fo[0], setFlourOpen = fo[1];
+    var ts = useState(null), tile = ts[0], setTile = ts[1];     // the number tile that is open, if any
+    function toggle(name) { return function () { setTile(tile === name ? null : name); }; }
+    var firstRow = tile === 'flour' || tile === 'loaves', secondRow = tile === 'recipes';
+    var mostBaked = st.recipeList.filter(function (r) { return r.count > 0; }).sort(function (a, b) {
+      return (b.count - a.count) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
     H.useLayoutEffect(function () { fitNames(box.current); });
     useEffect(function () {
       // measure again once the serif font has loaded, and when the screen changes size
@@ -784,16 +809,18 @@
     return html`<div class="wrap">
       <div class="top"><h1 class="serif">Stats</h1></div>
       <div class="stats" ref=${box}>
-        <button type="button" class=${'stat tap' + (flourOpen ? ' wide' : '')} aria-expanded=${flourOpen}
-          onClick=${function () { setFlourOpen(!flourOpen); }}>
-          <span class="label"><span class="em" aria-hidden="true">🌾</span>Flour used</span><b>${U.fmtWeight(st.flourGrams)}</b>
-          ${flourOpen && st.flours.length ? html`<ul class="flours">
+        <${NumberTile} emoji="🌾" label="Flour used" value=${U.fmtWeight(st.flourGrams)} wide=${firstRow} open=${tile === 'flour'} onToggle=${toggle('flour')}>
+          ${st.flours.length ? html`<ul class="flours">
             ${st.flours.map(function (f) { return html`<li key=${f.name}><span>${f.name}</span><b>${U.fmtWeight(f.grams)}</b></li>`; })}
           </ul>` : null}
-        </button>
-        <div class=${'stat' + (flourOpen ? ' wide' : '')}><span class="label"><span class="em" aria-hidden="true">🍞</span>Loaves</span><b>${st.loaves}</b></div>
-        <div class="stat"><span class="label"><span class="em" aria-hidden="true">📖</span>Recipes</span><b>${st.recipes}</b></div>
-        <div class="stat"><span class="label"><span class="em" aria-hidden="true">🌍</span>Countries</span><b>${st.countries.length}</b></div>
+        <//>
+        <${NumberTile} emoji="🍞" label="Loaves" value=${st.loaves} wide=${firstRow} open=${tile === 'loaves'} onToggle=${toggle('loaves')}>
+          <${RecipeLinks} items=${mostBaked} counts=${true} nav=${nav}/>
+        <//>
+        <${NumberTile} emoji="📖" label="Recipes" value=${st.recipes} wide=${secondRow} open=${tile === 'recipes'} onToggle=${toggle('recipes')}>
+          <${RecipeLinks} items=${st.recipeList} gray=${true} nav=${nav}/>
+        <//>
+        <${NumberTile} emoji="🌍" label="Countries" value=${st.countries.length} wide=${secondRow}/>
         <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">❤️</span>Most baked</span>
           <${Pick} item=${st.favorite} nav=${nav}>${st.favorite ? html`<small>${st.favorite.count}×</small>` : null}<//>
         </div>

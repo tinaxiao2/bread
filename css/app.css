@@ -251,7 +251,12 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .stat .pick .score svg { width: 14px; height: 14px; }
 .stat .lrow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .stat .lrow .n { padding-right: 25px; font-size: 15px; font-weight: 700; color: var(--ink2); font-variant-numeric: tabular-nums; }
-.stat.tap { text-align: left; cursor: pointer; }
+.stat .tilehead { display: block; width: 100%; text-align: left; color: inherit; }
+.tlist { display: flex; flex-direction: column; margin-top: 10px; }
+.tlist button { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid #EEE9E0; text-align: left; font-size: 15px; font-weight: 600; color: var(--crust-d); }
+.tlist button span { min-width: 0; }
+.tlist button.untried { color: var(--ink3); font-weight: 500; }
+.stat .tlist button b { display: inline; font-size: 15px; line-height: inherit; letter-spacing: 0; font-weight: 700; color: var(--ink2); }
 .flours { margin-top: 10px; }
 .flours li { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid #EEE9E0; font-size: 15px; font-weight: 600; }
 .flours li b { font-weight: 700; color: var(--ink2); font-variant-numeric: tabular-nums; }

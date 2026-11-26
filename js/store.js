@@ -310,6 +310,10 @@
     });
     return {
       flourGrams: flour, loaves: bakedOf(state.breads).length, minutes: minutes, countries: countries, recipes: lines().length,
+      // every recipe A to Z, and the baked ones by how often they were baked
+      recipeList: lines().map(function (l) {
+        return { id: l.latest.id, name: l.name, flag: l.flag || (l.parent ? labelFlag(l.parent) : ''), baked: l.baked, count: l.bakedCount };
+      }).sort(function (a, b) { return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }); }),
       flours: Object.keys(flours).map(function (k) { return flours[k]; }).sort(function (a, b) { return b.grams - a.grams; }),
       favorite: fav ? pick(fav, fav.lastBread) : null,
       highestRated: top ? pick(top, top.bestBread) : null

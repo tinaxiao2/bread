@@ -592,10 +592,21 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
   // flour: 500 g twice (the split copy shares entry 2's dough) + 3 cups at 120 g
   assert.equal(await stat('Flour used').locator('b').first().innerText(), '3 lb', '1,360 g');
   // tap it for the flour by kind
-  await stat('Flour used').click();
+  await stat('Flour used').locator('.tilehead').click();
   assert.deepEqual(await page.locator('.flours li').allInnerTexts(), ['AP flour\n3 lb']);
-  await stat('Flour used').click();
+  await stat('Flour used').locator('.tilehead').click();
   await count(page.locator('.flours'), 0);
+  // Loaves: the recipes by how often they were baked; Recipes: every recipe, the baked ones in brown
+  await stat('Loaves').locator('.tilehead').click();
+  assert.deepEqual(await page.locator('.tlist button').allInnerTexts(), ['Mantou\n3×', 'sandwich bread\n1×']);
+  await stat('Recipes').locator('.tilehead').click();
+  await count(page.locator('.flours'), 0);
+  assert.deepEqual(await page.locator('.tlist button').allInnerTexts(), ['Mantou', 'sandwich bread']);
+  await count(page.locator('.tlist .untried'), 0);
+  await page.locator('.tlist button', { hasText: 'sandwich bread' }).click();
+  assert.equal(await page.locator('.screen h2').innerText(), 'sandwich bread');
+  await page.getByRole('button', { name: 'Back' }).click();
+  await stat('Recipes').locator('.tilehead').click();
   assert.equal(await stat('Loaves').locator('b').innerText(), '5');
   assert.equal(await stat('Most baked').locator('b').innerText(), 'Mantou');
   assert.equal(await stat('Most baked').locator('small').innerText(), '3×');
@@ -716,7 +727,7 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   assert.equal(await page.locator('.pick .fl').count(), 0);
   assert.deepEqual(await page.locator('.countries .crow').allInnerTexts(), ['\u{1F1E8}\u{1F1F3}\nChina\n1 / 1'], 'recipes baked, of each country\'s recipes');
-  const tile = (label) => page.locator('.stat', { has: page.locator('> .label', { hasText: new RegExp('^[^A-Za-z]*' + label + '$', 'i') }) }).locator('> b');
+  const tile = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^[^A-Za-z]*' + label + '$', 'i') }) }).locator('b').first();
   assert.equal(await tile('Recipes').innerText(), '2', 'every recipe, baked or to try');
   assert.equal(await tile('Countries').first().innerText(), '1');
   assert.equal(await page.locator('.lrow .n').innerText(), '1 / 1', 'recipes tried, of all, across countries');
@@ -733,6 +744,9 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   assert.match(await page.locator('.countries .crow').innerText(), /China\s+1 \/ 2/);
   assert.equal(await page.locator('.lrow .n').innerText(), '1 / 2');
+  await page.locator('.stat .tilehead', { hasText: /Recipes/i }).click();
+  assert.deepEqual(await page.locator('.tlist .untried').allInnerTexts(), ['\u{1F1E8}\u{1F1F3}Bao'], 'not baked yet: gray');
+  await page.locator('.stat .tilehead', { hasText: /Recipes/i }).click();
   await page.locator('.countries .crow').click();
   assert.deepEqual(await page.locator('.crecipes button').allInnerTexts(), ['Bao', 'Mantou']);
   assert.deepEqual(await page.locator('.crecipes .untried').allInnerTexts(), ['Bao']);
