@@ -271,10 +271,10 @@ test('a label gathers recipes; arrows step between them', async (t) => {
   await count(page.locator('.screen .hero'), 2, 'every photo under the label, at the top');
   await count(page.locator('.screen .dots button'), 2);
   assert.equal(await page.locator('.pager h3').innerText(), 'Milk Mantou', 'opens on the one baked last');
-  assert.equal(await page.getByRole('button', { name: 'Next recipe' }).isDisabled(), true);
-  await page.getByRole('button', { name: 'Previous recipe' }).click();
+  assert.equal(await page.getByRole('button', { name: 'Previous recipe' }).isDisabled(), true, 'the newest recipe comes first');
+  await page.getByRole('button', { name: 'Next recipe' }).click();
   assert.equal(await page.locator('.pager h3').innerText(), 'Mantou');
-  assert.equal(await page.getByRole('button', { name: 'Previous recipe' }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Next recipe' }).isDisabled(), true);
   await page.getByRole('button', { name: 'Back' }).click();
 
   // filing two new recipes under a new label

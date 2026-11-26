@@ -110,8 +110,8 @@ These are decisions the owner made. Keep them.
 - **Recipe page**: at the top, a carousel of every photo of every bake under the label (newest
   bake first; dots, or "3 / 14" past 10 photos); the label as the heading, with a pencil to rename
   it and pick its cover from its photos ("Edit parent": every recipe under it, its flag, cover and
-  To try place follow, `store.renameLabel`); arrow buttons step between its recipes (in the
-  order made; it opens on the one baked last); below, that recipe's tweaks I, II, III, with the
+  To try place follow, `store.renameLabel`); arrow buttons step between its recipes (newest
+  recipe first; it opens on the one baked last); below, that recipe's tweaks I, II, III, with the
   ingredient lines that differ from I highlighted.
 - **Flags**: a recipe can carry a country flag, picked beside the Name field. It is kept the
   same on every tweak (`store.setShared`) and shows before the name everywhere (`ui.Named`).

@@ -454,7 +454,7 @@
       if (!to) return;
       (editing.picked ? store.setLabelCover(g.name, cover) : Promise.resolve()).then(function () { return store.renameLabel(g.name, to); });
     }
-    var list = g.lines.slice().sort(function (a, b) { return firstMade(a) - firstMade(b); });
+    var list = g.lines.slice().sort(function (a, b) { return firstMade(b) - firstMade(a); });   // newest recipe first
     if (!line || list.indexOf(line) < 0) line = list[0];
     var at = list.indexOf(line), many = line.tweaks.length > 1, first = line.tweaks[0];
     function edit(rv) { nav.push({ kind: 'recipeForm', recipeId: rv.id }); }
