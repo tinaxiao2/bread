@@ -588,7 +588,7 @@ test('the Stats tab adds up flour, loaves, the favourite and time', async (t) =>
     'breads/4': b('sandwich bread', 'b', 4, { ratings: { crust: 5, crumb: 4.5, taste: 4 } }), 'breads/5': b('Mystery', null, 5)
   } });
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
-  const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
+  const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^[^A-Za-z]*' + label + '$', 'i') }) });
   // flour: 500 g twice (the split copy shares entry 2's dough) + 3 cups at 120 g
   assert.equal(await stat('Flour used').locator('b').first().innerText(), '1.4 kg');
   // tap it for the flour by kind
@@ -657,7 +657,7 @@ test('Split marks the copy, so its dough is not counted twice', async (t) => {
   await page.getByRole('heading', { name: 'Split bread' }).waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Back' }).click();
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
-  const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^' + label + '$', 'i') }) });
+  const stat = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^[^A-Za-z]*' + label + '$', 'i') }) });
   assert.equal(await stat('Loaves').locator('b').innerText(), '2');
   assert.equal(await stat('Flour used').locator('b').first().innerText(), '500 g');
   assert.equal(await stat('Time spent').locator('b').innerText(), '2 h 10 min', '25 min of kneading and 65 in the machine once, plus 40 min of Bake');
@@ -716,7 +716,7 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   assert.equal(await page.locator('.pick .fl').count(), 0);
   assert.deepEqual(await page.locator('.countries .crow').allInnerTexts(), ['\u{1F1E8}\u{1F1F3}\nChina\n1 / 1'], 'recipes baked, of each country\'s recipes');
-  const tile = (label) => page.locator('.stat', { has: page.locator('> .label', { hasText: new RegExp('^' + label + '$', 'i') }) }).locator('> b');
+  const tile = (label) => page.locator('.stat', { has: page.locator('> .label', { hasText: new RegExp('^[^A-Za-z]*' + label + '$', 'i') }) }).locator('> b');
   assert.equal(await tile('Recipes').innerText(), '2', 'every recipe, baked or to try');
   assert.equal(await tile('Countries').first().innerText(), '1');
 

@@ -169,7 +169,9 @@ These are decisions the owner made. Keep them.
 - **Stats** (third tab): flour used, loaves, recipes, countries, favorite, highest rated, time spent and the country list, all derived in
   `store.stats`. Tapping Flour used opens it full width with the flour by kind (AP flour, Bread
   flour…), most first; Loaves goes full width beside it while it is open. Two more number
-  tiles: Recipes (every recipe, baked or to try) and Countries (how many countries they are from). Highest rated is the label (or recipe) with the best-rated bake (ties: more
+  tiles: Recipes (every recipe, baked or to try) and Countries (how many countries they are from).
+  Every Stats heading starts with an emoji: 🌾 Flour used, 🍞 Loaves, 📖 Recipes, 🌍 Countries,
+  ❤️ Favorite, ⭐ Highest rated, ⏱️ Time spent, 🗺️ Countries (the list). Highest rated is the label (or recipe) with the best-rated bake (ties: more
   baked, then more recent). Tapping the favorite's or highest rated's name opens its recipe page
   (on the recipe of the latest or best bake), or the bread when it has no recipe. Those two names
   stay on one line and at one size: when either is too long, both are set smaller until both

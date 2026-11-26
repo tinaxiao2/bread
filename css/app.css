@@ -240,6 +240,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .stat { min-width: 0; padding: 14px 16px 16px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 8px 18px -15px rgba(90, 60, 25, .55); }
 .stat.wide { grid-column: 1 / -1; }
 .stat .label { margin-bottom: 6px; }
+.stat .label .em { margin-right: 6px; font-size: 13px; letter-spacing: 0; }
 .stat b { display: block; font-size: 34px; font-weight: 650; line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .stat b.serif { font-size: 28px; font-weight: 640; }
 .stat small { display: block; margin-top: 4px; font-size: 14px; font-weight: 650; color: var(--ink2); }

@@ -786,22 +786,22 @@
       <div class="stats" ref=${box}>
         <button type="button" class=${'stat tap' + (flourOpen ? ' wide' : '')} aria-expanded=${flourOpen}
           onClick=${function () { setFlourOpen(!flourOpen); }}>
-          <span class="label">Flour used</span><b>${U.fmtWeight(st.flourGrams)}</b>
+          <span class="label"><span class="em" aria-hidden="true">🌾</span>Flour used</span><b>${U.fmtWeight(st.flourGrams)}</b>
           ${flourOpen && st.flours.length ? html`<ul class="flours">
             ${st.flours.map(function (f) { return html`<li key=${f.name}><span>${f.name}</span><b>${U.fmtWeight(f.grams)}</b></li>`; })}
           </ul>` : null}
         </button>
-        <div class=${'stat' + (flourOpen ? ' wide' : '')}><span class="label">Loaves</span><b>${st.loaves}</b></div>
-        <div class="stat"><span class="label">Recipes</span><b>${st.recipes}</b></div>
-        <div class="stat"><span class="label">Countries</span><b>${st.countries.length}</b></div>
-        <div class="stat wide"><span class="label">Favorite</span>
+        <div class=${'stat' + (flourOpen ? ' wide' : '')}><span class="label"><span class="em" aria-hidden="true">🍞</span>Loaves</span><b>${st.loaves}</b></div>
+        <div class="stat"><span class="label"><span class="em" aria-hidden="true">📖</span>Recipes</span><b>${st.recipes}</b></div>
+        <div class="stat"><span class="label"><span class="em" aria-hidden="true">🌍</span>Countries</span><b>${st.countries.length}</b></div>
+        <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">❤️</span>Favorite</span>
           <${Pick} item=${st.favorite} nav=${nav}>${st.favorite ? html`<small>${st.favorite.count}×</small>` : null}<//>
         </div>
-        <div class="stat wide"><span class="label">Highest rated</span>
+        <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⭐</span>Highest rated</span>
           <${Pick} item=${st.highestRated} nav=${nav}>${st.highestRated ? html`<${ui.Score} value=${st.highestRated.rating}/>` : null}<//>
         </div>
-        <div class="stat wide"><span class="label">Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
-        ${st.countries.length ? html`<div class="stat wide"><span class="label">Countries</span>
+        <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⏱️</span>Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
+        ${st.countries.length ? html`<div class="stat wide"><span class="label"><span class="em" aria-hidden="true">🗺️</span>Countries</span>
           <ul class="countries">
             ${st.countries.map(function (c) {
               var on = !!open[c.flag];
