@@ -59,8 +59,8 @@
     return html`<button type="button" class=${'tile' + (has ? ' has' : '')} onClick=${props.onOpen}>
       ${has ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
       ${U.photosOf(b).length > 1 ? html`<span class="many" aria-hidden="true"><${Icon} name="image"/></span>` : null}
-      ${U.isBaked(r ? r.bake : null) ? null : html`<span class="flag">Dough</span>`}
-      <span class="meta"><${ui.Score} value=${U.rating(b)}/><b><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></b><small>${U.fmtDate(b.date) || '–'}</small></span>
+      <span class="tl">${U.isBaked(r ? r.bake : null) ? null : html`<span class="flag">Dough</span>`}<${ui.Score} value=${U.rating(b)}/></span>
+      <span class="meta"><b><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></b><small>${U.fmtDate(b.date) || '–'}</small></span>
     </button>`;
   }
 
@@ -191,7 +191,8 @@
       ${g.bakedCount > 1 ? html`<span class="badge" aria-label=${g.bakedCount + ' entries'}>${g.bakedCount}</span>` : null}
       <button type="button" class=${'tile' + (cover ? ' has' : '')} onClick=${props.onOpen}>
       ${cover ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
-      <span class="meta"><${ui.Score} value=${bestRating(g.breads)}/><b><${ui.Named} flag=${g.flag} name=${g.name}/></b><small>${U.fmtDate(last.date) || '–'}</small></span>
+      <span class="tl"><${ui.Score} value=${bestRating(g.breads)}/></span>
+      <span class="meta"><b><${ui.Named} flag=${g.flag} name=${g.name}/></b><small>${U.fmtDate(last.date) || '–'}</small></span>
       </button>
     </div>`;
   }

@@ -114,8 +114,10 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .score svg { width: 12px; height: 12px; fill: var(--honey); }
 .count { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--ink2); white-space: nowrap; }
 .count .icon { width: 13px; height: 13px; color: var(--crust); }
-.tile .flag { position: absolute; top: 10px; left: 10px; z-index: 2; padding: 4px 10px; border-radius: 99px; background: var(--butter); color: var(--crust-d); font-size: 12.5px; font-weight: 700; }
-.tile .meta .score { margin-bottom: 6px; padding: 3px 8px 3px 6px; border-radius: 99px; background: rgba(255, 253, 248, .94); color: var(--ink); }
+.tile .tl { position: absolute; top: 10px; left: 10px; right: 40px; z-index: 2; display: flex; flex-wrap: wrap; gap: 5px; }
+.tile .tl:empty { display: none; }
+.tile .flag { padding: 4px 10px; border-radius: 99px; background: var(--butter); color: var(--crust-d); font-size: 12.5px; font-weight: 700; }
+.tile .tl .score { padding: 3px 8px 3px 6px; border-radius: 99px; background: rgba(255, 253, 248, .94); color: var(--ink); }
 
 /* ---------- full-screen pages ---------- */
 .screen { position: fixed; inset: 0; z-index: 30; background: var(--bg); display: flex; flex-direction: column; }
