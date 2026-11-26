@@ -167,7 +167,7 @@
       name: '',
       ingredients: STARTING.map(function (g) { return newIngredient(g); }),
       bake: cleanBake({}),
-      method: '', source: '', link: '', parent: '', originals: [], basedOn: null
+      method: '', source: '', link: '', parent: '', flag: '', originals: [], basedOn: null
     };
   }
   /** The programs a bake used, in the order chosen. Older entries kept a single `program`. */
@@ -217,6 +217,7 @@
       source: String(r.source || '').trim(),
       link: safeLink(r.link),
       parent: String(r.parent || '').trim(),
+      flag: cleanFlag(r.flag),
       originals: (r.originals || []).slice(),
       basedOn: r.basedOn || null
     };
@@ -224,7 +225,7 @@
   /** True when nothing about a recipe was entered, so there is no card to make. */
   function isEmptyRecipe(r) {
     var c = cleanRecipe(r), b = c.bake;
-    return !c.ingredients.length && !c.method && !c.source && !c.link && !c.parent && !c.originals.length &&
+    return !c.ingredients.length && !c.method && !c.source && !c.link && !c.parent && !c.flag && !c.originals.length &&
       !b.programs.length && !b.size && !b.crust && b.minutes === null && b.added === null && !b.reason &&
       b.ovenTemp === null && b.ovenMinutes === null && b.proofMinutes === null;
   }
@@ -237,7 +238,7 @@
   function sameDetails(a, b) {
     var x = cleanRecipe(a), y = cleanRecipe(b);
     return x.method === y.method && x.source === y.source && x.link === y.link && x.bake.reason === y.bake.reason &&
-      nameKey(x.parent) === nameKey(y.parent) &&
+      nameKey(x.parent) === nameKey(y.parent) && x.flag === y.flag &&
       JSON.stringify(x.originals) === JSON.stringify(y.originals);
   }
   /** Two names are the same recipe when they match apart from capitals and spacing. */
@@ -273,6 +274,28 @@
     return (recipe.ingredients || []).map(function (i) {
       return { name: ingredientName(i), amount: amountLabel(i) };
     }).filter(function (x) { return x.name; });
+  }
+
+  // ---------- flags ----------
+  /** Countries a recipe can be marked with, by ISO code. Shown as their flag emoji. */
+  var FLAGS = ('AD AE AF AG AI AL AM AO AR AT AU AW AZ BA BB BD BE BF BG BH BI BJ BM BN BO BR BS BT BW BY BZ CA CD CF CG ' +
+    'CH CI CL CM CN CO CR CU CV CY CZ DE DJ DK DM DO DZ EC EE EG ER ES ET FI FJ FM FO FR GA GB GD GE GH GI GL GM GN GQ ' +
+    'GR GT GW GY HK HN HR HT HU ID IE IL IN IQ IR IS IT JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS ' +
+    'LT LU LV LY MA MC MD ME MG MH MK ML MM MN MO MR MT MU MV MW MX MY MZ NA NE NG NI NL NO NP NR NZ OM PA PE PG PH PK ' +
+    'PL PR PS PT PW PY QA RO RS RU RW SA SB SC SD SE SG SI SK SL SM SN SO SR SS ST SV SY SZ TD TG TH TJ TL TM TN TO TR ' +
+    'TT TV TW TZ UA UG US UY UZ VA VC VE VN VU WS XK YE ZA ZM ZW').split(' ');
+  function cleanFlag(code) {
+    code = String(code || '').trim().toUpperCase();
+    return FLAGS.indexOf(code) >= 0 ? code : '';
+  }
+  /** The flag emoji for a country code: two regional-indicator letters. */
+  function flagEmoji(code) {
+    code = cleanFlag(code);
+    return code ? String.fromCodePoint(0x1F1E6 + code.charCodeAt(0) - 65, 0x1F1E6 + code.charCodeAt(1) - 65) : '';
+  }
+  var regionNames = null;
+  function flagName(code) {
+    try { regionNames = regionNames || new Intl.DisplayNames(['en'], { type: 'region' }); return regionNames.of(code); } catch (e) { return code; }
   }
 
   // ---------- photos ----------
@@ -451,7 +474,7 @@
     cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient, changedLines: changedLines,
     emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake,
     recipeKey: recipeKey, nameKey: nameKey, planRecipeSave: planRecipeSave, ingredientSummary: ingredientSummary,
-    photosOf: photosOf, flourGrams: flourGrams, minutesSpent: minutesSpent, fmtWeight: fmtWeight, fmtSpan: fmtSpan,
+    FLAGS: FLAGS, cleanFlag: cleanFlag, flagEmoji: flagEmoji, flagName: flagName, photosOf: photosOf, flourGrams: flourGrams, minutesSpent: minutesSpent, fmtWeight: fmtWeight, fmtSpan: fmtSpan,
     RATINGS: RATINGS, rating: rating, fmtRating: fmtRating,
     program: program, manualProgram: manualProgram, sizesFor: sizesFor, hasCrust: hasCrust, hasDough: hasDough,
     hasManual: hasManual, programMinutes: programMinutes, totalMinutes: totalMinutes, programLabels: programLabels,

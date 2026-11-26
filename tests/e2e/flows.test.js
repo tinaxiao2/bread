@@ -607,6 +607,63 @@ test('Split marks the copy, so its dough is not counted twice', async (t) => {
   assert.equal(await stat('Time spent').locator('b').innerText(), '2 h 10 min', '90 min of dough once, plus 40 min of Bake');
 });
 
+test('a flag chosen for a recipe shows before its name everywhere', async (t) => {
+  const page = await open(t);
+  const FR = '\u{1F1EB}\u{1F1F7}', CN = '\u{1F1E8}\u{1F1F3}';
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Flag').selectOption('FR');
+  await field(page, 'Name').fill('baguette');
+  await line(page, 'Flour').getByLabel('Amount').fill('500');
+  await save(page);
+  await formGone(page);
+  assert.equal(await page.locator('.gal .tile .fl').innerText(), FR);
+
+  // a tweak attached to it shows the parent's flag until it has its own
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('herb baguette');
+  await field(page, 'Comments').click();
+  await field(page, 'Parent').selectOption('baguette');
+  await line(page, 'Flour').getByLabel('Amount').fill('480');
+  await save(page);
+  await formGone(page);
+  assert.deepEqual(await page.locator('.gal .tile .fl').allInnerTexts(), [FR, FR]);
+
+  // the same name brings its flag along; a new bread of it keeps it
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('baguette');
+  await field(page, 'Comments').click();
+  assert.equal(await field(page, 'Flag').inputValue(), 'FR');
+  await field(page, 'Name').fill('Mantou');
+  await field(page, 'Comments').click();
+  assert.equal(await field(page, 'Flag').inputValue(), '', 'the flag filled in from baguette goes with it');
+  await field(page, 'Flag').selectOption('CN');
+  await line(page, 'Flour').getByLabel('Amount').fill('500');
+  await save(page);
+  await formGone(page);
+  assert.equal(await page.locator('.gal .tile', { hasText: 'Mantou' }).locator('.fl').innerText(), CN);
+
+  await page.getByRole('button', { name: 'Recipes' }).click();
+  const cards = page.locator('.rc');
+  await count(cards, 2);
+  assert.equal(await cards.filter({ hasText: 'baguette' }).locator('h3 .fl').innerText(), FR);
+  await cards.filter({ hasText: 'baguette' }).locator('.open').click();
+  assert.equal(await page.locator('.screen h2 .fl').innerText(), FR);
+  assert.equal(await page.locator('.tname .fl').innerText(), FR, 'the tweak shows its parent’s flag');
+
+  // changing the flag on the recipe changes it on every entry
+  await page.getByRole('button', { name: 'Edit tweak 1' }).click();
+  await field(page, 'Flag').selectOption('');
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit recipe' }).waitFor({ state: 'detached' });
+  await count(page.locator('.screen h2 .fl'), 0);
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Gallery' }).click();
+  await count(page.locator('.gal .tile .fl'), 1);
+
+  await page.getByRole('button', { name: 'Stats' }).click();
+  assert.equal(await page.locator('.stat .fl').count(), 0);
+});
+
 test('typing part of a name offers the saved recipe', async (t) => {
   const page = await open(t);
   await logBread(page, { photo: false });
@@ -1029,7 +1086,7 @@ test('interface copy follows the owner\'s rules', async (t) => {
     const found = await page.evaluate(() => {
       const out = { headings: [], labels: [], other: [] };
       const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-      const ours = (el) => !el.closest('.tile, .rc .open, .rc .body, .opt, .suggest, .ings, .src, .method, .comments, .notes, .tname, #f-parent');
+      const ours = (el) => !el.closest('.tile, .rc .open, .rc .body, .opt, .suggest, .ings, .src, .method, .comments, .notes, .tname, #f-parent, #f-flag');
       document.querySelectorAll('h1,h2,h3').forEach((el) => { if (visible(el)) out.headings.push(el.textContent.trim()); });
       document.querySelectorAll('button, .label, .pill, .flag, option, label').forEach((el) => {
         if ((visible(el) || el.tagName === 'OPTION') && ours(el)) out.labels.push(el.textContent.trim());

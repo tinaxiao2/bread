@@ -10,7 +10,7 @@
   // (ingredients + baking details). Only an imported recipe has more than one variant.
   function draftFromRecipe(r) {
     return {
-      name: r.name || '', method: r.method || '', source: r.source || '', link: r.link || '', parent: r.parent || '',
+      name: r.name || '', method: r.method || '', source: r.source || '', link: r.link || '', parent: r.parent || '', flag: U.cleanFlag(r.flag),
       originals: (r.originals || []).slice(), basedOn: r.basedOn || null, index: 0,
       variants: [{ label: '', ingredients: F.keyed((r.ingredients || []).map(U.upgradeIngredient)), bake: U.cleanBake(r.bake) }]
     };
@@ -20,7 +20,7 @@
   }
   function draftFromReading(reading) {
     return {
-      name: reading.name, method: reading.method, source: reading.source, link: '', parent: '',
+      name: reading.name, method: reading.method, source: reading.source, link: '', parent: '', flag: '',
       originals: [], basedOn: null, index: 0,
       variants: reading.variants.map(function (v, i) {
         var d = importer.toDraft(reading, i);
@@ -32,7 +32,7 @@
     var v = d.variants[index === undefined ? d.index : index];
     return {
       name: d.name, ingredients: v.ingredients, bake: v.bake, method: d.method,
-      source: d.source, link: d.link, parent: d.parent, originals: d.originals, basedOn: d.basedOn
+      source: d.source, link: d.link, parent: d.parent, flag: d.flag, originals: d.originals, basedOn: d.basedOn
     };
   }
   /** True while the form offers the recipe's own sizes, which stand in for the loaf-size field. */
@@ -60,7 +60,7 @@
       ${U.photosOf(b).length > 1 ? html`<span class="many" aria-hidden="true"><${Icon} name="image"/></span>` : null}
       ${U.isBaked(r ? r.bake : null) ? null : html`<span class="flag">Dough</span>`}
       <${ui.Score} value=${U.rating(b)}/>
-      <span class="meta"><b>${b.name}</b><small>${U.fmtDate(b.date)}</small></span>
+      <span class="meta"><b><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></b><small>${U.fmtDate(b.date)}</small></span>
     </button>`;
   }
 
@@ -97,7 +97,7 @@
       ${props.title ? html`<div class="rhead">
         <button type="button" class="open" onClick=${props.onOpen}>
           <span class="rl"><span class="label">Recipe</span>${props.tag ? html`<span class="pill sage">${props.tag}</span>` : null}</span>
-          <h3 class="serif">${r.name}</h3>
+          <h3 class="serif"><${ui.Named} flag=${store.flagFor(r.name)} name=${r.name}/></h3>
         </button>
         ${props.action ? html`<button type="button" class="btn primary sm" onClick=${props.onAction}>${props.action}</button>` : null}
       </div>` : null}
@@ -185,7 +185,7 @@
       ${cover ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
       ${g.breads.length > 1 ? html`<span class="pill count">${g.breads.length}×</span>` : null}
       <${ui.Score} value=${bestRating(g.breads)}/>
-      <span class="meta"><b>${g.name}</b><small>${U.fmtDate(last.date)}</small></span>
+      <span class="meta"><b><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></b><small>${U.fmtDate(last.date)}</small></span>
     </button>`;
   }
 
@@ -263,7 +263,7 @@
       <div class="scroll">
         ${photo ? html`<${Hero} photos=${photos} onView=${setView}/>` : null}
         <div class=${'wrap page' + (photo ? '' : ' nohero')}>
-          <h2 class="serif">${b.name}</h2>
+          <h2 class="serif"><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></h2>
           <div class="date">${U.fmtDate(b.date, true)}</div>
           ${rated || notes.length || b.comments ? html`<div class="how">
             ${rated ? html`<div class="scores">
@@ -330,7 +330,7 @@
               <button type="button" class="open" onClick=${open}>
                 ${last ? html`<span class="thumb">${U.photosOf(last)[0] ? html`<${ui.Photo} id=${U.photosOf(last)[0].thumb}/>` : html`<${Icon} name="loaf"/>`}</span>` : null}
                 <span>
-                  <h3 class="serif">${g.name}</h3>
+                  <h3 class="serif"><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></h3>
                   <span class="facts">
                     ${g.baked ? html`<span class="pill">Baked ${g.breads.length}×</span>` : null}
                     <${CountPill} n=${g.tweaks.length}/>
@@ -369,7 +369,7 @@
       </div></div>
       <div class="scroll">
         <div class="wrap page nohero">
-          <h2 class="serif">${g.name}</h2>
+          <h2 class="serif"><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></h2>
           <div class="tags">
             ${g.baked ? html`<span class="pill">Baked ${g.breads.length}×</span>` : html`<span class="pill sage">To try</span>`}
             <${CountPill} n=${g.tweaks.length}/>
@@ -385,7 +385,7 @@
                 <${ui.Score} value=${bestRating(breads)}/>
                 <button type="button" class="round" aria-label=${'Edit tweak ' + n} onClick=${function () { edit(rv); }}><${Icon} name="edit"/></button>
               </div>` : null}
-              ${own ? html`<h3 class="serif tname">${rv.name}</h3>` : null}
+              ${own ? html`<h3 class="serif tname"><${ui.Named} flag=${store.flagFor(rv.name)} name=${rv.name}/></h3>` : null}
               <${RecipeCard} recipe=${rv} against=${many && rv !== first ? first : null} onView=${setView}/>
               <div class="formend">
                 <button type="button" class="btn primary wide" onClick=${function () { nav.push({ kind: 'breadForm', fromRecipeId: rv.id }); }}>Bake this</button>
@@ -413,7 +413,7 @@
         var last = f.breads[0];
         return html`<button type="button" class="opt" key=${f.key} onClick=${function () { props.onPick(f.latest); }}>
           <span class="thumb">${U.photosOf(last)[0] ? html`<${ui.Photo} id=${U.photosOf(last)[0].thumb}/>` : html`<${Icon} name="loaf"/>`}</span>
-          <span>${f.name}<small>${f.baked ? 'Baked ' + f.breads.length + '×' : 'To try'}</small></span>
+          <span><${ui.Named} flag=${store.flagFor(f.name)} name=${f.name}/><small>${f.baked ? 'Baked ' + f.breads.length + '×' : 'To try'}</small></span>
         </button>`;
       })}
     <//>`;
@@ -469,6 +469,7 @@
         if (fam && cur.filled !== key) {
           var filled = draftFromRecipe(fam.latest);
           filled.parent = fam.parent;
+          filled.flag = fam.flag || cur.draft.flag;
           return Object.assign(patch, { draft: filled, baseRecipeId: fam.latest.id, pending: [], filled: key });
         }
         if (!fam && cur.filled) return Object.assign(patch, { draft: blankDraft(), baseRecipeId: null, pending: [], filled: '' });
@@ -520,9 +521,12 @@
         </label>` : null}
       </div>`}
       <${Field} label="Name">
+        <div class="namerow">
+        <${F.FlagPicker} value=${f.draft.flag} onChange=${function (v) { set(function (cur) { return { draft: Object.assign({}, cur.draft, { flag: v }) }; }); }}/>
         <input id="f-name" class="input" value=${f.name} aria-label="Name" autocomplete="off"
           onInput=${function (e) { set({ name: e.target.value }); }}
           onBlur=${function () { if (!editing) setF(function (cur) { return Object.assign({}, cur, follow()(cur)); }); }}/>
+        </div>
         ${names.length ? html`<div class="suggest">
           ${names.map(function (n) {
             return html`<button type="button" key=${n} onClick=${function () { set(follow(n)); }}>${n}</button>`;
@@ -611,8 +615,11 @@
     return html`<${ui.Screen} title=${props.reading ? 'Check recipe' : editing ? 'Edit recipe' : 'New recipe'} onBack=${back}
         onGo=${save} goDisabled=${!d.name.trim() || busy === 'saving'}>
       <${Field} label="Name">
-        <input id="f-name" class="input" value=${d.name} aria-label="Name" autocomplete="off"
-          onInput=${function (e) { set({ draft: Object.assign({}, d, { name: e.target.value }) }); }}/>
+        <div class="namerow">
+          <${F.FlagPicker} value=${d.flag} onChange=${function (v) { set({ draft: Object.assign({}, d, { flag: v }) }); }}/>
+          <input id="f-name" class="input" value=${d.name} aria-label="Name" autocomplete="off"
+            onInput=${function (e) { set({ draft: Object.assign({}, d, { name: e.target.value }) }); }}/>
+        </div>
       <//>
       <${VariantChips} draft=${d} both=${f.both}
         onPick=${function (i) { set({ draft: Object.assign({}, d, { index: i }) }); }}
@@ -658,7 +665,7 @@
         <div class="stat"><span class="label">Flour used</span><b>${U.fmtWeight(st.flourGrams)}</b></div>
         <div class="stat"><span class="label">Loaves</span><b>${st.loaves}</b></div>
         <div class="stat wide"><span class="label">Favorite</span>
-          ${fav ? html`<b class="serif">${fav.name}</b><small>${fav.count}×</small>` : html`<b>–</b>`}
+          ${fav ? html`<b class="serif"><${ui.Named} flag=${fav.flag} name=${fav.name}/></b><small>${fav.count}×</small>` : html`<b>–</b>`}
         </div>
         <div class="stat wide"><span class="label">Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
       </div>

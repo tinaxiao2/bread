@@ -62,7 +62,7 @@ Two collections and one document in the artifact database:
 - `recipes/{id}`: `name`, `ingredients[]` (`group`, `type`, `amount`, `unit`, `note`),
   `bake` (`programs[]`, `size`, `crust`, `minutes`, `added`, `reason`, `proof[]` (places:
   `machine`, `airfryer`, `fridge`), `proofMinutes`, `ovenTemp`, `ovenMinutes`), `method`, `source`, `link`, `parent` (name of the recipe it is attached
-  to, or ''), `originals[]` (asset ids of imported images), `basedOn`, `createdAt`, `updatedAt`
+  to, or ''), `flag` (ISO country code, or ''), `originals[]` (asset ids of imported images), `basedOn`, `createdAt`, `updatedAt`
 - `meta/order`: `toTry` — the owner's ranking of recipes to try, as group keys (the parent
   recipe's name, lower-cased). Recipes not in it come last.
 
@@ -85,6 +85,10 @@ These are decisions the owner made. Keep them.
   is attached to it. A parent name with no recipe of its own still gathers what is attached
   to it. The Parent list offers only recipes with no parent of their own, never the recipe
   being edited or anything attached to it.
+- **Flags**: a recipe can carry a country flag, picked beside the Name field. Like the
+  parent, it is kept the same on every variation of a name (`store.setShared`). It shows
+  before the name everywhere (`ui.Named`); a recipe without its own shows its nearest
+  parent's (`store.flagFor`). Stored as the ISO code, drawn as the emoji.
 - **Recipes to try are ranked** by dragging their rows (same hold-then-drag as photos,
   `ui.useDragOrder`).
 - **Gallery has a Recipes · All toggle** (top right, remembered on the device): All is every

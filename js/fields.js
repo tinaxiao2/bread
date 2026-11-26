@@ -30,6 +30,23 @@
       value=${props.value} onInput=${val(props.onChange)}></textarea>`;
   }
 
+  // ---------- flag ----------
+  /** A flag for the recipe: a small button showing it, over the phone's own list of countries. */
+  function FlagPicker(props) {
+    var used = LGT.store.flagsUsed(), seen = {}, list = [];
+    used.concat(U.FLAGS.slice().sort(function (a, b) { return U.flagName(a).localeCompare(U.flagName(b)); })).forEach(function (c) {
+      if (!seen[c]) { seen[c] = true; list.push(c); }
+    });
+    var e = U.flagEmoji(props.value);
+    return html`<div class=${'flagpick' + (e ? ' set' : '')}>
+      ${e ? html`<span class="fl" aria-hidden="true">${e}</span>` : html`<${Icon} name="flag"/>`}
+      <select id="f-flag" aria-label="Flag" value=${props.value || ''} onChange=${val(props.onChange)}>
+        <option value="">–</option>
+        ${list.map(function (c) { return html`<option key=${c} value=${c}>${U.flagEmoji(c) + ' ' + U.flagName(c)}</option>`; })}
+      </select>
+    </div>`;
+  }
+
   // ---------- ingredients ----------
   function TypePicker(props) {
     var options = LGT.store.types(props.group);
@@ -320,7 +337,7 @@
   }
 
   LGT.fields = {
-    keyed: keyed, Field: Field, Area: Area, IngredientsEditor: IngredientsEditor, BakeEditor: BakeEditor,
+    keyed: keyed, Field: Field, Area: Area, FlagPicker: FlagPicker, IngredientsEditor: IngredientsEditor, BakeEditor: BakeEditor,
     RecipeFields: RecipeFields, RatingsEditor: RatingsEditor, PhotosField: PhotosField, pic: pic, Chips: Chips
   };
 })(typeof window !== 'undefined' ? window : globalThis);

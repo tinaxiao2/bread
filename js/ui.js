@@ -17,6 +17,7 @@
     gallery: function () { return html`<rect class="fillable" x="3.5" y="3.5" width="7" height="7" rx="2"/><rect class="fillable" x="13.5" y="3.5" width="7" height="7" rx="2"/><rect class="fillable" x="3.5" y="13.5" width="7" height="7" rx="2"/><rect class="fillable" x="13.5" y="13.5" width="7" height="7" rx="2"/>`; },
     recipes: function () { return html`<rect class="fillable" x="3.5" y="5" width="17" height="14.5" rx="2.5"/><path d="M3.5 9.5h17M7.5 13h6M7.5 16h9"/>`; },
     stats: function () { return html`<rect class="fillable" x="4" y="12" width="4" height="8" rx="1.2"/><rect class="fillable" x="10" y="5" width="4" height="15" rx="1.2"/><rect class="fillable" x="16" y="9" width="4" height="11" rx="1.2"/>`; },
+    flag: function () { return html`<path d="M5.5 21V4.5M5.5 4.5h11l-2.2 4 2.2 4h-11"/>`; },
     loaf: function () { return html`<path d="M5 19V11.5C3 10.5 2.5 7 5.5 5.5c3-2 10-2 13 0 3 1.5 2.5 5 .5 6V19a1 1 0 01-1 1H6a1 1 0 01-1-1z"/><path d="M9 7.5l1.5 2M12 7l1.5 2M15 7.5l1.5 2"/>`; }
   };
 
@@ -54,6 +55,12 @@
         </span>`;
       })}
     </span>`;
+  }
+
+  /** A name with its flag in front, when it has one. */
+  function Named(props) {
+    var e = U.flagEmoji(props.flag);
+    return e ? html`<span class="flagged"><span class="fl" aria-hidden="true">${e}</span>${props.name}</span>` : props.name;
   }
 
   function Score(props) {
@@ -234,7 +241,7 @@
   }
 
   LGT.ui = {
-    moved: moved, useDragOrder: useDragOrder, Icon: Icon, Stars: Stars, Score: Score, Photo: Photo, BlobImage: BlobImage,
+    moved: moved, useDragOrder: useDragOrder, Icon: Icon, Stars: Stars, Named: Named, Score: Score, Photo: Photo, BlobImage: BlobImage,
     useObjectUrl: useObjectUrl, useStore: useStore,
     Sheet: Sheet, Confirm: Confirm, Viewer: Viewer, Screen: Screen
   };

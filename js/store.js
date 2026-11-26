@@ -81,7 +81,14 @@
     return state.recipes.filter(function (r) { return U.nameKey(r.name) === key; }).sort(byCreated);
   }
   /** Every recipe name: { key, name, variations (oldest first), latest, parent, breads (newest first), baked }. */
-  function families() {
+  var memo = {};
+  function remember(name, build) {
+    if (memo.recipes !== state.recipes || memo.breads !== state.breads) memo = { recipes: state.recipes, breads: state.breads };
+    if (!memo[name]) memo[name] = build();
+    return memo[name];
+  }
+  function families() { return remember('families', buildFamilies); }
+  function buildFamilies() {
     var map = {}, out = [];
     state.recipes.slice().sort(byCreated).forEach(function (r) {
       var key = U.nameKey(r.name);
@@ -95,7 +102,9 @@
       f.latest = f.variations.slice().sort(mostRecentFirst)[0];
       f.name = f.latest.name;
       // the parent is kept on every variation; the most recently saved one has the last word
-      f.parent = String(f.variations.slice().sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })[0].parent || '').trim();
+      var newest = f.variations.slice().sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })[0];
+      f.parent = String(newest.parent || '').trim();
+      f.flag = U.cleanFlag(newest.flag);
       f.baked = f.breads.length > 0;
     });
     return out.sort(function (a, b) { return mostRecentFirst(a.latest, b.latest); });
@@ -120,7 +129,8 @@
     return { key: key, name: name };
   }
   /** Every group: { key, name, root, families, tweaks (oldest first), latest, breads, baked }, most recent first. */
-  function groups() {
+  function groups() { return remember('groups', buildGroups); }
+  function buildGroups() {
     var fams = families(), byKey = {}, map = {}, out = [];
     fams.forEach(function (f) { byKey[f.key] = f; });
     fams.forEach(function (f) {
@@ -139,6 +149,30 @@
     });
     return out.sort(function (a, b) { return mostRecentFirst(a.latest, b.latest); });
   }
+  /** The flag shown before a recipe's name: its own, or else the nearest parent's. */
+  function flagFor(name) {
+    var byKey = remember('byKey', function () { var m = {}; families().forEach(function (f) { m[f.key] = f; }); return m; });
+    var key = U.nameKey(name), seen = {};
+    for (var i = 0; i < 20 && key && !seen[key]; i++) {
+      seen[key] = true;
+      var f = byKey[key];
+      if (!f) return '';
+      if (f.flag) return f.flag;
+      key = U.nameKey(f.parent);
+    }
+    return '';
+  }
+  function breadFlag(b) {
+    var r = b && b.recipeId ? recipe(b.recipeId) : null;
+    return r ? flagFor(r.name) : '';
+  }
+  /** Flags already used, most used first. */
+  function flagsUsed() {
+    var count = {};
+    families().forEach(function (f) { if (f.flag) count[f.flag] = (count[f.flag] || 0) + f.variations.length; });
+    return Object.keys(count).sort(function (a, b) { return count[b] - count[a]; });
+  }
+
   /** Recipes to try, in the order she ranked them; ones not ranked yet come last, newest first. */
   function toTry() {
     var list = groups().filter(function (g) { return !g.baked; }), rank = {};
@@ -197,7 +231,7 @@
         minutes += U.minutesSpent(r.bake, !!b.splitFrom);
       }
       var g = r ? groupOfRecipe[r.id] : null, key = g ? 'g:' + g.key : 'n:' + U.nameKey(b.name);
-      if (!tally[key]) tally[key] = { name: g ? g.name : b.name, count: 0, best: 0, last: '' };
+      if (!tally[key]) tally[key] = { name: g ? g.name : b.name, flag: g ? flagFor(g.name) : '', count: 0, best: 0, last: '' };
       var t = tally[key];
       t.count++;
       t.best = Math.max(t.best, U.rating(b) || 0);
@@ -312,6 +346,8 @@
       var reparent = U.nameKey(draft.parent) !== U.nameKey(fam ? fam.parent : '') &&
         (draft.parent || (base && U.nameKey(base.name) === U.nameKey(name)));
       if (fam && !reparent) draft.parent = fam.parent;
+      var reflag = draft.flag !== (fam ? fam.flag : '') && (draft.flag || (base && U.nameKey(base.name) === U.nameKey(name)));
+      if (fam && !reflag) draft.flag = fam.flag;
       var plan = U.planRecipeSave({
         draft: draft, family: family(name).sort(mostRecentFirst), current: current, base: base,
         others: current ? breadsOf(current.id).filter(function (x) { return x.id !== input.id; }).length : 0
@@ -331,7 +367,10 @@
         draft.basedOn = plan.basedOn;
         write = fresh.set(stored(draft, t, null));
       }
-      if (recipeId && reparent) write = write.then(function () { return setParent(name, draft.parent, plan.action === 'keep' ? null : recipeId); });
+      var shared = {};
+      if (reparent) shared.parent = draft.parent;
+      if (reflag) shared.flag = draft.flag;
+      if (recipeId && (reparent || reflag)) write = write.then(function () { return setShared(name, shared, plan.action === 'keep' ? null : recipeId); });
       return write.then(function () {
         var ref = input.id ? db.collection('breads').doc(input.id) : db.collection('breads').doc();
         var r = b.ratings || {}, n = b.notes || {};
@@ -377,7 +416,7 @@
         doc.originals = doc.originals.concat(ids);
         var ref = item.id ? db.collection('recipes').doc(item.id) : db.collection('recipes').doc();
         return ref.set(stored(doc, t, base)).then(function () {
-          return setParent(doc.name, doc.parent, ref.id);
+          return setShared(doc.name, { parent: doc.parent, flag: doc.flag }, ref.id);
         }).then(function () {
           if (!base) return null;
           var kept = {}, used = originalsInUse(base.id);
@@ -389,13 +428,15 @@
     });
   }
 
-  /** Attach every variation saved under `name` to `parent` ('' to detach), except the one already written. */
-  function setParent(name, parent, doneId) {
-    var key = U.nameKey(parent);
+  /** Give every variation saved under `name` the same parent and flag, except the one already written. */
+  function setShared(name, patch, doneId) {
     return Promise.all(family(name).filter(function (r) {
-      return r.id !== doneId && U.nameKey(r.parent) !== key;
-    }).map(function (r) { return db.collection('recipes').doc(r.id).update({ parent: parent }); }));
+      if (r.id === doneId) return false;
+      return ('parent' in patch && U.nameKey(r.parent) !== U.nameKey(patch.parent)) ||
+        ('flag' in patch && U.cleanFlag(r.flag) !== patch.flag);
+    }).map(function (r) { return db.collection('recipes').doc(r.id).update(patch); }));
   }
+  function setParent(name, parent, doneId) { return setShared(name, { parent: parent }, doneId); }
 
   /** Give a recipe a new name: every variation of it, the breads baked from them, and what is attached to it. */
   function rename(oldName, newName, doneId) {
@@ -433,6 +474,7 @@
     init: init, subscribe: subscribe, getState: getState,
     bread: bread, recipe: recipe, breadsOf: breadsOf,
     family: family, families: families, familyByKey: familyByKey, groups: groups, groupOf: groupOf, tweakOf: tweakOf, toTry: toTry, setToTryOrder: setToTryOrder, stats: stats,
+    flagFor: flagFor, breadFlag: breadFlag, flagsUsed: flagsUsed,
     parentChoices: parentChoices, names: names, otherNames: otherNames, types: types, sources: sources,
     saveBread: saveBread, deleteBread: deleteBread, saveRecipes: saveRecipes, deleteRecipe: deleteRecipe
   };
