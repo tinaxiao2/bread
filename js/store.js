@@ -309,7 +309,7 @@
       return (b.count - a.count) || U.flagName(a.flag).localeCompare(U.flagName(b.flag));
     });
     return {
-      flourGrams: flour, loaves: bakedOf(state.breads).length, minutes: minutes, countries: countries,
+      flourGrams: flour, loaves: bakedOf(state.breads).length, minutes: minutes, countries: countries, recipes: lines().length,
       flours: Object.keys(flours).map(function (k) { return flours[k]; }).sort(function (a, b) { return b.grams - a.grams; }),
       favorite: fav ? pick(fav, fav.lastBread) : null,
       highestRated: top ? pick(top, top.bestBread) : null

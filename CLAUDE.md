@@ -166,10 +166,10 @@ These are decisions the owner made. Keep them.
   Photos picked together are added in the order picked. iPhone always shows its own menu
   (Photo Library / Take Photo / Choose File) for a web page's file picker; a page cannot
   skip it, so do not try.
-- **Stats** (third tab): flour used, loaves, favorite, highest rated and time spent, all derived in
+- **Stats** (third tab): flour used, loaves, recipes, countries, favorite, highest rated, time spent and the country list, all derived in
   `store.stats`. Tapping Flour used opens it full width with the flour by kind (AP flour, Bread
-  flour…), most first; Loaves goes full width beside it while it is open. Countries has its
-  count of countries at the right of its label. Highest rated is the label (or recipe) with the best-rated bake (ties: more
+  flour…), most first; Loaves goes full width beside it while it is open. Two more number
+  tiles: Recipes (every recipe, baked or to try) and Countries (how many countries they are from). Highest rated is the label (or recipe) with the best-rated bake (ties: more
   baked, then more recent). Tapping the favorite's or highest rated's name opens its recipe page
   (on the recipe of the latest or best bake), or the bread when it has no recipe. Those two names
   stay on one line and at one size: when either is too long, both are set smaller until both
