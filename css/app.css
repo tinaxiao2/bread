@@ -250,6 +250,11 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .stat .pick .score { flex: none; font-size: 15px; }
 .stat .pick .score svg { width: 14px; height: 14px; }
 .stat .lrow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.covers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+.covers button { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: var(--fill); }
+.covers button img { width: 100%; height: 100%; object-fit: cover; }
+.covers button.on::after { content: ""; position: absolute; inset: 0; border-radius: 12px; box-shadow: inset 0 0 0 3px var(--crust); }
+.listsort { display: flex; justify-content: flex-end; margin: 10px 14px -4px; }
 .statsort { grid-column: 1 / -1; display: flex; justify-content: flex-end; margin: 4px 0 -4px; }
 .stat .lrow .n { padding-right: 25px; font-size: 15px; font-weight: 700; color: var(--ink2); font-variant-numeric: tabular-nums; }
 .stat .tilehead { display: block; width: 100%; text-align: left; color: inherit; }

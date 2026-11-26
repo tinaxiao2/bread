@@ -4,7 +4,7 @@
   var LGT = root.LGT = root.LGT || {};
   var U = LGT.util, P = LGT.platform;
 
-  var state = { phase: 'loading', slow: false, breads: [], recipes: [], toTryOrder: [], labelFlags: {}, canUpload: false };
+  var state = { phase: 'loading', slow: false, breads: [], recipes: [], toTryOrder: [], labelFlags: {}, labelCovers: {}, canUpload: false };
   var listeners = [];
   var db = null, assets = null, timer = null;
   var got = { breads: false, recipes: false };
@@ -54,7 +54,10 @@
       // A label has no document of its own; the flags chosen for labels are kept together here.
       db.doc('meta/labels').onSnapshot(function (snap) {
         var d = snap.exists ? snap.data() : null;
-        set({ labelFlags: d && d.flags && typeof d.flags === 'object' ? d.flags : {} });
+        set({
+          labelFlags: d && d.flags && typeof d.flags === 'object' ? d.flags : {},
+          labelCovers: d && d.covers && typeof d.covers === 'object' ? d.covers : {}
+        });
       }, function () {});
     });
   }
@@ -86,8 +89,8 @@
   }
   var memo = {};
   function remember(name, build) {
-    if (memo.recipes !== state.recipes || memo.breads !== state.breads || memo.labelFlags !== state.labelFlags) {
-      memo = { recipes: state.recipes, breads: state.breads, labelFlags: state.labelFlags };
+    if (memo.recipes !== state.recipes || memo.breads !== state.breads || memo.labelFlags !== state.labelFlags || memo.labelCovers !== state.labelCovers) {
+      memo = { recipes: state.recipes, breads: state.breads, labelFlags: state.labelFlags, labelCovers: state.labelCovers };
     }
     if (!memo[name]) memo[name] = build();
     return memo[name];
@@ -185,6 +188,31 @@
     lines().forEach(function (l) { if (l.flag) count[l.flag] = (count[l.flag] || 0) + l.tweaks.length; });
     return Object.keys(count).sort(function (a, b) { return count[b] - count[a]; });
   }
+  /** Labels have no documents of their own: their flags and chosen covers are kept in one. */
+  function saveLabels() { return db.doc('meta/labels').set({ flags: state.labelFlags, covers: state.labelCovers }); }
+  /** The photo chosen to stand for a label ({full, thumb}), if any. */
+  function labelCover(name) { var c = state.labelCovers[U.nameKey(name)]; return c && c.full ? c : null; }
+  function setLabelCover(name, photo) {
+    var k = U.nameKey(name), cur = labelCover(name);
+    if (!k || (cur ? cur.full : '') === (photo ? photo.full : '')) return Promise.resolve();
+    var next = Object.assign({}, state.labelCovers);
+    if (photo && photo.full) next[k] = { full: photo.full, thumb: photo.thumb || photo.full }; else delete next[k];
+    set({ labelCovers: next });
+    return saveLabels();
+  }
+  /**
+   * The photos of a group, newest bake first, each once (split copies share theirs). The chosen
+   * cover comes first; without one, the newest bake's first photo does.
+   */
+  function groupPhotos(g) {
+    var seen = {}, out = [];
+    (g ? g.breads : []).forEach(function (b) {
+      U.photosOf(b).forEach(function (p) { if (!seen[p.full]) { seen[p.full] = true; out.push(p); } });
+    });
+    var c = g && g.label ? labelCover(g.name) : null;
+    if (c && seen[c.full]) out = [out.filter(function (p) { return p.full === c.full; })[0]].concat(out.filter(function (p) { return p.full !== c.full; }));
+    return out;
+  }
   /** The flag chosen for a label, if any. */
   function labelFlag(name) { return U.cleanFlag(state.labelFlags[U.nameKey(name)]); }
   /** Keep a label's flag. Nothing is written when it has not changed. */
@@ -194,7 +222,7 @@
     var next = Object.assign({}, state.labelFlags);
     if (flag) next[k] = flag; else delete next[k];
     set({ labelFlags: next });
-    return db.doc('meta/labels').set({ flags: next });
+    return saveLabels();
   }
   /**
    * Rename a label: every recipe filed under it moves to the new name, with its flag and its
@@ -212,8 +240,15 @@
       delete flags[from];
       if (!flags[U.nameKey(to)]) flags[U.nameKey(to)] = flag;
       set({ labelFlags: flags });
-      jobs.push(db.doc('meta/labels').set({ flags: flags }));
     }
+    var cover = state.labelCovers[from];
+    if (cover && U.nameKey(to) !== from) {
+      var covers = Object.assign({}, state.labelCovers);
+      delete covers[from];
+      if (!covers[U.nameKey(to)]) covers[U.nameKey(to)] = cover;
+      set({ labelCovers: covers });
+    }
+    if ((flag || cover) && U.nameKey(to) !== from) jobs.push(saveLabels());
     var oldKey = 'label:' + from, newKey = 'label:' + U.nameKey(to);
     if (oldKey !== newKey && state.toTryOrder.indexOf(oldKey) >= 0) {
       var order = state.toTryOrder.map(function (k) { return k === oldKey ? newKey : k; });
@@ -583,6 +618,7 @@
     stats: stats, isBakedBread: isBakedBread, bakedOf: bakedOf,
     recipeFlag: recipeFlag, breadFlag: breadFlag, groupFlag: groupFlag, flagsUsed: flagsUsed, labels: labels,
     labelFlag: labelFlag, parentChoices: parentChoices, renameLabel: renameLabel,
+    labelCover: labelCover, setLabelCover: setLabelCover, groupPhotos: groupPhotos,
     names: names, otherNames: otherNames, types: types, sources: sources,
     saveBread: saveBread, deleteBread: deleteBread, saveRecipes: saveRecipes, deleteRecipe: deleteRecipe
   };

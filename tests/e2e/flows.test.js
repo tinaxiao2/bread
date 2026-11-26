@@ -322,9 +322,12 @@ test('a label gathers recipes; arrows step between them', async (t) => {
   await page.getByRole('button', { name: 'Back' }).click();
   await page.getByRole('button', { name: 'Recipes', exact: true }).click();
 
-  // the parent's name can be edited on its page; everything under it follows
+  // the parent's name and cover can be edited on its page; everything under it follows
   await titled('Mantou').locator('.open').click();
+  assert.match(await page.locator('.screen .hero img').first().getAttribute('src'), /seed11/, 'the newest bake\'s photo first');
   await page.getByRole('button', { name: 'Edit parent' }).click();
+  assert.equal(await page.getByRole('radio', { name: 'Cover 1' }).getAttribute('aria-checked'), 'true');
+  await page.getByRole('radio', { name: 'Cover 2' }).click();
   await field(page, 'Parent name').fill('Chinese steamed buns');
   await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
   await page.locator('.screen h2', { hasText: 'Chinese steamed buns' }).waitFor();
@@ -332,6 +335,10 @@ test('a label gathers recipes; arrows step between them', async (t) => {
   await page.getByRole('button', { name: 'Back' }).click();
   await count(titled('Mantou'), 0);
   assert.match(await titled('Chinese steamed buns').innerText(), /2 recipes/);
+  assert.match(await titled('Chinese steamed buns').locator('.thumb img').getAttribute('src'), /seed10/, 'the chosen cover, after the rename too');
+  await titled('Chinese steamed buns').locator('.open').click();
+  assert.match(await page.locator('.screen .hero img').first().getAttribute('src'), /seed10/);
+  await page.getByRole('button', { name: 'Back' }).click();
 
   // taking a recipe out of a label gives it its own card
   await label.locator('.open').click();
@@ -914,6 +921,20 @@ test('a second proof is added with +', async (t) => {
   const card = await page.locator('.bake').innerText();
   assert.match(card, /PROOFING\s+Fridge\s+10 h/i);
   assert.match(card, /2ND PROOF\s+Air fryer\s+45 min/i);
+});
+
+test('the Baked recipes can be sorted like the Gallery', async (t) => {
+  const page = await open(t, { db: RANKED });
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
+  const names = () => page.locator('.list .rc h3').allInnerTexts();
+  assert.equal(await page.locator('.listsort .sortby span').innerText(), 'Most recent');
+  assert.deepEqual(await names(), ['french bread', 'Mantou']);
+  await field(page, 'Filter by').selectOption('az');
+  assert.deepEqual(await names(), ['french bread', 'Mantou']);
+  await page.getByRole('tab', { name: /To try/ }).click();
+  await count(page.locator('.listsort'), 0, 'To try keeps its own ranking');
+  await page.getByRole('tab', { name: /Baked/ }).click();
+  assert.equal(await page.locator('.listsort .sortby span').innerText(), 'A to Z');
 });
 
 test('the app opens on Recipes, by Rating', async (t) => {

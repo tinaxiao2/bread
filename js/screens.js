@@ -184,7 +184,7 @@
   // ---------- Gallery ----------
   /** One tile per parent recipe: its latest bread's photo, its best rating. */
   function RecipeTile(props) {
-    var g = props.group, last = g.breads[0], cover = U.photosOf(g.breads.filter(function (b) { return U.photosOf(b).length; })[0])[0];
+    var g = props.group, last = g.breads[0], cover = store.groupPhotos(g)[0];
     var layers = Math.min(Math.max(g.bakedCount - 1, 0), 3);              // +1, +2, +3 or more
     return html`<div class=${'stack s' + layers}>
       ${[3, 2, 1].filter(function (n) { return n <= layers; }).map(function (n) { return html`<span class=${'layer l' + n} key=${n} aria-hidden="true"></span>`; })}
@@ -197,7 +197,17 @@
     </div>`;
   }
 
-  var VIEW_KEY = 'lgt-gallery-view', SORT_KEY = 'lgt-gallery-sort';
+  var VIEW_KEY = 'lgt-gallery-view', SORT_KEY = 'lgt-gallery-sort', RECIPES_SORT_KEY = 'lgt-recipes-sort';
+  /** Icon and brown text naming the order, over the phone's own list of choices. */
+  function SortBy(props) {
+    var label = props.options.filter(function (o) { return o[0] === props.value; })[0][1];
+    return html`<div class="sortby">
+      <${Icon} name="sort"/><span>${label}</span>
+      <select id=${props.id} aria-label=${props.label || 'Filter by'} value=${props.value} onChange=${function (e) { props.onChange(e.target.value); }}>
+        ${props.options.map(function (o) { return html`<option key=${o[0]} value=${o[0]}>${o[1]}</option>`; })}
+      </select>
+    </div>`;
+  }
   /** A choice kept on the device. `session` keeps it only until the app is opened again. */
   function remembered(key, allowed, fallback, session) {
     try { var v = (session ? sessionStorage : localStorage).getItem(key); return allowed.indexOf(v) >= 0 ? v : fallback; } catch (e) { return fallback; }
@@ -383,24 +393,27 @@
     var byKey = {};
     toTry.forEach(function (g) { byKey[g.key] = g; });
     var d = ui.useDragOrder(toTry.map(function (g) { return g.key; }), store.setToTryOrder);
-    var shown = showBaked ? baked : d.order.map(function (k) { return byKey[k]; }).filter(Boolean);
+    var rs = useState(remembered(RECIPES_SORT_KEY, SORTS.map(function (o) { return o[0]; }), 'recent', true)), rsort = rs[0], setRsort = rs[1];
+    var shown = showBaked ? sorted('recipes', rsort) : d.order.map(function (k) { return byKey[k]; }).filter(Boolean);
     return html`<div class="wrap">
       <div class="top"><h1 class="serif">Recipes</h1></div>
       <div class="seg" role="tablist">
         <button type="button" role="tab" aria-selected=${showBaked} class=${showBaked ? 'on' : ''} onClick=${function () { props.onSeg('baked'); }}>Baked${baked.length ? html` <small>${baked.length}</small>` : null}</button>
         <button type="button" role="tab" aria-selected=${!showBaked} class=${showBaked ? '' : 'on'} onClick=${function () { props.onSeg('try'); }}>To try${toTry.length ? html` <small>${toTry.length}</small>` : null}</button>
       </div>
+      ${showBaked ? html`<div class="listsort"><${SortBy} id="f-recipes-sort" options=${SORTS} value=${rsort}
+        onChange=${function (v) { setRsort(v); remember(RECIPES_SORT_KEY, v, true); }}/></div>` : null}
       <div class="list">
         ${showBaked ? null : html`<button type="button" class="add" onClick=${props.onAdd}><${Icon} name="plus"/>Add recipe</button>`}
       </div>
       <div class=${'list' + (showBaked ? '' : ' ranked') + (d.dragging ? ' dragging' : '')} ref=${showBaked ? null : d.box}>
         ${shown.map(function (g) {
           function open() { nav.push({ kind: 'recipe', id: g.latest.id }); }
-          var last = g.breads[0];
+          var last = g.breads[0], cover = store.groupPhotos(g)[0];
           return html`<div class=${'rc' + (d.dragging === g.key ? ' lifted' : '')} key=${g.key} ...${showBaked ? {} : d.item(g.key)}>
             <div class="rtop">
               <button type="button" class="open" onClick=${open}>
-                ${last ? html`<span class="thumb">${U.photosOf(last)[0] ? html`<${ui.Photo} id=${U.photosOf(last)[0].thumb}/>` : html`<${Icon} name="loaf"/>`}</span>` : null}
+                ${last ? html`<span class="thumb">${cover ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<${Icon} name="loaf"/>`}</span>` : null}
                 <span>
                   <h3 class="serif"><${ui.Named} flag=${g.flag} name=${g.name}/></h3>
                   <span class="facts">
@@ -432,13 +445,14 @@
     var g = line ? store.groups().filter(function (x) { return x.lines.indexOf(line) >= 0; })[0] : store.groupByKey(gkey.current);
     if (g) gkey.current = g.key;
     var v = useState(null), view = v[0], setView = v[1];
-    var rn = useState(null), renaming = rn[0], setRenaming = rn[1];       // the label's name while it is being edited
+    var rn = useState(null), editing = rn[0], setEditing = rn[1];         // { name, cover } while the label is being edited
     useEffect(function () { if (!g) nav.close(props.k); }, [!g]);
     if (!g) return null;
-    function rename() {
-      var to = String(renaming || '').trim();
-      setRenaming(null);
-      if (to) store.renameLabel(g.name, to);
+    function saveLabel() {
+      var to = String(editing.name || '').trim(), cover = editing.cover;
+      setEditing(null);
+      if (!to) return;
+      (editing.picked ? store.setLabelCover(g.name, cover) : Promise.resolve()).then(function () { return store.renameLabel(g.name, to); });
     }
     var list = g.lines.slice().sort(function (a, b) { return firstMade(a) - firstMade(b); });
     if (!line || list.indexOf(line) < 0) line = list[0];
@@ -446,10 +460,7 @@
     function edit(rv) { nav.push({ kind: 'recipeForm', recipeId: rv.id }); }
     function step(d) { var next = list[at + d]; if (next) setLineId(next.id); }
     // every photo of every bake under it, newest bake first; split copies share theirs
-    var seen = {}, photos = [];
-    g.breads.forEach(function (b) {
-      U.photosOf(b).forEach(function (p) { if (!seen[p.full]) { seen[p.full] = true; photos.push(p); } });
-    });
+    var photos = store.groupPhotos(g);
     var heading = html`<${ui.Named} flag=${g.label ? g.flag : line.flag} name=${g.label ? g.name : line.name}/>`;
     return html`<div class="screen">
       <div class=${'floatbar' + (photos.length ? '' : ' solid')}><div class="wrap">
@@ -460,7 +471,7 @@
         ${photos.length ? html`<${Hero} photos=${photos} onView=${setView}/>` : null}
         <div class=${'wrap page' + (photos.length ? '' : ' nohero')}>
           <h2 class="serif">${heading}${g.label ? html`<button type="button" class="round sm" aria-label="Edit parent"
-            onClick=${function () { setRenaming(g.name); }}><${Icon} name="edit"/></button>` : null}</h2>
+            onClick=${function () { setEditing({ name: g.name, cover: photos[0] || null }); }}><${Icon} name="edit"/></button>` : null}</h2>
           <div class="tags">
             ${g.baked ? html`<span class="pill">Baked ${g.bakedCount}×</span>` : html`<span class="pill sage">To try</span>`}
             <${RecipeCount} n=${list.length}/>
@@ -499,12 +510,19 @@
         </div>
       </div>
       ${view ? html`<${ui.Viewer} id=${view.id} blob=${view.blob} onClose=${function () { setView(null); }}/>` : null}
-      ${renaming !== null ? html`<${ui.Sheet} title="Edit parent" onClose=${function () { setRenaming(null); }}>
-        <input id="f-parent-name" class="input" value=${renaming} aria-label="Parent name" autocomplete="off" autoFocus
-          onInput=${function (e) { setRenaming(e.target.value); }}
-          onKeyDown=${function (e) { if (e.key === 'Enter') rename(); }}/>
+      ${editing ? html`<${ui.Sheet} title="Edit parent" onClose=${function () { setEditing(null); }}>
+        <input id="f-parent-name" class="input" value=${editing.name} aria-label="Parent name" autocomplete="off"
+          onInput=${function (e) { setEditing(Object.assign({}, editing, { name: e.target.value })); }}
+          onKeyDown=${function (e) { if (e.key === 'Enter') saveLabel(); }}/>
+        ${photos.length > 1 ? html`<div class="covers" role="radiogroup" aria-label="Cover">
+          ${photos.map(function (p, i) {
+            var on = editing.cover && editing.cover.full === p.full;
+            return html`<button type="button" key=${p.full} role="radio" aria-checked=${!!on} aria-label=${'Cover ' + (i + 1)} class=${on ? 'on' : ''}
+              onClick=${function () { setEditing(Object.assign({}, editing, { cover: p, picked: true })); }}><${ui.Photo} id=${p.thumb || p.full}/></button>`;
+          })}
+        </div>` : null}
         <div class="formend">
-          <button type="button" class="btn primary wide" disabled=${!String(renaming).trim()} onClick=${rename}>Save</button>
+          <button type="button" class="btn primary wide" disabled=${!String(editing.name).trim()} onClick=${saveLabel}>Save</button>
         </div>
       <//>` : null}
     </div>`;

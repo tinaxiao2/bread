@@ -64,7 +64,8 @@ Two collections and two documents in the artifact database:
   `machine`, `airfryer`, `fridge`), `proofMinutes`, `extraProofs[]` (`{proof[], minutes}` for each proof after the first), `ovenTemp`, `ovenMinutes`), `method`, `source`, `link`, `parent` (the label it is filed
   under, or ''), `flag` (ISO country code, or ''), `line` (id of the recipe's first tweak), `tweak` (its number in
   the recipe, 1 for the first), `originals[]` (asset ids of imported images), `basedOn`, `createdAt`, `updatedAt`
-- `meta/labels`: `flags` — each label's own country flag, keyed by the label lower-cased.
+- `meta/labels`: `flags` — each label's own country flag, and `covers` — the photo (`{full, thumb}`)
+  she chose to stand for a label, both keyed by the label lower-cased.
 - `meta/order`: `toTry` — the owner's ranking of recipes to try, as group keys (`label:<label>` or
   `line:<id>`; keys from before, a lower-cased name, are still read). Recipes not in it come last.
 
@@ -100,11 +101,16 @@ These are decisions the owner made. Keep them.
 - **A bread's name defaults to its recipe's name plus the tweak's numeral from II on**
   ("Country White Bread", "Country White Bread II") and follows the form as the baking changes
   (`store.previewName`), until she types her own. The recipe keeps its own name.
-- **Recipes tab**: one card per label (or per recipe with no label). A label with several recipes
+- **Cover photo** of a group (Gallery tile, Recipes card thumbnail, first in the recipe page's
+  carousel): the one chosen in Edit parent, else the first photo of the newest bake
+  (`store.groupPhotos`). A chosen cover whose bread is deleted falls back to that.
+- **Recipes tab**: one card per label (or per recipe with no label). Baked has a sort like the
+  Gallery's (default Most recent, held while the app is open); To try keeps her drag ranking. A label with several recipes
   shows "N recipes" like the rating: icon and text, no background.
 - **Recipe page**: at the top, a carousel of every photo of every bake under the label (newest
   bake first; dots, or "3 / 14" past 10 photos); the label as the heading, with a pencil to rename
-  it ("Edit parent": every recipe under it, its flag and its To try place follow, `store.renameLabel`); arrow buttons step between its recipes (in the
+  it and pick its cover from its photos ("Edit parent": every recipe under it, its flag, cover and
+  To try place follow, `store.renameLabel`); arrow buttons step between its recipes (in the
   order made; it opens on the one baked last); below, that recipe's tweaks I, II, III, with the
   ingredient lines that differ from I highlighted.
 - **Flags**: a recipe can carry a country flag, picked beside the Name field. It is kept the
