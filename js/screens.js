@@ -516,15 +516,10 @@
       setOverlay(null);
       set(function (cur) { return { draft: draftFromRecipe(r), baseRecipeId: r.id, pending: [], name: cur.name || r.name, hers: true }; });
     }
+    /** A recipe read from a photo is saved as a recipe to try, not as a bread: check it, then both forms close. */
     function useReading(result) {
       setOverlay(null);
-      set(function (cur) {
-        return {
-          draft: draftFromReading(result.reading), baseRecipeId: null, pending: result.originals,
-          name: cur.name || result.reading.name, hers: true,
-          date: editing ? cur.date : ''                       // a recipe read in is a plan until it is baked
-        };
-      });
+      nav.push({ kind: 'recipeForm', reading: result.reading, originals: result.originals, closes: props.k });
     }
     function save() {
       if (!f.name.trim() || busy === 'saving') return;
@@ -644,7 +639,7 @@
       var list = f.both
         ? d.variants.map(function (v, i) { return { recipe: recipeOf(d, i) }; })
         : [{ id: props.recipeId || null, recipe: recipeOf(d) }];
-      store.saveRecipes(list, f.pending).then(function () { nav.close(props.k); }, function () { setBusy('failed'); });
+      store.saveRecipes(list, f.pending).then(function () { nav.close(props.closes || props.k); }, function () { setBusy('failed'); });
     }
     function remove() {
       setOverlay(null);

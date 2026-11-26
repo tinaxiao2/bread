@@ -95,10 +95,13 @@ These are decisions the owner made. Keep them.
   entry; Recipes is one tile per parent recipe that has been baked. Tiles show the rating at the
   bottom left above the name. In the Recipes view the number of baked entries is a red
   bubble at the top right, sized like an iPhone badge on an app icon (about a third of the
-  tile's width, overlapping the corner), and one card per extra entry (up to 3) steps
+  tile's width, overlapping the corner; the tiles have extra side margin so it clears the
+  screen edge), and one card per extra entry (up to 3) steps
   diagonally up and to the left behind the tile. Under the toggle, **Filter by** (icon +
   brown text naming the current choice) sorts either view: Most recent, Most baked,
   Rating (unrated last), A to Z. Remembered on the device.
+- **From photo on New bread saves a recipe, not a bread**: it opens Check recipe on top of the
+  bread form; saving closes both and the recipe goes to To try. Cancel returns to the bread form.
 - **Sources from Reddit are just "Reddit"** (`util.cleanSource`, applied on save, when
   reading a recipe in, and when showing older ones): the link carries the subreddit and user.
 - **A bread's name is its recipe's name.** Saving a bread named like a saved recipe joins
@@ -109,8 +112,7 @@ These are decisions the owner made. Keep them.
 - **Baked, To try and Dough are derived, never stored.** A bread counts as **baked once it
   has a date** (`store.isBakedBread`); an entry dated "–" (the button beside Date) is still a
   plan. A recipe is baked when a baked bread points at one of its variations, and "Baked n×"
-  counts baked breads only. A bread filled in with From photo starts undated. Photos do not
-  decide it. (The owner chose this: recipes read in through New bread were showing as baked
+  counts baked breads only. Photos do not decide it. (The owner chose this: recipes read in through New bread were showing as baked
   before anything was baked.) An entry is Dough until a bake is recorded: a program
   that is not a dough program, or an oven step (`LGT.util.isBaked`).
 - **Programs can be combined** (for example Dough then Bake). The program marked `manual`

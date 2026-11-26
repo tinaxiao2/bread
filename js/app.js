@@ -50,7 +50,7 @@
       }
       if (s.kind === 'recipeForm') {
         return html`<${S.RecipeForm} key=${s.key} k=${s.key} recipeId=${s.recipeId} reading=${s.reading}
-          originals=${s.originals} nav=${nav}/>`;
+          originals=${s.originals} closes=${s.closes} nav=${nav}/>`;
       }
       return null;
     }

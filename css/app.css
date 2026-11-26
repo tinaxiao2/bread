@@ -72,7 +72,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .toggle button { height: 30px; padding: 0 11px; border-radius: 99px; font-size: 13px; font-weight: 650; color: var(--ink2); }
 .toggle button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(60, 40, 20, .18); }
 /* Recipes view: a card for each extra entry stacked behind the tile, and the count in a bubble */
-.gal.stacks { column-gap: 18px; row-gap: 18px; padding-top: 6px; }
+.gal.stacks { column-gap: 26px; row-gap: 20px; padding: 6px 30px 0; }
 /* each extra entry is a card stepping up and to the left behind the tile */
 .stack { position: relative; padding-top: 15px; container-type: inline-size; }
 .stack .layer { position: absolute; top: 15px; left: 0; right: 0; aspect-ratio: 1 / 1.08; border-radius: 22px; border: 1px solid rgba(255, 253, 248, .9); box-shadow: 0 2px 6px -2px rgba(60, 40, 20, .25); }
@@ -82,7 +82,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .stack .tile { box-shadow: 0 6px 14px -8px rgba(60, 40, 20, .45); }
 /* sized like an iPhone badge on an app icon: about a third of the icon's width, overlapping its corner */
 .badge { position: absolute; z-index: 4; top: calc(15px - 9cqw); right: -9cqw; min-width: 34cqw; height: 34cqw; padding: 0 9cqw;
-  border-radius: 99px; background: #FF3B30; color: #fff; font-size: 22cqw; font-weight: 600; line-height: 34cqw; text-align: center;
+  border-radius: 99px; background: #FF3B30; color: #fff; font-size: 17cqw; font-weight: 600; line-height: 34cqw; text-align: center;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums;
   box-shadow: 0 2px 6px rgba(0, 0, 0, .22); }
 .top h1 { white-space: nowrap; }
