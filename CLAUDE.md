@@ -92,7 +92,11 @@ These are decisions the owner made. Keep them.
 - **Recipes to try are ranked** by dragging their rows (same hold-then-drag as photos,
   `ui.useDragOrder`).
 - **Gallery has a Recipes · All toggle** (top right, remembered on the device): All is every
-  entry; Recipes is one tile per parent recipe that has been baked.
+  entry; Recipes is one tile per parent recipe that has been baked. Tiles show the rating at the
+  bottom left above the name. In the Recipes view the number of baked entries is a red
+  bubble at the top right, and one card is stacked behind the tile per extra entry (up to 3).
+- **Sources from Reddit are just "Reddit"** (`util.cleanSource`, applied on save, when
+  reading a recipe in, and when showing older ones): the link carries the subreddit and user.
 - **A bread's name is its recipe's name.** Saving a bread named like a saved recipe joins
   that recipe: the matching variation if the ingredients and baking details are the same,
   a new variation if they differ. See `LGT.util.planRecipeSave`. Naming a new bread like a

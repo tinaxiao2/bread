@@ -34,7 +34,7 @@
       ' "ovenTemp": number | null, // degrees Fahrenheit, only if the recipe bakes in an oven',
       ' "ovenMinutes": number | null,',
       ' "method": string,          // the steps, concise, one per line, keeping the recipe\'s own instructions',
-      ' "source": string           // where it is from, only as far as the image shows: book or chapter title and page number, site, subreddit and username. "" if nothing is shown.',
+      ' "source": string           // where it is from, only as far as the image shows: book or chapter title and page number, or site. Anything from Reddit is just "Reddit" (no subreddit or username). "" if nothing is shown.',
       '}',
       'Rules: copy amounts exactly as printed. For an amount made of two measures, put both in "amount" (e.g. "1 tbsp + 1 tsp") and leave "unit" as "".',
       'When an ingredient offers alternatives, use the first and put the other in "note".',
@@ -100,7 +100,7 @@
       programs: programs,
       crust: machine.crusts.some(function (c) { return c.id === crust; }) ? crust : '',
       ovenTemp: U.num(raw.ovenTemp), ovenMinutes: U.num(raw.ovenMinutes),
-      method: text(raw.method), source: str(raw.source)
+      method: text(raw.method), source: U.cleanSource(raw.source)
     };
   }
 

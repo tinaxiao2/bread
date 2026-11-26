@@ -336,3 +336,12 @@ test('stats arithmetic: flour in grams, time spent, and how they read', () => {
   assert.equal(U.fmtSpan(3000), '2 d 2 h');
   assert.equal(U.fmtSpan(1439), '23 h 59 min');
 });
+
+test('anything from Reddit is saved as just "Reddit"', () => {
+  for (const s of ['Reddit, r/BreadMachines, comment by Ok_Instruction7805 (OP)', 'reddit', 'r/BreadMachines', 'r/BreadMachines, u/someone', 'u/someone on reddit.com'])
+    assert.equal(U.cleanSource(s), 'Reddit', s);
+  assert.equal(U.cleanSource('Daily Breads, page 45'), 'Daily Breads, page 45');
+  assert.equal(U.cleanSource('  Mom  '), 'Mom');
+  assert.equal(U.cleanSource('Bread & Butter, p. 3'), 'Bread & Butter, p. 3', 'not every r/ or u/ inside a word');
+  assert.equal(U.cleanRecipe({ source: 'r/Breadit' }).source, 'Reddit');
+});

@@ -214,13 +214,18 @@
       ingredients: sortIngredients((r.ingredients || []).filter(function (i) { return !isBlankIngredient(i); }).map(cleanIngredient)),
       bake: cleanBake(r.bake),
       method: String(r.method || '').trim(),
-      source: String(r.source || '').trim(),
+      source: cleanSource(r.source),
       link: safeLink(r.link),
       parent: String(r.parent || '').trim(),
       flag: cleanFlag(r.flag),
       originals: (r.originals || []).slice(),
       basedOn: r.basedOn || null
     };
+  }
+  /** Where a recipe is from. Anything from Reddit is saved as just "Reddit": the link carries the rest. */
+  function cleanSource(s) {
+    s = String(s || '').replace(/\s+/g, ' ').trim();
+    return /reddit|(^|[\s,(])\/?r\/\w|(^|[\s,(])\/?u\/\w/i.test(s) ? 'Reddit' : s;
   }
   /** True when nothing about a recipe was entered, so there is no card to make. */
   function isEmptyRecipe(r) {
@@ -474,7 +479,7 @@
     cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient, changedLines: changedLines,
     emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake,
     recipeKey: recipeKey, nameKey: nameKey, planRecipeSave: planRecipeSave, ingredientSummary: ingredientSummary,
-    FLAGS: FLAGS, cleanFlag: cleanFlag, flagEmoji: flagEmoji, flagName: flagName, photosOf: photosOf, flourGrams: flourGrams, minutesSpent: minutesSpent, fmtWeight: fmtWeight, fmtSpan: fmtSpan,
+    FLAGS: FLAGS, cleanFlag: cleanFlag, flagEmoji: flagEmoji, flagName: flagName, cleanSource: cleanSource, photosOf: photosOf, flourGrams: flourGrams, minutesSpent: minutesSpent, fmtWeight: fmtWeight, fmtSpan: fmtSpan,
     RATINGS: RATINGS, rating: rating, fmtRating: fmtRating,
     program: program, manualProgram: manualProgram, sizesFor: sizesFor, hasCrust: hasCrust, hasDough: hasDough,
     hasManual: hasManual, programMinutes: programMinutes, totalMinutes: totalMinutes, programLabels: programLabels,

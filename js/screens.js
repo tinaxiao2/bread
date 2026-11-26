@@ -10,7 +10,7 @@
   // (ingredients + baking details). Only an imported recipe has more than one variant.
   function draftFromRecipe(r) {
     return {
-      name: r.name || '', method: r.method || '', source: r.source || '', link: r.link || '', parent: r.parent || '', flag: U.cleanFlag(r.flag),
+      name: r.name || '', method: r.method || '', source: U.cleanSource(r.source), link: r.link || '', parent: r.parent || '', flag: U.cleanFlag(r.flag),
       originals: (r.originals || []).slice(), basedOn: r.basedOn || null, index: 0,
       variants: [{ label: '', ingredients: F.keyed((r.ingredients || []).map(U.upgradeIngredient)), bake: U.cleanBake(r.bake) }]
     };
@@ -59,8 +59,7 @@
       ${has ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
       ${U.photosOf(b).length > 1 ? html`<span class="many" aria-hidden="true"><${Icon} name="image"/></span>` : null}
       ${U.isBaked(r ? r.bake : null) ? null : html`<span class="flag">Dough</span>`}
-      <${ui.Score} value=${U.rating(b)}/>
-      <span class="meta"><b><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></b><small>${U.fmtDate(b.date) || '–'}</small></span>
+      <span class="meta"><${ui.Score} value=${U.rating(b)}/><b><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></b><small>${U.fmtDate(b.date) || '–'}</small></span>
     </button>`;
   }
 
@@ -79,7 +78,7 @@
    * ingredient lines this one is compared with, so the lines that differ stand out)
    */
   function RecipeCard(props) {
-    var r = props.recipe, b = U.cleanBake(r.bake), labels = U.programLabels(b.programs), cells = [];
+    var r = props.recipe, source = U.cleanSource(r.source), b = U.cleanBake(r.bake), labels = U.programLabels(b.programs), cells = [];
     if (labels.length) cells.push(['Setting', labels]);
     if (b.size) cells.push(['Loaf size', [U.sizeLabel(b.size)]]);
     if (b.crust) cells.push(['Crust color', [U.crustLabel(b.crust)]]);
@@ -115,8 +114,8 @@
         })}
       </div>` : null}
       ${r.method ? html`<div class="method"><span class="label">Method</span><p>${r.method}</p></div>` : null}
-      ${r.source || link ? html`<div class="src"><${Icon} name="link"/>
-        <span>${link ? html`<a href=${link} target="_blank" rel="noopener noreferrer">${r.source || host}</a>` : r.source}</span>
+      ${source || link ? html`<div class="src"><${Icon} name="link"/>
+        <span>${link ? html`<a href=${link} target="_blank" rel="noopener noreferrer">${source || host}</a>` : source}</span>
       </div>` : null}
       ${r.originals && r.originals.length ? html`<div class="origs">
         ${r.originals.map(function (id) {
@@ -181,12 +180,15 @@
   /** One tile per parent recipe: its latest bread's photo, its best rating. */
   function RecipeTile(props) {
     var g = props.group, last = g.breads[0], cover = U.photosOf(g.breads.filter(function (b) { return U.photosOf(b).length; })[0])[0];
-    return html`<button type="button" class=${'tile' + (cover ? ' has' : '')} onClick=${props.onOpen}>
+    var layers = Math.min(Math.max(g.bakedCount - 1, 0), 3);              // +1, +2, +3 or more
+    return html`<div class=${'stack s' + layers}>
+      ${[3, 2, 1].filter(function (n) { return n <= layers; }).map(function (n) { return html`<span class=${'layer l' + n} key=${n} aria-hidden="true"></span>`; })}
+      ${g.bakedCount > 1 ? html`<span class="badge" aria-label=${g.bakedCount + ' entries'}>${g.bakedCount}</span>` : null}
+      <button type="button" class=${'tile' + (cover ? ' has' : '')} onClick=${props.onOpen}>
       ${cover ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
-      ${g.bakedCount > 1 ? html`<span class="pill count">${g.bakedCount}×</span>` : null}
-      <${ui.Score} value=${bestRating(g.breads)}/>
-      <span class="meta"><b><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></b><small>${U.fmtDate(last.date) || '–'}</small></span>
-    </button>`;
+      <span class="meta"><${ui.Score} value=${bestRating(g.breads)}/><b><${ui.Named} flag=${store.flagFor(g.name)} name=${g.name}/></b><small>${U.fmtDate(last.date) || '–'}</small></span>
+      </button>
+    </div>`;
   }
 
   var VIEW_KEY = 'lgt-gallery-view';
@@ -206,7 +208,7 @@
           })}
         </div>
       </div>
-      <div class="gal">
+      <div class=${'gal' + (view === 'recipes' ? ' stacks' : '')}>
         ${view === 'recipes'
           ? store.groups().filter(function (g) { return g.baked; }).map(function (g) {
             return html`<${RecipeTile} key=${g.key} group=${g} onOpen=${function () { nav.push({ kind: 'recipe', id: g.latest.id }); }}/>`;
@@ -335,7 +337,7 @@
                     ${g.baked ? html`<span class="pill">Baked ${g.bakedCount}×</span>` : null}
                     <${CountPill} n=${g.tweaks.length}/>
                     <${ui.Score} value=${bestRating(g.breads)}/>
-                    ${!g.baked && g.latest.source ? g.latest.source : null}
+                    ${!g.baked && g.latest.source ? U.cleanSource(g.latest.source) : null}
                   </span>
                 </span>
               </button>

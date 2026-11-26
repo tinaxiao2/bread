@@ -281,7 +281,7 @@
   function sources() {
     var seen = {}, out = [];
     state.recipes.forEach(function (r) {
-      var s = (r.source || '').trim();
+      var s = U.cleanSource(r.source);
       if (s && !seen[s.toLowerCase()]) { seen[s.toLowerCase()] = true; out.push(s); }
     });
     return out.slice(0, 6);

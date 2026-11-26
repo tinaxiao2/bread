@@ -65,7 +65,15 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .toggle { margin-left: auto; flex: none; display: flex; padding: 3px; border-radius: 99px; background: #EFE4D2; }
 .toggle button { height: 30px; padding: 0 11px; border-radius: 99px; font-size: 13px; font-weight: 650; color: var(--ink2); }
 .toggle button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(60, 40, 20, .18); }
-.tile .count { position: absolute; top: 10px; left: 10px; z-index: 2; }
+/* Recipes view: a card for each extra entry stacked behind the tile, and the count in a bubble */
+.gal.stacks { row-gap: 16px; padding-top: 10px; }
+.stack { position: relative; padding-top: 15px; }
+.stack .layer { position: absolute; top: 15px; left: 0; right: 0; aspect-ratio: 1 / 1.08; border-radius: 22px; background: #E9DCC6; border: 1px solid rgba(255, 253, 248, .9); box-shadow: 0 2px 6px -2px rgba(60, 40, 20, .25); transform-origin: 50% 0; }
+.stack .layer.l1 { transform: translateY(-5px) scale(.94); background: #E2D2B8; }
+.stack .layer.l2 { transform: translateY(-10px) scale(.88); background: #EBDFCB; }
+.stack .layer.l3 { transform: translateY(-15px) scale(.82); background: #F1E8D9; }
+.stack .tile { box-shadow: 0 6px 14px -8px rgba(60, 40, 20, .45); }
+.badge { position: absolute; top: 5px; right: -5px; z-index: 4; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 99px; background: #E0362C; color: #fff; font-size: 13.5px; font-weight: 750; line-height: 26px; text-align: center; box-shadow: 0 0 0 2.5px var(--bg), 0 2px 6px rgba(0, 0, 0, .25); font-variant-numeric: tabular-nums; }
 .top h1 { white-space: nowrap; }
 @media (max-width: 430px) { .top:has(.toggle) .mark { display: none; } .top:has(.toggle) h1 { font-size: 28px; } }
 .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: var(--bottom); }
@@ -94,7 +102,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .score { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 700; }
 .score svg { width: 12px; height: 12px; fill: var(--honey); }
 .tile .flag { position: absolute; top: 10px; left: 10px; z-index: 2; padding: 4px 10px; border-radius: 99px; background: var(--butter); color: var(--crust-d); font-size: 12.5px; font-weight: 700; }
-.tile .score { position: absolute; top: 10px; right: 10px; z-index: 2; padding: 4px 9px 4px 7px; border-radius: 99px; background: rgba(255, 253, 248, .94); }
+.tile .meta .score { margin-bottom: 6px; padding: 3px 8px 3px 6px; border-radius: 99px; background: rgba(255, 253, 248, .94); color: var(--ink); }
 
 /* ---------- full-screen pages ---------- */
 .screen { position: fixed; inset: 0; z-index: 30; background: var(--bg); display: flex; flex-direction: column; }
@@ -124,7 +132,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, label:focus-within 
 .dots button { width: 22px; height: 22px; display: grid; place-items: center; }
 .dots button::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 253, 248, .6); box-shadow: 0 1px 3px rgba(0, 0, 0, .3); }
 .dots button.on::after { background: #fff; }
-.tile .many { position: absolute; left: 10px; bottom: 50px; z-index: 2; color: #fff; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5)); }
+.tile .many { position: absolute; top: 12px; right: 12px; z-index: 2; color: #fff; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5)); }
 .tile .many .icon { width: 18px; height: 18px; }
 .hero { width: 100%; aspect-ratio: 4 / 3; max-height: 52vh; background: var(--fill); overflow: hidden; }
 .hero img { width: 100%; height: 100%; object-fit: cover; }

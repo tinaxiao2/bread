@@ -517,7 +517,10 @@ test('the gallery shows every entry, or one tile per parent recipe', async (t) =
   await count(tiles, 2);
   assert.deepEqual((await tiles.locator('.meta b').allInnerTexts()).sort(), ['Mantou', 'french bread'],
     'tweaks sit under their parent, even one whose own recipe was renamed away; to-try and recipe-less entries are not shown');
-  assert.match(await tiles.filter({ hasText: 'Mantou' }).innerText(), /2×/);
+  const mantou = page.locator('.stack', { hasText: 'Mantou' });
+  assert.equal(await mantou.locator('.badge').innerText(), '2', 'the count in a bubble');
+  await count(mantou.locator('.layer'), 1, 'one card stacked behind for one extra entry');
+  await count(page.locator('.stack', { hasText: 'french bread' }).locator('.layer'), 1);
   await tiles.filter({ hasText: 'french bread' }).click();
   await count(page.locator('.variation'), 2);
   await page.getByRole('button', { name: 'Back' }).click();
