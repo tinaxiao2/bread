@@ -4,7 +4,7 @@
   var LGT = root.LGT = root.LGT || {};
   var U = LGT.util, P = LGT.platform;
 
-  var state = { phase: 'loading', slow: false, breads: [], recipes: [], toTryOrder: [], labelFlags: {}, labelCovers: {}, canUpload: false };
+  var state = { phase: 'loading', slow: false, breads: [], recipes: [], toTryOrder: [], labelFlags: {}, labelCovers: {}, labelsLoaded: false, seenAchievements: null, canUpload: false };
   var listeners = [];
   var db = null, assets = null, timer = null;
   var got = { breads: false, recipes: false };
@@ -56,8 +56,14 @@
         var d = snap.exists ? snap.data() : null;
         set({
           labelFlags: d && d.flags && typeof d.flags === 'object' ? d.flags : {},
-          labelCovers: d && d.covers && typeof d.covers === 'object' ? d.covers : {}
+          labelCovers: d && d.covers && typeof d.covers === 'object' ? d.covers : {},
+          labelsLoaded: true
         });
+      }, function () {});
+      // Achievements are worked out from the log; this only remembers which have been celebrated.
+      db.doc('meta/achievements').onSnapshot(function (snap) {
+        var d = snap.exists ? snap.data() : null;
+        set({ seenAchievements: d && d.seen && typeof d.seen === 'object' ? d.seen : {} });
       }, function () {});
     });
   }
@@ -368,6 +374,63 @@
     };
   }
 
+  // ---------- achievements ----------
+  function lineFlag(l) { return l.flag || (l.parent ? labelFlag(l.parent) : ''); }
+  /** What the achievements are worked out from: see achievements.js. Counted the way Stats counts. */
+  function achievementFacts() {
+    var loaves = [], flour = [];
+    state.breads.forEach(function (b) {
+      var r = b.recipeId ? recipe(b.recipeId) : null, l = r ? lineOf(r) : null;
+      var day = isBakedBread(b) ? b.date : '';
+      var rows = r ? (r.ingredients || []).map(U.upgradeIngredient) : [];
+      if (r && !b.splitFrom) {
+        var grams = 0;
+        rows.forEach(function (i) { grams += U.flourGrams(i) || 0; });
+        if (grams) flour.push({ date: day, created: b.createdAt || 0, grams: grams });
+      }
+      if (!day) return;
+      loaves.push({
+        date: day, created: b.createdAt || 0, line: l ? l.id : null,
+        name: l ? l.name : '', label: l ? l.parent : '', bread: b.name || '',
+        flag: l ? lineFlag(l) : '', source: r ? U.cleanSource(r.source) : '',
+        rating: U.rating(b), taste: U.num((b.ratings || {}).taste) || 0,
+        programs: r ? U.cleanBake(r.bake).programs : [],
+        flours: rows.filter(function (i) { return i.group === 'flour'; }).map(function (i) { return i.type; })
+      });
+    });
+    return {
+      loaves: loaves, flour: flour,
+      recipes: lines().map(function (l) {
+        return {
+          created: Math.min.apply(null, l.tweaks.map(function (t) { return t.createdAt || 0; })),
+          flag: lineFlag(l),
+          read: l.tweaks.some(function (t) { return (t.originals || []).length > 0; })
+        };
+      })
+    };
+  }
+  /** Every achievement with how far along she is: derived, never stored. */
+  function achievements() {
+    return remember('achievements', function () { return LGT.achievements.evaluate(achievementFacts()); });
+  }
+  /** Earned and not celebrated yet. Empty until everything it depends on has loaded. */
+  function newAchievements() {
+    if (state.phase !== 'ready' || !state.labelsLoaded || !state.seenAchievements) return [];
+    var seen = state.seenAchievements;
+    return achievements().filter(function (a) { return a.earned && !seen[a.id]; });
+  }
+  function markAchievementsSeen(ids) {
+    if (!ids.length || !db) return Promise.resolve();
+    var next = Object.assign({}, state.seenAchievements || {}), day = U.today();
+    ids.forEach(function (id) { next[id] = day; });
+    set({ seenAchievements: next });
+    return db.doc('meta/achievements').set({ seen: next }).catch(function () {});
+  }
+
+  // What was just added, so the screen can greet it: { kind: 'bread' | 'recipe', id, at }.
+  var added = null;
+  function justAdded(kind, id) { return !!(added && added.kind === kind && added.id === id && Date.now() - added.at < 4000); }
+
   /** Recipe names, most recently used first. */
   function names() { return lines().map(function (l) { return l.name; }); }
   /** Named ingredients added before, most used first. */
@@ -524,6 +587,7 @@
           U.photosOf(existing).forEach(function (old) {
             if (!photos.some(function (p) { return p.full === old.full; })) dropPhoto(old, existing.id);
           });
+          if (!input.id) added = { kind: 'bread', id: ref.id, at: Date.now() };
           return ref.id;
         });
       });
@@ -577,6 +641,7 @@
           });
         });
       }, Promise.resolve([])).then(function (done) {
+        if (lineId) added = { kind: 'recipe', id: lineId, at: Date.now() };
         var parent = first ? String(first.parent || '').trim() : '';
         return parent && 'parentFlag' in first ? setLabelFlag(parent, first.parentFlag).then(function () { return done; }) : done;
       });
@@ -624,6 +689,7 @@
     recipeFlag: recipeFlag, breadFlag: breadFlag, groupFlag: groupFlag, flagsUsed: flagsUsed, labels: labels,
     labelFlag: labelFlag, parentChoices: parentChoices, renameLabel: renameLabel,
     labelCover: labelCover, setLabelCover: setLabelCover, groupPhotos: groupPhotos,
+    achievements: achievements, newAchievements: newAchievements, markAchievementsSeen: markAchievementsSeen, justAdded: justAdded,
     names: names, otherNames: otherNames, types: types, sources: sources,
     saveBread: saveBread, deleteBread: deleteBread, saveRecipes: saveRecipes, deleteRecipe: deleteRecipe
   };

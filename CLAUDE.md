@@ -43,9 +43,11 @@ runtime.
 - `data/machine.js` – the bread machine's programs (Cuisinart CBK-110NAS). Program names,
   loaf sizes, crust colour support and times live here as data, never in UI code.
 - `js/util.js` – pure helpers: dates, times, amounts, recipe comparison
+- `js/achievements.js` – the achievements, each worked out from the log (pure, unit-tested)
 - `js/platform.js` – access to the artifact capabilities
 - `js/store.js` – data layer: live lists, saving, photo upload
 - `js/importer.js` – reading a recipe from an image
+- `js/fx.js` – celebrations: sparks, the achievement card, the little loaf for a bake's photos
 - `js/ui.js`, `js/fields.js`, `js/screens.js`, `js/app.js` – the interface
 - `js/vendor/htm-preact.js` – Preact + htm, vendored
 - `dev/` – local stand-in for the artifact runtime, and a dev server. Never published.
@@ -53,7 +55,7 @@ runtime.
 
 ## Data
 
-Two collections and two documents in the artifact database:
+Two collections and three documents in the artifact database:
 
 - `breads/{id}`: `name`, `date` (YYYY-MM-DD, or '' for "–": not baked yet), `recipeId` (or null), `photos` (list of
   `{full, thumb}` asset ids, cover first; `photo` repeats the cover), `ratings` (`crust`,
@@ -66,6 +68,8 @@ Two collections and two documents in the artifact database:
   the recipe, 1 for the first), `originals[]` (asset ids of imported images), `basedOn`, `createdAt`, `updatedAt`
 - `meta/labels`: `flags` — each label's own country flag, and `covers` — the photo (`{full, thumb}`)
   she chose to stand for a label, both keyed by the label lower-cased.
+- `meta/achievements`: `seen` — the achievements already celebrated (id → the day), so each card
+  shows once. Whether one is earned is never stored: it is worked out from the log.
 - `meta/order`: `toTry` — the owner's ranking of recipes to try, as group keys (`label:<label>` or
   `line:<id>`; keys from before, a lower-cased name, are still read). Recipes not in it come last.
 
@@ -190,7 +194,8 @@ These are decisions the owner made. Keep them.
   fit. **Countries** lists where the recipes are from: every recipe once (baked or to try), by its
   flag or else its label's, most first; recipes with no flag are left out. Each row shows
   "baked / all" (no label) and taps open to list its recipes A to Z, the ones not baked yet in
-  gray; tapping one opens its recipe page. At the right of the list's heading: recipes tried
+  gray; tapping one opens its recipe page. The list shows five countries (in the chosen order)
+  until the "+N" under it is tapped. At the right of the list's heading: recipes tried
   / all recipes, across every country listed. Above the list's box, a sort like the Gallery's (icon +
   brown text, remembered on the device): Most recipes (the default; ties by country name), Most recent
   bake, Most baked (loaves), Rating (best bake, unrated last), A to Z. Loaves and the favorite count baked (dated) entries; flour and time
@@ -198,6 +203,54 @@ These are decisions the owner made. Keep them.
   cup, and flour is shown in pounds (`util.fmtWeight`). Time is machine programs + Bake's added time + proofing + oven. A split copy's dough
   (flour, machine time, proofing) is counted once, with the entry it came from. The favorite
   is the label (or recipe with no label) with the most entries.
+- **Achievements** are worked out from the log every time (`achievements.evaluate` from
+  `store.achievementFacts`, counted the way Stats counts): each has an emoji, a name, what earns
+  it, how far along she is, and the day it was earned. **The names are the owner's own; keep
+  them and their goals as written** (the catalog is `CATALOG` in `js/achievements.js`):
+  - Loaves: Bread-y or not (first loaf), Doughmesticated (10), Yeast mode (25), Fifty shades of
+    grain (50), Doughverachiever (100), Our daily bread (365), On a roll (3 days in a row),
+    Fleischmann’s Fave (one recipe 5 times).
+  - Flour: Flour power (10 lb), Commercialized (25 lb), Eat your wheaties (whole wheat flour or
+    the Whole Wheat program), Catcher in the rye (rye flour), Knead for speed (the machine's
+    fast program, named from `data/machine.js`).
+  - Recipes: Roll model (10 recipes baked), Knowledge is flour (50 saved), Baking news (a recipe
+    read from a photo), Breddit (10 baked from Reddit), Chef de Cuisinart (10 baked from
+    Cuisinart), Challahback girl (bake Challah).
+  - Ratings: Rising star (a loaf rated 4+), Doughpamine (Taste 5 stars), The best thing since
+    sliced (a loaf rated 5.0).
+  - Countries: Eat, pray, loaf (3 countries), Bakersfield, CA (US), Like naan other (India),
+    Gluten tag (Germany), Bing bing (China), Great British Bake-off (UK), and one for every other
+    country she has a recipe from, named for the country ("first recipe tried from a country").
+  The ones the owner wrote word for word: Fifty shades of grain, Our daily bread, Commercialized,
+  Breddit, Chef de Cuisinart, Like naan other, Challahback girl, Gluten tag, Bing bing, Great
+  British Bake-off. The rest use names she offered, matched to goals by Claude: ask before
+  changing which name goes with which goal.
+- **Achievements on Stats** (🏆, after Time spent): "earned / all" at the right; rows with the
+  emoji, name, goal, and the day earned or "have / need" with a bar. Earned first (latest on
+  top), then the nearest. Five rows until opened, like the country list. Tapping an earned one
+  makes it hop and throw sparks.
+- **Celebrations** (`js/fx.js`), in the manner of the owner's Throughline app: gold four-point
+  sparks where something good just happened, and a dark card that springs up for a milestone.
+  - A new bread: its tile (marked `data-fresh`) settles in and throws sparks, with the emoji for
+    what was baked (`fx.breadEmoji`: 🥖 🥐 🥨 … else 🍞) floating up and the recipe's flag among
+    the sparks. If its tile is not on the page in front, the Gallery tab catches it instead.
+  - A new recipe: the same on its To try row, with 📖; else on the Recipes tab.
+  - A rating: the stars up to the one picked pop in turn and throw sparks, the most for five.
+  - A photo: the little loaf at the stage its place stands for. **The owner takes a bake's
+    photos at 1 kneading, 2 proofing, 3 shaped (after the proof, before the bake), 4 baked**:
+    a ball of dough, dough risen over a bowl, a scored pale loaf, a golden loaf with steam.
+    Photos after the fourth get the baked loaf.
+  - An achievement earned: the card (emoji, name, goal) springs up about a second later, sparks
+    behind it; it leaves by itself or at a tap and never takes a tap meant for anything else.
+    Several at once share one card. The very first time, that is everything earned so far.
+  - Small ones: sparks where a dragged row or photo is dropped; a perfect 5.0 chip catches the
+    light; a perfect loaf's page sparkles when opened; the tab icon hops when chosen; pages,
+    sheets and dialogs arrive rather than appear; tapping the Gallery's title makes it hop, and
+    every fifth tap throws bread.
+  - Rules: decoration never blocks a tap (`pointer-events: none`), adds no copy, and stands
+    down for `prefers-reduced-motion` (cards still show, nothing flies). `window.__lgtQuiet`
+    (set by the tests) turns it all off and holds CSS animation still (`html.quiet`); the flows
+    about celebrations open with `fx: true`.
 - **Split** on a bread's page opens a copy of the entry (name, date, photo, ratings, comments,
   recipe) that is saved as a new bread. It is for one dough baked two ways: change the
   baking on the copy and it becomes the recipe's next tweak, and the copy's name follows. The copy records

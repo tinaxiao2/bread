@@ -47,13 +47,23 @@
         ${five.map(function (n) { return html`<${Star} key=${n} fill=${fillOf(v, n)}/>`; })}
       </span>`;
     }
-    function pick(x) { props.onChange(x === v ? 0 : x); }
+    function pick(x, e) {
+      var next = x === v ? 0 : x;
+      props.onChange(next);
+      if (!next) return;
+      // the stars up to the one picked pop one after another, and it throws sparks
+      var slots = e.currentTarget.closest('.stars').querySelectorAll('.slot');
+      for (var i = 0; i < Math.ceil(next); i++) (function (slot, wait) {
+        setTimeout(function () { LGT.fx.replay(slot, 'pop'); }, wait);
+      })(slots[i], i * 45);
+      LGT.fx.star(e.currentTarget.closest('.slot'), next);
+    }
     return html`<span class="stars pick" role="group" aria-label=${props.label}>
       ${five.map(function (n) {
         return html`<span class="slot" key=${n}>
           <${Star} fill=${fillOf(v, n)}/>
-          <button type="button" class="half l" aria-label=${label(n - 0.5)} aria-pressed=${v === n - 0.5} onClick=${function () { pick(n - 0.5); }}></button>
-          <button type="button" class="half r" aria-label=${label(n)} aria-pressed=${v === n} onClick=${function () { pick(n); }}></button>
+          <button type="button" class="half l" aria-label=${label(n - 0.5)} aria-pressed=${v === n - 0.5} onClick=${function (e) { pick(n - 0.5, e); }}></button>
+          <button type="button" class="half r" aria-label=${label(n)} aria-pressed=${v === n} onClick=${function (e) { pick(n, e); }}></button>
         </span>`;
       })}
     </span>`;
@@ -67,7 +77,7 @@
 
   function Score(props) {
     if (props.value === null || props.value === undefined) return null;
-    return html`<span class="score"><svg viewBox="0 0 24 24" aria-hidden="true"><path d=${STAR}/></svg>${U.fmtRating(props.value)}</span>`;
+    return html`<span class=${'score' + (props.value >= 5 ? ' perfect' : '')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d=${STAR}/></svg>${U.fmtRating(props.value)}</span>`;
   }
 
   /** A stored photo, by asset id. */
@@ -197,6 +207,13 @@
       var now = latest.current.order, was = latest.current.keys;
       if (now.join('\n') !== was.join('\n')) {
         latest.current.onCommit(now);
+        // it landed somewhere new: a few sparks from where it was let go
+        var dropped = el.current && Array.prototype.filter.call(el.current.querySelectorAll('[data-drag]'), function (n) {
+          return n.getAttribute('data-drag') === L.key;
+        })[0];
+        var box = dropped ? dropped.getBoundingClientRect() : null;
+        if (box) LGT.fx.sparkleAt(dropped, 6, { spread: 30 }, box.width > box.height * 2 ? [0.1, 0.5] : null);
+        LGT.fx.buzz(8);
         setTimeout(function () { setTemp(null); }, 4000);   // in case the save never comes back
       } else setTemp(null);
     }

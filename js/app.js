@@ -28,6 +28,23 @@
     }, []);
     useEffect(function () { if (mainRef.current) mainRef.current.scrollTop = 0; }, [tab]);
 
+    // Achievements earned since they were last celebrated: the card springs up once for them.
+    // The first time ever, that is everything earned so far. A bread's own sparks go first.
+    var earned = useRef({ list: [], timer: null });
+    useEffect(function () {
+      var fresh = LGT.store.newAchievements(), e = earned.current;
+      if (!fresh.length) return;
+      LGT.store.markAchievementsSeen(fresh.map(function (a) { return a.id; }));
+      // ones earned a moment apart share a card
+      e.list = e.list.concat(fresh);
+      clearTimeout(e.timer);
+      e.timer = setTimeout(function () {
+        var list = e.list;
+        e.list = [];
+        LGT.fx.unlock(LGT.achievements.inOrder(list));
+      }, 1300);
+    }, [st.phase, st.breads, st.recipes, st.labelFlags, st.labelsLoaded, st.seenAchievements]);
+
     function go(t) {
       setTab(t);
       try { if (hashTab() !== t) root.location.hash = t; } catch (e) { /* the hash is a convenience only */ }
@@ -72,11 +89,11 @@
         <button type="button" class="fab" aria-label="Add bread" onClick=${function () { nav.push({ kind: 'breadForm' }); }}><${Icon} name="plus"/></button>
       </div></div>
       <nav class="tabbar"><div class="wrap">
-        <button type="button" class=${'tab' + (tab === 'gallery' ? ' on' : '')} aria-current=${tab === 'gallery' ? 'page' : null}
+        <button type="button" data-tab="gallery" class=${'tab' + (tab === 'gallery' ? ' on' : '')} aria-current=${tab === 'gallery' ? 'page' : null}
           onClick=${function () { go('gallery'); }}><${Icon} name="gallery"/>Gallery</button>
-        <button type="button" class=${'tab' + (tab === 'recipes' ? ' on' : '')} aria-current=${tab === 'recipes' ? 'page' : null}
+        <button type="button" data-tab="recipes" class=${'tab' + (tab === 'recipes' ? ' on' : '')} aria-current=${tab === 'recipes' ? 'page' : null}
           onClick=${function () { go('recipes'); }}><${Icon} name="recipes"/>Recipes</button>
-        <button type="button" class=${'tab' + (tab === 'stats' ? ' on' : '')} aria-current=${tab === 'stats' ? 'page' : null}
+        <button type="button" data-tab="stats" class=${'tab' + (tab === 'stats' ? ' on' : '')} aria-current=${tab === 'stats' ? 'page' : null}
           onClick=${function () { go('stats'); }}><${Icon} name="stats"/>Stats</button>
       </div></nav>
       ${stack.map(page)}

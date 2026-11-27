@@ -56,7 +56,8 @@
   function Tile(props) {
     var b = props.bread, cover = U.photosOf(b)[0], has = !!cover;
     var r = b.recipeId ? store.recipe(b.recipeId) : null;
-    return html`<button type="button" class=${'tile' + (has ? ' has' : '')} onClick=${props.onOpen}>
+    var fresh = store.justAdded('bread', b.id);                          // just saved: it settles in and is greeted
+    return html`<button type="button" class=${'tile' + (has ? ' has' : '') + (fresh ? ' fresh' : '')} data-fresh=${fresh ? 'bread' : null} onClick=${props.onOpen}>
       ${has ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
       ${U.photosOf(b).length > 1 ? html`<span class="many" aria-hidden="true"><${Icon} name="image"/></span>` : null}
       <span class="tl">${U.isBaked(r ? r.bake : null) ? null : html`<span class="flag">Dough</span>`}<${ui.Score} value=${U.rating(b)}/></span>
@@ -186,7 +187,8 @@
   function RecipeTile(props) {
     var g = props.group, last = g.breads[0], cover = store.groupPhotos(g)[0];
     var layers = Math.min(Math.max(g.bakedCount - 1, 0), 3);              // +1, +2, +3 or more
-    return html`<div class=${'stack s' + layers}>
+    var fresh = g.breads.some(function (b) { return store.justAdded('bread', b.id); });
+    return html`<div class=${'stack s' + layers + (fresh ? ' fresh' : '')} data-fresh=${fresh ? 'bread' : null}>
       ${[3, 2, 1].filter(function (n) { return n <= layers; }).map(function (n) { return html`<span class=${'layer l' + n} key=${n} aria-hidden="true"></span>`; })}
       ${g.bakedCount > 1 ? html`<span class="badge" aria-label=${g.bakedCount + ' entries'}>${g.bakedCount}</span>` : null}
       <button type="button" class=${'tile' + (cover ? ' has' : '')} onClick=${props.onOpen}>
@@ -271,7 +273,7 @@
     var label = SORTS.filter(function (o) { return o[0] === sort; })[0][1];
     return html`<div class="wrap">
       <div class="top">
-        <h1 class="serif">Let's Get This</h1><img class="mark" src="icons/icon.svg" alt=""/>
+        <h1 class="serif" onClick=${function (e) { LGT.fx.mark(e.currentTarget); }}>Let's Get This</h1><img class="mark" src="icons/icon.svg" alt=""/>
         <div class="controls">
           <div class="toggle" role="tablist">
             ${[['recipes', 'Recipes'], ['all', 'All']].map(function (o) {
@@ -327,7 +329,14 @@
   function BreadPage(props) {
     var nav = props.nav, b = store.bread(props.id);
     var v = useState(null), view = v[0], setView = v[1];
+    var scores = useRef(null);
     useEffect(function () { if (!b) nav.close(props.k); }, [!b]);
+    // a perfect loaf catches the light when its page is opened
+    useEffect(function () {
+      if (!b || U.rating(b) < 5) return undefined;
+      var t = setTimeout(function () { LGT.fx.sparkleAt(scores.current, 12, { spread: 64 }); }, 420);
+      return function () { clearTimeout(t); };
+    }, []);
     if (!b) return null;
     var r = store.recipe(b.recipeId);
     var which = r ? store.tweakOf(r) : null;
@@ -348,7 +357,7 @@
           <h2 class="serif"><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></h2>
           <div class="date">${U.fmtDate(b.date, true) || '–'}</div>
           ${rated || notes.length || b.comments ? html`<div class="how">
-            ${rated ? html`<div class="scores">
+            ${rated ? html`<div class="scores" ref=${scores}>
               ${U.RATINGS.map(function (k) {
                 return html`<div key=${k[0]}><span class="label">${k[1]}</span><${ui.Stars} value=${b.ratings[k[0]]}/></div>`;
               })}
@@ -410,7 +419,9 @@
         ${shown.map(function (g) {
           function open() { nav.push({ kind: 'recipe', id: g.latest.id }); }
           var last = g.breads[0], cover = store.groupPhotos(g)[0];
-          return html`<div class=${'rc' + (d.dragging === g.key ? ' lifted' : '')} key=${g.key} ...${showBaked ? {} : d.item(g.key)}>
+          var fresh = g.lines.some(function (l) { return store.justAdded('recipe', l.id); });
+          return html`<div class=${'rc' + (d.dragging === g.key ? ' lifted' : '') + (fresh ? ' fresh' : '')} key=${g.key}
+              data-fresh=${fresh ? 'recipe' : null} ...${showBaked ? {} : d.item(g.key)}>
             <div class="rtop">
               <button type="button" class="open" onClick=${open}>
                 ${last ? html`<span class="thumb">${cover ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<${Icon} name="loaf"/>`}</span>` : null}
@@ -580,7 +591,7 @@
       Promise.all(files.map(function (file) {
         return U.resizeImage(file, 1600, 0.85).catch(function () { setBusy('photo'); return null; });
       })).then(function (blobs) {
-        var added = blobs.filter(Boolean).map(function (blob) { return F.pic({ blob: blob }); });
+        var added = blobs.filter(Boolean).map(function (blob) { return F.pic({ blob: blob, fresh: Date.now() }); });
         if (added.length) set(function (cur) { return { pics: cur.pics.concat(added) }; });
       });
     }
@@ -602,7 +613,10 @@
         id: props.breadId || null,
         bread: { name: name, date: f.date, ratings: f.ratings, notes: f.notes, comments: f.comments },
         pics: f.pics, splitFrom: splitting ? props.splitFromId : null, recipe: recipeOf(f.draft), baseRecipeId: f.baseRecipeId, originalBlobs: f.pending
-      }).then(function () { nav.close(props.k); }, function () { setBusy('failed'); });
+      }).then(function () {
+        nav.close(props.k);
+        if (!editing) LGT.fx.greet('bread', { emoji: LGT.fx.breadEmoji(name), flag: U.flagEmoji(f.draft.flag) });
+      }, function () { setBusy('failed'); });
     }
     function remove() {
       setOverlay(null);
@@ -711,7 +725,10 @@
       var list = f.both
         ? d.variants.map(function (v, i) { return { recipe: recipeOf(d, i) }; })
         : [{ id: props.recipeId || null, recipe: recipeOf(d) }];
-      store.saveRecipes(list, f.pending).then(function () { nav.close(props.closes || props.k); }, function () { setBusy('failed'); });
+      store.saveRecipes(list, f.pending).then(function () {
+        nav.close(props.closes || props.k);
+        if (!editing) LGT.fx.greet('recipe', { emoji: '📖', flag: U.flagEmoji(d.flag) });
+      }, function () { setBusy('failed'); });
     }
     function remove() {
       setOverlay(null);
@@ -823,13 +840,53 @@
     }[sort] || tie;
     return list.slice().sort(by);
   }
+  /** How many countries, and how many achievements, a list shows until it is opened. */
+  var COUNTRY_ROWS = 5, ACHIEVEMENT_ROWS = 5;
+  /** The button under a shortened list: how many more there are, and a chevron that turns over. */
+  function More(props) {
+    return props.total > props.rows ? html`<button type="button" class=${'cmore' + (props.open ? ' open' : '')}
+      aria-expanded=${!!props.open} aria-label=${props.open ? 'Show fewer' : 'Show all'} onClick=${props.onToggle}>
+      ${props.open ? null : html`<span>+${props.total - props.rows}</span>`}<${Icon} name="next"/>
+    </button>` : null;
+  }
+  /**
+   * Achievements: the earned ones first (latest on top), then the nearest. An earned one shows
+   * the day it was earned; one still ahead shows how far along she is.
+   */
+  function Achievements(props) {
+    var list = LGT.achievements.inOrder(store.achievements());
+    var s = useState(false), all = s[0], setAll = s[1];
+    var earned = list.filter(function (a) { return a.earned; }).length;
+    return html`<div class="stat wide awards"><div class="lrow"><span class="label"><span class="em" aria-hidden="true">🏆</span>Achievements</span>
+        <span class="n flush">${earned} / ${list.length}</span></div>
+      <ul class="achs">
+        ${list.slice(0, all ? list.length : ACHIEVEMENT_ROWS).map(function (a) {
+          var counted = !a.earned && a.need > 1;
+          var body = html`<span class="aemoji" aria-hidden="true">${a.emoji}</span>
+            <span class="atext"><b>${a.name}</b><span class="agoal">${a.goal}</span>
+              ${counted ? html`<span class="bar"><i style=${'width:' + Math.round(Math.min(a.have / a.need, 1) * 100) + '%'}></i></span>` : null}</span>
+            <span class="aside">${a.earned ? U.fmtDate(a.date) : counted ? Math.min(a.have, a.need) + ' / ' + a.need : ''}</span>`;
+          return html`<li key=${a.id}>${a.earned
+            ? html`<button type="button" class="ach" onClick=${function (e) {
+              var badge = e.currentTarget.querySelector('.aemoji');
+              LGT.fx.replay(badge, 'hop');
+              LGT.fx.sparkleAt(badge, 8, { spread: 38 });
+            }}>${body}</button>`
+            : html`<div class="ach locked">${body}</div>`}</li>`;
+        })}
+      </ul>
+      <${More} total=${list.length} rows=${ACHIEVEMENT_ROWS} open=${all} onToggle=${function () { setAll(!all); }}/>
+    </div>`;
+  }
   function Stats(props) {
     var st = store.stats(), nav = props.nav, box = useRef(null);
     var os = useState({}), open = os[0], setOpen = os[1];
+    var as = useState(false), allCountries = as[0], setAllCountries = as[1];
     var ts = useState(null), tile = ts[0], setTile = ts[1];     // the number tile that is open, if any
     var cs = useState(remembered(COUNTRY_KEY, COUNTRY_SORTS.map(function (o) { return o[0]; }), 'recipes')), csort = cs[0], setCsort = cs[1];
     function toggle(name) { return function () { setTile(tile === name ? null : name); }; }
     var firstRow = tile === 'flour' || tile === 'loaves', secondRow = tile === 'recipes';
+    var countries = sortCountries(st.countries, csort);
     var mostBaked = st.recipeList.filter(function (r) { return r.count > 0; }).sort(function (a, b) {
       return (b.count - a.count) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     });
@@ -866,6 +923,7 @@
           <b class="avg">${st.average === null ? '–' : html`${U.fmtRating(st.average)}<svg viewBox="0 0 24 24" aria-hidden="true"><path d=${ui.STAR}/></svg>`}</b>
         </div>
         <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⏱️</span>Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
+        <${Achievements}/>
         ${st.countries.length ? html`<div class="statsort">
           <div class="sortby">
             <${Icon} name="sort"/><span>${COUNTRY_SORTS.filter(function (o) { return o[0] === csort; })[0][1]}</span>
@@ -874,10 +932,10 @@
             </select>
           </div>
         </div>` : null}
-        ${st.countries.length ? html`<div class="stat wide"><div class="lrow"><span class="label"><span class="em" aria-hidden="true">🗺️</span>Countries</span>
+        ${st.countries.length ? html`<div class="stat wide places"><div class="lrow"><span class="label"><span class="em" aria-hidden="true">🗺️</span>Countries</span>
           <span class="n">${st.countries.reduce(function (n, c) { return n + c.tried; }, 0)} / ${st.countries.reduce(function (n, c) { return n + c.count; }, 0)}</span></div>
           <ul class="countries">
-            ${sortCountries(st.countries, csort).map(function (c) {
+            ${countries.slice(0, allCountries ? countries.length : COUNTRY_ROWS).map(function (c) {
               var on = !!open[c.flag];
               return html`<li key=${c.flag} class=${on ? 'open' : ''}>
                 <button type="button" class="crow" aria-expanded=${on} onClick=${function () {
@@ -895,6 +953,7 @@
               </li>`;
             })}
           </ul>
+          <${More} total=${countries.length} rows=${COUNTRY_ROWS} open=${allCountries} onToggle=${function () { setAllCountries(!allCountries); }}/>
         </div>` : null}
       </div>
     </div>`;

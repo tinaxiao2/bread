@@ -11,12 +11,15 @@ test.before(async () => { srv = await start(0); browser = await chromium.launch(
 test.after(async () => { await browser.close(); srv.server.close(); });
 
 async function open(t, o = {}) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 1 });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 1,
+    reducedMotion: o.reducedMotion ? 'reduce' : 'no-preference' });
   const page = await context.newPage();
   page.setDefaultTimeout(8000);
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(e.message));
+  // celebrations and entrances are held still, except in the flows that are about them
+  if (!o.fx) await context.addInitScript(() => { window.__lgtQuiet = true; });
   // the app opens on Recipes by Rating; most flows look at every entry, newest first
   if (!o.fresh) {
     await context.addInitScript(() => {
@@ -746,7 +749,7 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   const tile = (label) => page.locator('.stat', { has: page.locator('.label', { hasText: new RegExp('^[^A-Za-z]*' + label + '$', 'i') }) }).locator('b').first();
   assert.equal(await tile('Recipes').innerText(), '2', 'every recipe, baked or to try');
   assert.equal(await tile('Countries').first().innerText(), '1');
-  assert.equal(await page.locator('.lrow .n').innerText(), '1 / 1', 'recipes tried, of all, across countries');
+  assert.equal(await page.locator('.places .lrow .n').innerText(), '1 / 1', 'recipes tried, of all, across countries');
 
   // a recipe not baked yet counts too, and shows in gray
   await page.getByRole('button', { name: 'Recipes', exact: true }).click();
@@ -759,7 +762,7 @@ test('a flag chosen for a recipe shows before its name everywhere', async (t) =>
   await formGone(page);
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   assert.match(await page.locator('.countries .crow').innerText(), /China\s+1 \/ 2/);
-  assert.equal(await page.locator('.lrow .n').innerText(), '1 / 2');
+  assert.equal(await page.locator('.places .lrow .n').innerText(), '1 / 2');
   await page.locator('.stat .tilehead', { hasText: /Recipes/i }).click();
   assert.deepEqual(await page.locator('.tlist .untried').allInnerTexts(), ['\u{1F1E8}\u{1F1F3}Bao'], 'not baked yet: gray');
   await page.locator('.stat .tilehead', { hasText: /Recipes/i }).click();
@@ -923,6 +926,169 @@ test('a second proof is added with +', async (t) => {
   const card = await page.locator('.bake').innerText();
   assert.match(card, /PROOFING\s+Fridge\s+10 h/i);
   assert.match(card, /2ND PROOF\s+Air fryer\s+45 min/i);
+});
+
+test('the country list shows five countries until it is opened', async (t) => {
+  const r = (name, n, flag) => ({ name, ingredients: [{ group: 'flour', type: 'AP', amount: '500', unit: 'g' }], bake: { programs: [1], size: '1.5', minutes: 205 },
+    method: '', source: '', link: '', parent: '', flag, originals: [], basedOn: null, line: 'r' + n, tweak: 1, createdAt: n, updatedAt: n });
+  const db = {};
+  // seven countries: China has three recipes, France two, the rest one each
+  ['CN', 'CN', 'CN', 'FR', 'FR', 'CH', 'DE', 'IT', 'JP', 'US'].forEach((flag, i) => { db['recipes/' + (i + 1)] = r('Recipe ' + (i + 1), i + 1, flag); });
+  const page = await open(t, { db });
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  const names = () => page.locator('.countries .cname').allInnerTexts();
+  assert.deepEqual(await names(), ['China', 'France', 'Germany', 'Italy', 'Japan'], 'the first five in the chosen order');
+  assert.equal(await page.locator('.places .cmore').innerText(), '+2');
+  assert.equal(await page.locator('.places .lrow .n').innerText(), '0 / 10', 'the count still covers every country');
+  await page.locator('.places').getByRole('button', { name: 'Show all' }).click();
+  assert.deepEqual(await names(), ['China', 'France', 'Germany', 'Italy', 'Japan', 'Switzerland', 'United States']);
+  await page.locator('.places').getByRole('button', { name: 'Show fewer' }).click();
+  await count(page.locator('.countries .cname'), 5);
+  // the order chosen decides which five
+  await field(page, 'Sort countries').selectOption('az');
+  assert.deepEqual(await names(), ['China', 'France', 'Germany', 'Italy', 'Japan']);
+});
+
+// ---------- achievements and celebrations ----------
+// Three loaves from three countries, one of them rated five stars; a German recipe still to try.
+const FEATS = (() => {
+  const r = (name, n, flag, extra) => Object.assign({ name, ingredients: [{ group: 'flour', type: 'AP', amount: '500', unit: 'g' }], bake: { programs: [1], size: '1.5', minutes: 205 },
+    method: '', source: 'Reddit', link: '', parent: '', flag, originals: [], basedOn: null, line: 'r' + n, tweak: 1, createdAt: n, updatedAt: n }, extra);
+  const b = (name, rid, n, date, stars) => ({ name, date, recipeId: rid, photos: [{ full: 'seed' + n, thumb: 'seed' + n }], photo: null, comments: '', notes: { crust: '', crumb: '', taste: '' },
+    ratings: { crust: stars, crumb: stars, taste: stars }, createdAt: n, updatedAt: n });
+  return {
+    'recipes/r1': r('Mantou', 1, 'CN'), 'recipes/r2': r('Baguette', 2, 'FR'), 'recipes/r3': r('Cinnamon Rolls', 3, 'US'), 'recipes/r4': r('Soft pretzels', 4, 'DE'),
+    'breads/1': b('Mantou', 'r1', 1, '2026-11-10', 3), 'breads/2': b('Baguette', 'r2', 2, '2026-11-12', 4.5), 'breads/3': b('Cinnamon Rolls', 'r3', 3, '2026-11-15', 5)
+  };
+})();
+const EARNED = ['Bakersfield, CA', 'Bing bing', 'Bread-y or not', 'Doughpamine', 'Eat, pray, loaf', 'France', 'Rising star', 'The best thing since sliced'];
+
+test('achievements are listed on Stats: the earned with their day, the rest with how far along', async (t) => {
+  const page = await open(t, { db: FEATS });
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  const box = page.locator('.awards'), rows = box.locator('.ach');
+  assert.equal(await box.locator('.lrow .n').innerText(), '8 / 29', 'earned, of all there are');
+  await count(rows, 5);
+  assert.deepEqual(await rows.locator('b').allInnerTexts(), ['Doughpamine', 'The best thing since sliced', 'Eat, pray, loaf', 'Bakersfield, CA', 'Rising star'],
+    'the earned first, the latest on top');
+  assert.match(await rows.first().innerText(), /Doughpamine\s+Give Taste 5 stars\s+Nov 15/);
+  assert.equal(await box.locator('.cmore').innerText(), '+24');
+
+  await box.getByRole('button', { name: 'Show all' }).click();
+  await count(rows, 29);
+  assert.deepEqual((await box.locator('.ach:not(.locked) b').allInnerTexts()).sort(), EARNED);
+  const row = (name) => box.locator('.ach', { has: page.locator('b', { hasText: new RegExp('^' + name + '$') }) });
+  assert.match(await row('Doughmesticated').innerText(), /Bake 10 loaves\s+3 \/ 10/);
+  assert.match(await row('Flour power').innerText(), /Use 10 lb of flour\s+3\.3 \/ 10/);
+  assert.match(await row('Breddit').innerText(), /Bake 10 recipes from Reddit\s+3 \/ 10/);
+  assert.match(await row('Gluten tag').innerText(), /Bake a bread from Germany$/);
+  assert.equal(await row('Gluten tag').locator('.aemoji').innerText(), '\u{1F1E9}\u{1F1EA}');
+  assert.equal(await row('Like naan other').count(), 1, 'the named countries are listed even with no recipe from them');
+  await box.getByRole('button', { name: 'Show fewer' }).click();
+  await count(rows, 5);
+
+  // baking the German recipe earns its own: it moves up, with the day it was earned
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
+  await page.getByRole('tab', { name: /To try/ }).click();
+  await page.locator('.rc').getByRole('button', { name: 'Bake this' }).click();
+  await field(page, 'Date').fill('2026-11-20');
+  await save(page);
+  await formGone(page);
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  assert.equal(await box.locator('.lrow .n').innerText(), '9 / 29');
+  assert.match(await rows.first().innerText(), /Gluten tag\s+Bake a bread from Germany\s+Nov 20/);
+});
+
+test('what is already earned is celebrated once; a new bread is greeted, and what it earns springs up', async (t) => {
+  const page = await open(t, { db: FEATS, fx: true });
+  const card = page.locator('.unlock');
+  await card.waitFor();
+  assert.deepEqual((await card.locator('b').allInnerTexts()).sort(), EARNED, 'the first time: everything earned so far');
+  assert.equal(await card.getAttribute('role'), 'status');
+  await page.locator('.spark').first().waitFor({ state: 'attached' });
+  // it does not get in the way: what is beside it can still be tapped, and a tap sends it off
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  await page.getByRole('heading', { name: 'Stats' }).waitFor();
+  await card.click();
+  await card.waitFor({ state: 'detached' });
+
+  // not again, after a reload
+  await page.reload();
+  await page.locator('.awards').waitFor();
+  await page.waitForTimeout(1900);
+  await count(card, 0);
+
+  // a new bread: sparks from its tile, its emoji floating up, then the card for what it earned
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
+  await page.getByRole('tab', { name: /To try/ }).click();
+  await page.locator('.rc').getByRole('button', { name: 'Bake this' }).click();
+  await save(page);
+  await formGone(page);
+  await page.locator('.spark').first().waitFor({ state: 'attached' });
+  assert.equal(await page.locator('.floaty').innerText(), '\u{1F968}', 'a pretzel for the pretzels');
+  await card.waitFor();
+  assert.deepEqual(await card.locator('b').allInnerTexts(), ['Gluten tag']);
+  assert.equal(await card.locator('i').innerText(), 'BAKE A BREAD FROM GERMANY');
+  assert.equal(await card.locator('.uemoji').innerText(), '\u{1F1E9}\u{1F1EA}');
+  await card.waitFor({ state: 'detached', timeout: 6000 });      // one card leaves by itself
+});
+
+test('a new recipe is greeted where it lands; photos get the little loaf at each stage; stars throw sparks', async (t) => {
+  const page = await open(t, { fx: true });
+  // a recipe typed in: its row on the To try list is marked and throws sparks
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click();
+  await page.getByRole('tab', { name: /To try/ }).click();
+  await page.getByRole('button', { name: 'Add recipe' }).click();
+  await page.getByRole('button', { name: 'Type it in' }).click();
+  await field(page, 'Name').fill('Focaccia');
+  await save(page);
+  await formGone(page);
+  await page.locator('.rc.fresh[data-fresh="recipe"]').waitFor();
+  await page.locator('.spark').first().waitFor({ state: 'attached' });
+  assert.equal(await page.locator('.floaty').innerText(), '\u{1F4D6}');
+  await page.locator('.spark').first().waitFor({ state: 'detached' });
+
+  // photos, one at a time and then two together: kneading, proofing, shaped, baked
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('Stages');
+  const stage = (n) => page.locator('.stagefx.s' + n);
+  await field(page, 'Photo').setInputFiles(await picture(page, '#d9c7a0'));
+  await stage(1).waitFor({ state: 'attached' });
+  await field(page, 'Photo').setInputFiles(await picture(page, '#e3d3ae'));
+  await stage(2).waitFor({ state: 'attached' });
+  await field(page, 'Photo').setInputFiles([await picture(page, '#e8dcc0'), await picture(page, '#c98a3f')]);
+  await stage(3).waitFor({ state: 'attached' });
+  await stage(4).waitFor({ state: 'attached' });
+  await count(page.locator('.photos .photo.has'), 4);
+  await stage(4).waitFor({ state: 'detached', timeout: 4000 });
+  await count(page.locator('.stagefx'), 0, 'they leave by themselves');
+
+  // a star picked pops and throws sparks; taking the rating back does not
+  await page.locator('.spark').first().waitFor({ state: 'detached' }).catch(() => {});
+  await page.getByRole('group', { name: 'Taste' }).getByRole('button', { name: '5 of 5' }).click();
+  await page.locator('.spark').first().waitFor({ state: 'attached' });
+  assert.ok(await page.locator('.spark').count() >= 16, 'five stars throw the most');
+  await page.locator('.spark').first().waitFor({ state: 'detached' });
+  await page.getByRole('group', { name: 'Taste' }).getByRole('button', { name: '5 of 5' }).click();
+  await page.waitForTimeout(150);
+  await count(page.locator('.spark'), 0);
+});
+
+test('with less motion asked for, nothing flies but the card still shows', async (t) => {
+  const page = await open(t, { db: FEATS, fx: true, reducedMotion: true });
+  const card = page.locator('.unlock');
+  await card.waitFor();
+  assert.equal((await card.locator('b').allInnerTexts()).length, EARNED.length);
+  await count(page.locator('.spark'), 0);
+  assert.equal(await card.evaluate((el) => getComputedStyle(el).opacity), '1');
+  await card.click();
+  await card.waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Photo').setInputFiles(await picture(page, '#d9c7a0'));
+  await page.locator('.photos .photo.has').waitFor();
+  await page.getByRole('group', { name: 'Taste' }).getByRole('button', { name: '5 of 5' }).click();
+  await page.waitForTimeout(400);
+  await count(page.locator('.spark, .stagefx, .floaty'), 0);
 });
 
 test('the Baked recipes can be sorted like the Gallery', async (t) => {
@@ -1435,7 +1601,7 @@ test('interface copy follows the owner\'s rules', async (t) => {
     const found = await page.evaluate(() => {
       const out = { headings: [], labels: [], other: [] };
       const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-      const ours = (el) => !el.closest('.tile, .rc .open, .rc .body, .opt, .suggest, .ings, .src, .method, .comments, .notes, .tname, #f-parent, #f-flag, #f-sort');
+      const ours = (el) => !el.closest('.tile, .rc .open, .rc .body, .opt, .suggest, .ings, .src, .method, .comments, .notes, .tname, .achs, #f-parent, #f-flag, #f-sort');
       document.querySelectorAll('h1,h2,h3').forEach((el) => { if (visible(el)) out.headings.push(el.textContent.trim()); });
       document.querySelectorAll('button, .label, .pill, .flag, option, label').forEach((el) => {
         if ((visible(el) || el.tagName === 'OPTION') && ours(el)) out.labels.push(el.textContent.trim());

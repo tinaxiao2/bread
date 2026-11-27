@@ -5,7 +5,8 @@
    program that stops before baking. `manual` marks the one whose time is set by hand each
    time it is used, which the log records as added time. `kneading` is a dough program's time
    without its rise: the log records the rise as proofing, so Dough's 90 minutes are 25 of
-   kneading and a 65 minute proof in the machine (`proofMinutes`). */
+   kneading and a 65 minute proof in the machine (`proofMinutes`). `fast` and `wholeWheat` mark
+   the programs two achievements look for. */
 (function (root) {
   var LGT = root.LGT = root.LGT || {};
   LGT.machine = {
@@ -24,8 +25,8 @@
     programs: [
       { n: 1, name: 'White', aka: ['Basic'], crust: true, minutes: { '1': 198, '1.5': 205, '2': 210 } },
       { n: 2, name: 'French', aka: ['Italian'], crust: false, minutes: { '1': 245, '1.5': 255, '2': 260 } },
-      { n: 3, name: 'Whole Wheat', aka: ['Whole Grain', 'Wheat'], crust: true, minutes: { '1': 237, '1.5': 245, '2': 250 } },
-      { n: 4, name: 'Ultra-Fast', aka: ['Rapid', 'Express'], crust: true, minutes: { '1': 113, '1.5': 123 } },
+      { n: 3, name: 'Whole Wheat', aka: ['Whole Grain', 'Wheat'], crust: true, minutes: { '1': 237, '1.5': 245, '2': 250 }, wholeWheat: true },
+      { n: 4, name: 'Ultra-Fast', aka: ['Rapid', 'Express'], crust: true, minutes: { '1': 113, '1.5': 123 }, fast: true },
       { n: 5, name: 'Sweet', aka: [], crust: true, minutes: { '1': 195, '1.5': 200 } },
       { n: 6, name: 'Gluten-Free', aka: [], crust: true, minutes: { '1.5': 135 } },
       { n: 7, name: 'Artisan Dough', aka: [], crust: false, total: 305, dough: true },

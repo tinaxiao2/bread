@@ -350,6 +350,20 @@
   function PhotosField(props) {
     var items = props.items || [], byKey = {};
     items.forEach(function (it) { byKey[it.key] = it; });
+    // A photo just picked is greeted once: the little loaf at the stage its place stands for.
+    var greeted = useRef({});
+    useEffect(function () {
+      var wait = 0;
+      items.forEach(function (it, n) {
+        if (!it.fresh || greeted.current[it.key]) return;
+        greeted.current[it.key] = true;
+        setTimeout(function () {
+          var el = root.document.querySelector('[data-pic="' + it.key + '"]');
+          if (el) LGT.fx.stage(el, n + 1);
+        }, 160 + wait);
+        wait += 240;
+      });
+    }, [items.map(function (it) { return it.key; }).join(' ')]);
     var d = ui.useDragOrder(items.map(function (it) { return it.key; }), function (keys) {
       props.onChange(keys.map(function (k) { return byKey[k]; }).filter(Boolean));
     });
@@ -362,7 +376,7 @@
       ${d.order.map(function (k, n) {
         var it = byKey[k];
         if (!it) return null;
-        return html`<div class=${'photo has' + (d.dragging === k ? ' lifted' : '')} key=${k} ...${d.item(k)}>
+        return html`<div class=${'photo has' + (d.dragging === k ? ' lifted' : '') + (it.fresh && Date.now() - it.fresh < 900 ? ' fresh' : '')} key=${k} data-pic=${k} ...${d.item(k)}>
           <button type="button" class="view" aria-label=${'Photo ' + (n + 1)}
             onClick=${function () { props.onView(it.photo ? { id: it.photo.full } : { blob: it.blob }); }}>
             ${it.photo ? html`<${ui.Photo} id=${it.photo.thumb || it.photo.full}/>` : html`<${ui.BlobImage} blob=${it.blob}/>`}

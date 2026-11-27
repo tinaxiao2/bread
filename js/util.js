@@ -9,6 +9,12 @@
     var d = new Date();
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
+  /** The local day ("YYYY-MM-DD") a timestamp falls on, or '' for none. */
+  function isoDay(ms) {
+    if (!ms) return '';
+    var d = new Date(ms);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
   function parseDate(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
     return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
@@ -539,7 +545,7 @@
   }
 
   LGT.util = {
-    today: today, parseDate: parseDate, fmtDate: fmtDate,
+    today: today, isoDay: isoDay, parseDate: parseDate, fmtDate: fmtDate,
     num: num, fmtMinutes: fmtMinutes, splitMinutes: splitMinutes, joinMinutes: joinMinutes,
     prettyAmount: prettyAmount, parseAmount: parseAmount, amountLabel: amountLabel, unitLabel: unitLabel,
     UNITS: UNITS, GROUPS: GROUPS, GROUP_LABEL: GROUP_LABEL, DEFAULT_TYPES: DEFAULT_TYPES, DEFAULT_UNIT: DEFAULT_UNIT,
