@@ -39,7 +39,7 @@
     });
     var e = U.flagEmoji(props.value);
     return html`<div class=${'flagpick' + (e ? ' set' : '')}>
-      ${e ? html`<span class="fl" aria-hidden="true">${e}</span>` : html`<${Icon} name="flag"/>`}
+      ${e ? html`<span class="fl" key=${props.value} aria-hidden="true">${e}</span>` : html`<${Icon} name="flag"/>`}
       <select id=${props.id || 'f-flag'} aria-label=${props.label || 'Flag'} value=${props.value || ''} onChange=${val(props.onChange)}>
         <option value="">–</option>
         ${list.map(function (c) { return html`<option key=${c} value=${c}>${U.flagEmoji(c) + ' ' + U.flagName(c)}</option>`; })}
@@ -71,7 +71,7 @@
     function setType(type) { change(U.countedRow(Object.assign({}, ing, { type: type, _auto: false }))); }
     var metric = ing.unit === 'g' || ing.unit === 'ml' || ing.unit === 'oz' || ing.unit === 'lb';
     var id = 'ing-' + ing._k;
-    return html`<div class="line">
+    return html`<div class=${'line' + (ing._new && Date.now() - ing._new < 900 ? ' fresh' : '')}>
       ${ing.group === 'salt' ? html`<span></span>`
         : ing.group === 'other'
           ? html`<input id=${id + '-name'} class="mini" value=${ing.type} placeholder="Ingredient" aria-label="Ingredient"
@@ -94,6 +94,7 @@
     function add(group, name) {
       var row = U.newIngredient(group, name);
       if (group === 'other' && !name) row._auto = false;         // a blank row is hers to name
+      row._new = Date.now();                                     // so it can settle in; never saved
       props.onChange(list.concat(keyed([row])));
     }
     var groups = U.GROUPS.filter(function (g) { return list.some(function (i) { return i.group === g; }); });
@@ -225,11 +226,11 @@
         function put(patch) {
           set({ extraProofs: extras.map(function (y, j) { return j === i ? Object.assign({}, y, patch) : y; }) });
         }
-        return html`<${Proof} key=${i} label=${U.ordinal(i + 2) + ' proof'} timeLabel=${U.ordinal(i + 2) + ' proof time'} names=${name}
+        return html`<div class="proofx" key=${i}><${Proof} label=${U.ordinal(i + 2) + ' proof'} timeLabel=${U.ordinal(i + 2) + ' proof time'} names=${name}
           places=${x.proof} minutes=${x.minutes}
           onPlaces=${function (list) { put({ proof: list }); }}
           onMinutes=${function (m) { put({ minutes: m }); }}
-          onRemove=${function () { set({ extraProofs: extras.filter(function (y, j) { return j !== i; }) }); }}/>`;
+          onRemove=${function () { set({ extraProofs: extras.filter(function (y, j) { return j !== i; }) }); }}/></div>`;
       })}
       <button type="button" class="addproof" aria-label="Add proof" onClick=${function () { set({ extraProofs: extras.concat([U.newProof()]) }); }}><${Icon} name="plus"/></button>
       ${oven ? html`<${Field} label="Oven">
@@ -318,7 +319,9 @@
   function RatingsEditor(props) {
     var ratings = props.ratings, notes = props.notes;
     var s = useState({}), open = s[0], setOpen = s[1];
-    return html`<div class="rate">
+    var box = useRef(null);
+    function allFive(r) { return U.RATINGS.every(function (k) { return r[k[0]] >= 5; }); }
+    return html`<div class="rate" ref=${box}>
       ${U.RATINGS.map(function (k) {
         var key = k[0], label = k[1], showNote = open[key] || !!notes[key];
         function setNote(v) { var n = Object.assign({}, notes); n[key] = v; props.onChange(ratings, n); }
@@ -327,6 +330,8 @@
             <b>${label}</b>
             <${ui.Stars} label=${label} value=${ratings[key]} onChange=${function (v) {
               var r = Object.assign({}, ratings); r[key] = v; props.onChange(r, notes);
+              // five for crust, crumb and taste: the whole card celebrates, after the star's own sparks
+              if (allFive(r) && !allFive(ratings)) setTimeout(function () { LGT.fx.perfect(box.current); }, 320);
             }}/>
             ${showNote ? null : html`<button type="button" class="noteb" onClick=${function () {
               var o = Object.assign({}, open); o[key] = true; setOpen(o);
@@ -344,8 +349,9 @@
   function pic(x) { return Object.assign({ key: 'p' + (++picSeq) }, x); }
 
   /**
-   * The bread's photos in order, cover first, with + at the end. Drag a photo to move it.
-   * props: items ([{key, photo} | {key, blob}]), onChange(items), onAdd(files), onView({id} | {blob})
+   * The bread's photos in order, cover first, with + at the end. Drag a photo to move it. Each
+   * carries the stage it was taken at, shown on it and changed there.
+   * props: items ([{key, photo, stage} | {key, blob, stage}]), onChange(items), onAdd(files), onView({id} | {blob})
    */
   function PhotosField(props) {
     var items = props.items || [], byKey = {};
@@ -359,7 +365,7 @@
         greeted.current[it.key] = true;
         setTimeout(function () {
           var el = root.document.querySelector('[data-pic="' + it.key + '"]');
-          if (el) LGT.fx.stage(el, n + 1);
+          if (el) LGT.fx.stage(el, U.stageNumber(it.stage) || n + 1);
         }, 160 + wait);
         wait += 240;
       });
@@ -383,6 +389,17 @@
           </button>
           <button type="button" class="x" aria-label="Remove photo"
             onClick=${function () { props.onChange(items.filter(function (x) { return x.key !== k; })); }}><${Icon} name="close"/></button>
+          <div class=${'pstage' + (it.stage ? '' : ' none')}>
+            <span>${U.stageLabel(it.stage) || '–'}</span>
+            <select aria-label="Stage" value=${it.stage || ''} onChange=${function (e) {
+              var stage = U.cleanStage(e.target.value), thumb = e.target.closest('.photo');
+              props.onChange(items.map(function (x) { return x.key === k ? Object.assign({}, x, { stage: stage }) : x; }));
+              if (stage) LGT.fx.stage(thumb, U.stageNumber(stage));      // the little loaf shows what was picked
+            }}>
+              <option value="">–</option>
+              ${U.STAGES.map(function (st) { return html`<option key=${st.id} value=${st.id}>${st.label}</option>`; })}
+            </select>
+          </div>
         </div>`;
       })}
       <div class="photo add">

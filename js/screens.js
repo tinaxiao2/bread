@@ -53,14 +53,18 @@
     return best;
   }
 
+  /** A tile's place in the grid, for arriving in turn (the first ten; the rest come with the tenth). */
+  function place(i) { return i === undefined ? null : '--i:' + Math.min(i, 9); }
   function Tile(props) {
     var b = props.bread, cover = U.photosOf(b)[0], has = !!cover;
     var r = b.recipeId ? store.recipe(b.recipeId) : null;
     var fresh = store.justAdded('bread', b.id);                          // just saved: it settles in and is greeted
-    return html`<button type="button" class=${'tile' + (has ? ' has' : '') + (fresh ? ' fresh' : '')} data-fresh=${fresh ? 'bread' : null} onClick=${props.onOpen}>
+    return html`<button type="button" class=${'tile' + (has ? ' has' : '') + (fresh ? ' fresh' : '')} data-fresh=${fresh ? 'bread' : null}
+        style=${place(props.i)} onClick=${props.onOpen}>
       ${has ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
       ${U.photosOf(b).length > 1 ? html`<span class="many" aria-hidden="true"><${Icon} name="image"/></span>` : null}
-      <span class="tl">${U.isBaked(r ? r.bake : null) ? null : html`<span class="flag">Dough</span>`}<${ui.Score} value=${U.rating(b)}/></span>
+      <span class="tl">${U.isBaked(r ? r.bake : null) ? null : html`<span class="flag">Dough</span>`}<${ui.Score} value=${U.rating(b)}/>${
+        b.gifted ? html`<span class="gift" role="img" aria-label="Gifted"><${Icon} name="gift"/></span>` : null}</span>
       <span class="meta"><b><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></b><small>${U.fmtDate(b.date) || '–'}</small></span>
     </button>`;
   }
@@ -171,7 +175,7 @@
         onCancel=${props.onCancel} onConfirm=${function () { attempt[1](attempt[0] + 1); }}/>`;
     }
     return html`<div class="busy" role="status" aria-label="Reading">
-      <div class="spinner"></div>
+      <${ui.Dough} stage=${1}/>
       <button type="button" class="btn ghost sm" onClick=${function () { if (ctl.current) ctl.current.abort(); }}>Stop</button>
     </div>`;
   }
@@ -188,9 +192,9 @@
     var g = props.group, last = g.breads[0], cover = store.groupPhotos(g)[0];
     var layers = Math.min(Math.max(g.bakedCount - 1, 0), 3);              // +1, +2, +3 or more
     var fresh = g.breads.some(function (b) { return store.justAdded('bread', b.id); });
-    return html`<div class=${'stack s' + layers + (fresh ? ' fresh' : '')} data-fresh=${fresh ? 'bread' : null}>
+    return html`<div class=${'stack s' + layers + (fresh ? ' fresh' : '')} data-fresh=${fresh ? 'bread' : null} style=${place(props.i)}>
       ${[3, 2, 1].filter(function (n) { return n <= layers; }).map(function (n) { return html`<span class=${'layer l' + n} key=${n} aria-hidden="true"></span>`; })}
-      ${g.bakedCount > 1 ? html`<span class="badge" aria-label=${g.bakedCount + ' entries'}>${g.bakedCount}</span>` : null}
+      ${g.bakedCount > 1 ? html`<span class="badge" key=${'n' + g.bakedCount} aria-label=${g.bakedCount + ' entries'}>${g.bakedCount}</span>` : null}
       <button type="button" class=${'tile' + (cover ? ' has' : '')} onClick=${props.onOpen}>
       ${cover ? html`<${ui.Photo} id=${cover.thumb || cover.full}/>` : html`<span class="blank"><${Icon} name="loaf"/></span>`}
       <span class="tl"><${ui.Score} value=${bestRating(g.breads)}/></span>
@@ -289,13 +293,13 @@
           </div>
         </div>
       </div>
-      <div class=${'gal' + (view === 'recipes' ? ' stacks' : '')}>
+      <div class=${'gal' + (view === 'recipes' ? ' stacks' : '')} key=${view + ':' + sort}>
         ${view === 'recipes'
-          ? sorted('recipes', sort).map(function (g) {
-            return html`<${RecipeTile} key=${g.key} group=${g} onOpen=${function () { nav.push({ kind: 'recipe', id: g.latest.id }); }}/>`;
+          ? sorted('recipes', sort).map(function (g, i) {
+            return html`<${RecipeTile} key=${g.key} i=${i} group=${g} onOpen=${function () { nav.push({ kind: 'recipe', id: g.latest.id }); }}/>`;
           })
-          : sorted('all', sort, props.state.breads).map(function (b) {
-            return html`<${Tile} key=${b.id} bread=${b} onOpen=${function () { nav.push({ kind: 'bread', id: b.id }); }}/>`;
+          : sorted('all', sort, props.state.breads).map(function (b, i) {
+            return html`<${Tile} key=${b.id} i=${i} bread=${b} onOpen=${function () { nav.push({ kind: 'bread', id: b.id }); }}/>`;
           })}
       </div>
     </div>`;
@@ -314,7 +318,7 @@
       <div class="hero-row" ref=${ref} onScroll=${onScroll}>
         ${photos.map(function (p, i) {
           return html`<button type="button" class="hero" key=${p.full} aria-label=${'Photo ' + (i + 1)} onClick=${function () { props.onView({ id: p.full }); }}>
-            <${ui.Photo} id=${p.full}/></button>`;
+            <${ui.Photo} id=${p.full}/>${U.stageLabel(p.stage) ? html`<span class="stagechip">${U.stageLabel(p.stage)}</span>` : null}</button>`;
         })}
       </div>
       ${photos.length > 10 ? html`<span class="herocount">${at + 1} / ${photos.length}</span>` : null}
@@ -355,7 +359,8 @@
         ${photo ? html`<${Hero} photos=${photos} onView=${setView}/>` : null}
         <div class=${'wrap page' + (photo ? '' : ' nohero')}>
           <h2 class="serif"><${ui.Named} flag=${store.breadFlag(b)} name=${b.name}/></h2>
-          <div class="date">${U.fmtDate(b.date, true) || '–'}</div>
+          <div class="date">${U.fmtDate(b.date, true) || '–'}${
+            b.gifted ? html`<span class="gift" role="img" aria-label="Gifted"><${Icon} name="gift"/></span>` : null}</div>
           ${rated || notes.length || b.comments ? html`<div class="how">
             ${rated ? html`<div class="scores" ref=${scores}>
               ${U.RATINGS.map(function (k) {
@@ -492,7 +497,7 @@
             ? html`<h3 class="serif tname pname"><${ui.Named} flag=${line.flag} name=${line.name}/></h3>` : null}
           ${g.label && list.length > 1 ? html`<div class="pager">
             <button type="button" class="round" aria-label="Previous recipe" disabled=${at <= 0} onClick=${function () { step(-1); }}><${Icon} name="back"/></button>
-            <h3 class="serif"><${ui.Named} flag=${line.flag} name=${line.name}/></h3>
+            <h3 class="serif linepane" key=${line.id}><${ui.Named} flag=${line.flag} name=${line.name}/></h3>
             <button type="button" class="round" aria-label="Next recipe" disabled=${at >= list.length - 1} onClick=${function () { step(1); }}><${Icon} name="next"/></button>
           </div>` : null}
           ${line.tweaks.map(function (rv) {
@@ -566,7 +571,8 @@
         // Until she types her own, the name is the recipe's with the number of the tweak it lands in.
         named: !!bread && (!base || U.nameKey(bread.name) !== U.nameKey(store.tweakTitle(base))),
         date: bread ? bread.date : U.today(),
-        pics: U.photosOf(bread).map(function (p) { return F.pic({ photo: p }); }),
+        pics: U.photosOf(bread).map(function (p) { return F.pic({ photo: p, stage: U.cleanStage(p.stage) }); }),
+        gifted: !!(bread && props.breadId && bread.gifted),                // a split copy starts ungifted
         ratings: Object.assign({ crust: 0, crumb: 0, taste: 0 }, bread && bread.ratings),
         notes: Object.assign({ crust: '', crumb: '', taste: '' }, bread && bread.notes),
         comments: bread ? bread.comments : '',
@@ -591,8 +597,13 @@
       Promise.all(files.map(function (file) {
         return U.resizeImage(file, 1600, 0.85).catch(function () { setBusy('photo'); return null; });
       })).then(function (blobs) {
-        var added = blobs.filter(Boolean).map(function (blob) { return F.pic({ blob: blob, fresh: Date.now() }); });
-        if (added.length) set(function (cur) { return { pics: cur.pics.concat(added) }; });
+        var picked = blobs.filter(Boolean), now = Date.now();
+        // each starts at the stage its place stands for: the 1st kneading … the 4th and after baked
+        if (picked.length) set(function (cur) {
+          return { pics: cur.pics.concat(picked.map(function (blob, i) {
+            return F.pic({ blob: blob, fresh: now, stage: U.stageAt(cur.pics.length + i + 1) });
+          })) };
+        });
       });
     }
     function useRecipe(r) {
@@ -609,13 +620,15 @@
     function save() {
       if (!name.trim() || busy === 'saving') return;
       setBusy('saving');
+      // a recipe baked for the very first time
+      var firstBake = !!U.parseDate(f.date) && !!baseLine && !baseLine.baked;
       store.saveBread({
         id: props.breadId || null,
-        bread: { name: name, date: f.date, ratings: f.ratings, notes: f.notes, comments: f.comments },
+        bread: { name: name, date: f.date, ratings: f.ratings, notes: f.notes, comments: f.comments, gifted: f.gifted },
         pics: f.pics, splitFrom: splitting ? props.splitFromId : null, recipe: recipeOf(f.draft), baseRecipeId: f.baseRecipeId, originalBlobs: f.pending
       }).then(function () {
         nav.close(props.k);
-        if (!editing) LGT.fx.greet('bread', { emoji: LGT.fx.breadEmoji(name), flag: U.flagEmoji(f.draft.flag) });
+        if (!editing) LGT.fx.greet('bread', { emoji: LGT.fx.breadEmoji(name), flag: U.flagEmoji(f.draft.flag), more: firstBake ? ['🎉'] : [] });
       }, function () { setBusy('failed'); });
     }
     function remove() {
@@ -663,6 +676,8 @@
           <input id="f-date" class="input date" type="date" value=${f.date} aria-label="Date" onInput=${function (e) { set({ date: e.target.value }); }}/>
           <button type="button" class=${'nodate' + (f.date ? '' : ' on')} aria-label="No date" aria-pressed=${!f.date}
             onClick=${function () { set({ date: f.date ? '' : U.today() }); }}>–</button>
+          <button type="button" class=${'giftbtn' + (f.gifted ? ' on' : '')} aria-label="Gifted" aria-pressed=${!!f.gifted}
+            onClick=${function (e) { if (!f.gifted) LGT.fx.gift(e.currentTarget); set({ gifted: !f.gifted }); }}><${Icon} name="gift"/></button>
         </div>
       <//>
       <${VariantChips} draft=${f.draft} onPick=${function (i) { set({ draft: Object.assign({}, f.draft, { index: i }) }); }}/>
@@ -809,9 +824,13 @@
   /** A number tile. Tapping its heading opens it full width with the list behind the number. */
   function NumberTile(props) {
     var tappable = !!props.onToggle;
-    var head = html`<span class="label"><span class="em" aria-hidden="true">${props.emoji}</span>${props.label}</span><b>${props.value}</b>`;
+    var head = html`<span class="label"><span class="em" aria-hidden="true">${props.emoji}</span>${props.label}</span>
+      <b><${ui.CountUp} value=${props.value} format=${props.format}/></b>`;
     return html`<div class=${'stat' + (props.wide ? ' wide' : '')}>
-      ${tappable ? html`<button type="button" class="tilehead" aria-expanded=${!!props.open} onClick=${props.onToggle}>${head}</button>` : head}
+      ${tappable ? html`<button type="button" class="tilehead" aria-expanded=${!!props.open} onClick=${function (e) {
+        LGT.fx.replay(e.currentTarget.querySelector('.em'), 'hop');
+        props.onToggle();
+      }}>${head}</button>` : head}
       ${props.open ? props.children : null}
     </div>`;
   }
@@ -901,7 +920,7 @@
     return html`<div class="wrap">
       <div class="top"><h1 class="serif">Stats</h1></div>
       <div class="stats" ref=${box}>
-        <${NumberTile} emoji="🌾" label="Flour used" value=${U.fmtWeight(st.flourGrams)} wide=${firstRow} open=${tile === 'flour'} onToggle=${toggle('flour')}>
+        <${NumberTile} emoji="🌾" label="Flour used" value=${st.flourGrams} format=${U.fmtWeight} wide=${firstRow} open=${tile === 'flour'} onToggle=${toggle('flour')}>
           ${st.flours.length ? html`<ul class="flours">
             ${st.flours.map(function (f) { return html`<li key=${f.name}><span>${f.name}</span><b>${U.fmtWeight(f.grams)}</b></li>`; })}
           </ul>` : null}
@@ -920,9 +939,9 @@
           <${Pick} item=${st.highestRated} nav=${nav}>${st.highestRated ? html`<${ui.Score} value=${st.highestRated.rating}/>` : null}<//>
         </div>
         <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">🌟</span>Average rating</span>
-          <b class="avg">${st.average === null ? '–' : html`${U.fmtRating(st.average)}<svg viewBox="0 0 24 24" aria-hidden="true"><path d=${ui.STAR}/></svg>`}</b>
+          <b class="avg">${st.average === null ? '–' : html`<${ui.CountUp} value=${st.average} format=${U.fmtRating}/><svg viewBox="0 0 24 24" aria-hidden="true"><path d=${ui.STAR}/></svg>`}</b>
         </div>
-        <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⏱️</span>Time spent</span><b>${U.fmtSpan(st.minutes)}</b></div>
+        <div class="stat wide"><span class="label"><span class="em" aria-hidden="true">⏱️</span>Time spent</span><b><${ui.CountUp} value=${st.minutes} format=${U.fmtSpan}/></b></div>
         <${Achievements}/>
         ${st.countries.length ? html`<div class="statsort">
           <div class="sortby">

@@ -20,6 +20,12 @@
     stats: function () { return html`<rect class="fillable" x="4" y="12" width="4" height="8" rx="1.2"/><rect class="fillable" x="10" y="5" width="4" height="15" rx="1.2"/><rect class="fillable" x="16" y="9" width="4" height="11" rx="1.2"/>`; },
     sort: function () { return html`<path d="M4 7h16M7 12h10M10 17h4"/>`; },
     flag: function () { return html`<path d="M5.5 21V4.5M5.5 4.5h11l-2.2 4 2.2 4h-11"/>`; },
+    // a gift box: its lid and bow are one piece, so they can lift together
+    gift: function () {
+      return html`<g class="lid"><rect x="3.5" y="7.6" width="17" height="4" rx="1.2"/>
+        <path d="M12 7.6C11 5 9.4 3.8 8 3.8a1.9 1.9 0 000 3.8h4zM12 7.6c1-2.6 2.6-3.8 4-3.8a1.9 1.9 0 010 3.8h-4z"/></g>
+        <path d="M5.2 11.6v7.2a1.7 1.7 0 001.7 1.7h10.2a1.7 1.7 0 001.7-1.7v-7.2M12 7.6v12.9"/>`;
+    },
     loaf: function () { return html`<path d="M5 19V11.5C3 10.5 2.5 7 5.5 5.5c3-2 10-2 13 0 3 1.5 2.5 5 .5 6V19a1 1 0 01-1 1H6a1 1 0 01-1-1z"/><path d="M9 7.5l1.5 2M12 7l1.5 2M15 7.5l1.5 2"/>`; }
   };
 
@@ -31,7 +37,7 @@
   /** One star, filled to `fill` (0, 0.5 or 1). */
   function Star(props) {
     var w = props.fill >= 1 ? '100%' : props.fill > 0 ? '50%' : '0%';
-    return html`<span class="star" aria-hidden="true">
+    return html`<span class="star" aria-hidden="true" style=${'--n:' + (props.n || 0)}>
       <svg viewBox="0 0 24 24"><path d=${STAR}/></svg>
       <span class="fill" style=${'width:' + w}><svg viewBox="0 0 24 24"><path d=${STAR}/></svg></span>
     </span>`;
@@ -44,7 +50,7 @@
     var v = Math.round((U.num(props.value) || 0) * 2) / 2, five = [1, 2, 3, 4, 5];
     if (!props.onChange) {
       return html`<span class="stars" role="img" aria-label=${label(v)}>
-        ${five.map(function (n) { return html`<${Star} key=${n} fill=${fillOf(v, n)}/>`; })}
+        ${five.map(function (n) { return html`<${Star} key=${n} n=${n - 1} fill=${fillOf(v, n)}/>`; })}
       </span>`;
     }
     function pick(x, e) {
@@ -78,6 +84,36 @@
   function Score(props) {
     if (props.value === null || props.value === undefined) return null;
     return html`<span class=${'score' + (props.value >= 5 ? ' perfect' : '')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d=${STAR}/></svg>${U.fmtRating(props.value)}</span>`;
+  }
+
+  /**
+   * A number that runs up to its value when it appears, and on from there when it changes.
+   * props: value (a number), format (number → what is shown)
+   */
+  function CountUp(props) {
+    var to = Number(props.value) || 0, fmt = props.format || function (x) { return String(Math.round(x)); };
+    var el = H.useRef(null), last = H.useRef(null);
+    H.useLayoutEffect(function () {
+      var node = el.current, from = last.current === null ? 0 : last.current, raf = 0, t0 = null;
+      last.current = to;
+      if (!node) return undefined;
+      if (from === to || LGT.fx.still() || !root.requestAnimationFrame) { node.textContent = fmt(to); return undefined; }
+      node.textContent = fmt(from);
+      function step(t) {
+        if (t0 === null) t0 = t;
+        var k = Math.min(1, (t - t0) / 750), eased = 1 - Math.pow(1 - k, 3);
+        node.textContent = fmt(k < 1 ? from + (to - from) * eased : to);
+        if (k < 1) raf = root.requestAnimationFrame(step);
+      }
+      raf = root.requestAnimationFrame(step);
+      return function () { root.cancelAnimationFrame(raf); node.textContent = fmt(to); };
+    }, [to]);
+    return html`<span class="countup" ref=${el}></span>`;
+  }
+
+  /** The little loaf as a waiting sign: dough being kneaded (1) or rising (2). */
+  function Dough(props) {
+    return html`<span class=${'doughfx s' + (props.stage || 1)} aria-hidden="true" dangerouslySetInnerHTML=${{ __html: LGT.fx.art(props.stage || 1) }}></span>`;
   }
 
   /** A stored photo, by asset id. */
@@ -261,6 +297,7 @@
 
   LGT.ui = {
     moved: moved, useDragOrder: useDragOrder, Icon: Icon, Stars: Stars, Named: Named, Score: Score, Photo: Photo, BlobImage: BlobImage,
+    CountUp: CountUp, Dough: Dough,
     useObjectUrl: useObjectUrl, useStore: useStore, STAR: STAR,
     Sheet: Sheet, Confirm: Confirm, Viewer: Viewer, Screen: Screen
   };

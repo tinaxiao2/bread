@@ -58,8 +58,10 @@ runtime.
 Two collections and three documents in the artifact database:
 
 - `breads/{id}`: `name`, `date` (YYYY-MM-DD, or '' for "–": not baked yet), `recipeId` (or null), `photos` (list of
-  `{full, thumb}` asset ids, cover first; `photo` repeats the cover), `ratings` (`crust`,
+  `{full, thumb, stage}` asset ids, cover first; `stage` is `knead`, `proof`, `proofed` or `bake`, or absent;
+  `photo` repeats the cover), `ratings` (`crust`,
   `crumb`, `taste`, 0–5 in half steps, 0 = not rated), `notes` (one per rating), `comments`,
+  `gifted` (true when the bread or dough was given away),
   `splitFrom` (id of the entry it was split from, or null), `createdAt`, `updatedAt`
 - `recipes/{id}`: `name`, `ingredients[]` (`group`, `type`, `amount`, `unit`, `note`),
   `bake` (`programs[]`, `size`, `crust`, `minutes`, `added`, `reason`, `proof[]` (places:
@@ -205,26 +207,45 @@ These are decisions the owner made. Keep them.
   is the label (or recipe with no label) with the most entries.
 - **Achievements** are worked out from the log every time (`achievements.evaluate` from
   `store.achievementFacts`, counted the way Stats counts): each has an emoji, a name, what earns
-  it, how far along she is, and the day it was earned. **The names are the owner's own; keep
-  them and their goals as written** (the catalog is `CATALOG` in `js/achievements.js`):
-  - Loaves: Bread-y or not (first loaf), Doughmesticated (10), Yeast mode (25), Fifty shades of
-    grain (50), Doughverachiever (100), Our daily bread (365), On a roll (3 days in a row),
-    Fleischmann’s Fave (one recipe 5 times).
-  - Flour: Flour power (10 lb), Commercialized (25 lb), Eat your wheaties (whole wheat flour or
-    the Whole Wheat program), Catcher in the rye (rye flour), Knead for speed (the machine's
-    fast program, named from `data/machine.js`).
-  - Recipes: Roll model (10 recipes baked), Knowledge is flour (50 saved), Baking news (a recipe
-    read from a photo), Breddit (10 baked from Reddit), Chef de Cuisinart (10 baked from
-    Cuisinart), Challahback girl (bake Challah).
-  - Ratings: Rising star (a loaf rated 4+), Doughpamine (Taste 5 stars), The best thing since
-    sliced (a loaf rated 5.0).
-  - Countries: Eat, pray, loaf (3 countries), Bakersfield, CA (US), Like naan other (India),
-    Gluten tag (Germany), Bing bing (China), Great British Bake-off (UK), and one for every other
-    country she has a recipe from, named for the country ("first recipe tried from a country").
-  The ones the owner wrote word for word: Fifty shades of grain, Our daily bread, Commercialized,
-  Breddit, Chef de Cuisinart, Like naan other, Challahback girl, Gluten tag, Bing bing, Great
-  British Bake-off. The rest use names she offered, matched to goals by Claude: ask before
-  changing which name goes with which goal.
+  it, how far along she is, and the day it was earned. **The names are the owner's own.** The
+  catalog is `CATALOG`, `STAMPS` and `COLLECTORS` in `js/achievements.js`; that file is the list.
+  - **Hers word for word (name and goal; never change these):** Fifty shades of grain (50
+    loaves), Our daily bread (365 loaves), Commercialized (25 lb of flour), Breddit (10 recipes
+    baked from Reddit), Chef de Cuisinart (10 from Cuisinart); the first bread from a country:
+    Like naan other (India), Gluten tag (Germany), Bing bing (China), Great British Bake-off
+    (UK), Challahback girl (Israel), So da-lightful (Ireland), For focaccia’s sake (Italy),
+    Pan-chant for baking (Japan), Life is pain (France), On a roll (Sweden), Kaboom pao
+    (Brazil), Everything bagel (Poland), Roti, set, go (Malaysia); and Eat, pray, loaf: a bread
+    from Italy, one from India and one from Southeast Asia (`SOUTHEAST_ASIA`).
+  - **Names she offered, matched to goals by Claude** (ask before changing which name goes with
+    which goal): loaves 1 Bread-y or not, 10 Doughmesticated, 13 Baker’s dozen, 25 Yeast mode,
+    100 Doughverachiever, 221 221B Baker Street, 500 Kingbaker; days in a row 3 Rise and shine,
+    7 Seven minutes in leaven; in one day 2 Dealbaker, 5 Bake no prisoners, one recipe twice
+    All’s fair in loaf and war; one recipe 5 times Fleischmann’s Fave; hours 24 Loafing around,
+    100 Bread, sweat, and tears; flour 5 lb Flour child, 10 Flour power, 50 Joan of Starch, 100
+    Bread equity; 5 kinds of flour Flour rangers; 10 loaves with AP Soft flour, with bread flour
+    Submissive and breadable; Eat your wheaties (whole wheat), Catcher in the rye (rye), Yeast of
+    Eden (2 kinds of yeast), Butter together (butter), Knead for speed (the machine's fast
+    program); Half-baked (a dough logged), Pillsbury doughboy (10 doughs), Reap what you dough (a
+    dough baked in the oven), Dough not disturb (proofed in the fridge), The butcher, the...
+    (every proofing place), Troublebaker (time added to a bake), My butter half (a Split), Bake
+    the rules (a recipe tweaked), Bake it till you make it (tweak V), Bake a leg (all four photo
+    stages on one bread); Roll model (10 recipes baked), Easier bread than done (25 saved),
+    Knowledge is flour (50 saved), Baking news (a recipe read from a photo); named for what was
+    baked: Roll with it (rolls), No bun intended (buns), Mind your biscuits, Unlimited
+    breadsticks; ratings: Rising star (4+), In crust we trust / Crumb club / Doughpamine (5 stars
+    for Crust / Crumb / Taste), The best thing since sliced (5.0), Upper crust (five 5.0s),
+    Well-bread (ten 4+), Loaf at first sight (a first bake rated 5), We’re toast (2 or less);
+    gifts: 1 Givers and bakers, 5 Take my bread away, 10 Breaking bread, 25 Made with loaf,
+    Heartbaker (a 5-star loaf given away); the calendar: Loaf, actually (Dec 24–25), Don’t go
+    baking my heart (Feb 14), Hot cross buns (Good Friday to Easter Monday); countries:
+    Bakersfield, CA (US), Bakin my way downtown (5 countries), Let them eat bread (5 breads from
+    France), Doughmestic affairs (10 from the US); Master baker (25 achievements earned).
+  - Any other country she has a recipe from gets one named for the country.
+  - Offered and not used yet: The baker’s wife.
+  - A goal must only ever go up: nothing that un-earns itself as the log grows.
+  - `since` on an entry is the day its name replaced another (France was "France"): one
+    celebrated before that day is celebrated again (`achievements.uncelebrated`).
 - **Achievements on Stats** (🏆, after Time spent): "earned / all" at the right; rows with the
   emoji, name, goal, and the day earned or "have / need" with a bar. Earned first (latest on
   top), then the nearest. Five rows until opened, like the country list. Tapping an earned one
@@ -236,21 +257,38 @@ These are decisions the owner made. Keep them.
     the sparks. If its tile is not on the page in front, the Gallery tab catches it instead.
   - A new recipe: the same on its To try row, with 📖; else on the Recipes tab.
   - A rating: the stars up to the one picked pop in turn and throw sparks, the most for five.
-  - A photo: the little loaf at the stage its place stands for. **The owner takes a bake's
-    photos at 1 kneading, 2 proofing, 3 shaped (after the proof, before the bake), 4 baked**:
-    a ball of dough, dough risen over a bowl, a scored pale loaf, a golden loaf with steam.
-    Photos after the fourth get the baked loaf.
+  - A photo: the little loaf at the photo's stage (see photo stages): a ball of dough, dough
+    risen over a bowl, a scored pale loaf, a golden loaf with steam. Changing a photo's stage
+    shows the loaf for the new one.
   - An achievement earned: the card (emoji, name, goal) springs up about a second later, sparks
     behind it; it leaves by itself or at a tap and never takes a tap meant for anything else.
     Several at once share one card. The very first time, that is everything earned so far.
   - Small ones: sparks where a dragged row or photo is dropped; a perfect 5.0 chip catches the
     light; a perfect loaf's page sparkles when opened; the tab icon hops when chosen; pages,
     sheets and dialogs arrive rather than appear; tapping the Gallery's title makes it hop, and
-    every fifth tap throws bread.
+    every fifth tap rains bread.
+  - More: Gallery tiles arrive in turn (again when the view or order changes), the cards behind
+    a tile fan out and its count pops in; Stats numbers run up to their value (`ui.CountUp`),
+    bars fill, opened lists arrive a row at a time; a bread's stars fill one after another;
+    chips, toggles and the flag pop when chosen; an achievement's emoji rains behind its card
+    (`fx.rain`); five stars for crust, crumb and taste together throw stars (`fx.perfect`);
+    the first bake of a recipe adds 🎉 to its sparks; marking a gift lifts the box's lid.
+  - Waiting is dough too (`ui.Dough`): kneaded while a recipe is read, rising while the log loads.
   - Rules: decoration never blocks a tap (`pointer-events: none`), adds no copy, and stands
-    down for `prefers-reduced-motion` (cards still show, nothing flies). `window.__lgtQuiet`
+    down for `prefers-reduced-motion` (one blanket rule at the end of the stylesheet: cards still
+    show, nothing flies, numbers are simply there). `window.__lgtQuiet`
     (set by the tests) turns it all off and holds CSS animation still (`html.quiet`); the flows
     about celebrations open with `fx: true`.
+- **Photo stages.** The owner takes a bake's photos at four moments: kneading, proofing, after
+  the proof and before the bake, and baked. Each photo keeps its stage (`photos[].stage`;
+  `util.STAGES`: Kneading, Proofing, Proofed, Baked). A new photo starts at the stage its place
+  stands for (the 1st kneading … the 4th and any after baked, `util.stageAt`); the chip on the
+  photo in the form changes it, or takes it off ("–"). The bread's page (and a label's carousel)
+  shows the chip on each photo. Photos from before have no stage until she gives them one. The
+  cover is still the first photo.
+- **Gifted.** The gift box beside the date marks a bread or dough as given away (`gifted`). It
+  shows as a small gift on the entry's tile and beside the date on its page, and counts towards
+  the gift achievements. A Split copy starts ungifted.
 - **Split** on a bread's page opens a copy of the entry (name, date, photo, ratings, comments,
   recipe) that is saved as a new bread. It is for one dough baked two ways: change the
   baking on the copy and it becomes the recipe's next tweak, and the copy's name follows. The copy records

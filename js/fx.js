@@ -79,6 +79,22 @@
     e.textContent = emoji;
     put(e, x, y, 1300);
   }
+  /** Emoji falling the height of the screen, behind whatever is being celebrated. */
+  function rain(emojis, n) {
+    if (still() || !emojis || !emojis.length) return;
+    for (var i = 0; i < n; i++) (function (i) {
+      later(function () {
+        var e = doc.createElement('span');
+        e.className = 'rainy';
+        e.textContent = emojis[i % emojis.length];
+        e.style.setProperty('--dx', (Math.random() * 80 - 40) + 'px');
+        e.style.setProperty('--rot', (Math.random() * 240 - 120) + 'deg');
+        e.style.setProperty('--t', (1.5 + Math.random() * 0.9) + 's');
+        e.style.fontSize = (20 + Math.random() * 14) + 'px';
+        put(e, Math.random() * root.innerWidth, -40, 2600);
+      }, i * 70 + Math.random() * 120);
+    })(i);
+  }
   /** Play a one-shot animation class on an element again. */
   function replay(el, cls) {
     if (!el || still()) return;
@@ -105,12 +121,12 @@
   /**
    * Find what was just added on screen (the piece marked data-fresh), bring it into view and
    * throw sparks from it. If it is not on this screen, the sparks come from its tab instead.
-   * kind: 'bread' | 'recipe'; opts: emoji (floats up from it), flag (joins the sparks)
+   * kind: 'bread' | 'recipe'; opts: emoji (floats up from it), flag and more (join the sparks)
    */
   function greet(kind, opts) {
     if (still()) return;
     opts = opts || {};
-    var tries = 0, extras = [opts.emoji, opts.flag].filter(Boolean);
+    var tries = 0, extras = [opts.emoji, opts.flag].concat(opts.more || []).filter(Boolean);
     function celebrate(x, y, n, spread) {
       sparkle(x, y, n, { spread: spread, emojis: extras });
       if (opts.emoji) float(x, y - 6, opts.emoji);
@@ -167,6 +183,10 @@
     '<path d="M21 31l5 8M30 29l5 8M39 31l5 8" fill="none" stroke="#F6DDAE" stroke-width="2.6" stroke-linecap="round"/>' +
     '<path class="steam" d="M24 19c-2-3 2-5 0-8M32 17c-2-3 2-5 0-8M40 19c-2-3 2-5 0-8" fill="none" stroke="#B9AB98" stroke-width="2" stroke-linecap="round"/>'
   ];
+  /** The drawing for a stage (1 to 4), as SVG: the loaders use the same loaf. */
+  function art(n) {
+    return '<svg viewBox="0 0 64 64">' + STAGES[Math.max(1, Math.min(STAGES.length, n)) - 1] + '</svg>';
+  }
   /** The little loaf at its nth stage (1 to 4, the last for any after), over an element. */
   function stage(el, n) {
     if (still()) return;
@@ -174,11 +194,22 @@
     if (!c) return;
     var i = Math.max(1, Math.min(STAGES.length, n)), s = doc.createElement('span');
     s.className = 'stagefx s' + i;
-    s.innerHTML = '<svg viewBox="0 0 64 64">' + STAGES[i - 1] + '</svg>';
+    s.innerHTML = art(i);
     put(s, c.x, c.y, 1500);
     if (i === STAGES.length) later(function () { sparkle(c.x, c.y, 12, { spread: 58 }); }, 260);
     else sparkle(c.x, c.y, 5, { spread: 44 });
     buzz(8);
+  }
+
+  /** Five stars for crust, crumb and taste alike: the whole rating throws stars. */
+  function perfect(el) {
+    sparkleAt(el, 30, { spread: 120, emojis: ['⭐', '🌟'] });
+    buzz([10, 40, 10, 40, 18]);
+  }
+  /** A bread marked as given away: the box throws sparks and a present or two. */
+  function gift(el) {
+    sparkleAt(el, 12, { spread: 52, emojis: ['🎁', '💝'] });
+    buzz(10);
   }
 
   /** Sparks from a star as it is picked: more of them for five. */
@@ -224,9 +255,11 @@
     showing = card;
     var c = center(card);
     if (c) sparkle(c.x, c.y, 26, { spread: 130 });
+    rain(list.map(function (a) { return a.emoji; }), Math.min(20, 8 + list.length * 2));
     buzz([10, 40, 18]);
     card.addEventListener('click', function () { dismiss(card); });
-    later(function () { dismiss(card); }, list.length > 1 ? Math.min(9000, 3200 + list.length * 700) : 3000);
+    // one leaves soon; several stay long enough to be read (a tap sends any of them off)
+    later(function () { dismiss(card); }, list.length > 1 ? Math.min(20000, 4000 + list.length * 900) : 3000);
   }
 
   /** The loaf in the corner of the Gallery likes being tapped; now and then it throws bread. */
@@ -234,13 +267,15 @@
   function mark(el) {
     replay(el, 'hop');
     taps++;
-    if (taps % 5 === 0) sparkleAt(el, 20, { spread: 120, emojis: ['🍞', '🥖', '🥐', '🥨', '🥯'] });
-    else sparkleAt(el, 6, { spread: 36 });
+    if (taps % 5 === 0) {
+      sparkleAt(el, 20, { spread: 120 });
+      rain(['🍞', '🥖', '🥐', '🥨', '🥯'], 18);
+    } else sparkleAt(el, 6, { spread: 36 });
     buzz(6);
   }
 
   LGT.fx = {
-    quiet: quiet, calm: calm, sparkle: sparkle, sparkleAt: sparkleAt, float: float, replay: replay, buzz: buzz,
-    breadEmoji: breadEmoji, greet: greet, stage: stage, star: star, unlock: unlock, mark: mark
+    quiet: quiet, calm: calm, still: still, sparkle: sparkle, sparkleAt: sparkleAt, float: float, rain: rain, replay: replay, buzz: buzz, art: art,
+    breadEmoji: breadEmoji, greet: greet, stage: stage, star: star, perfect: perfect, gift: gift, unlock: unlock, mark: mark
   };
 })(typeof window !== 'undefined' ? window : globalThis);

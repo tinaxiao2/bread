@@ -355,6 +355,25 @@
   }
 
   // ---------- photos ----------
+  /**
+   * The moments the owner photographs a bake at, in order. A photo keeps its stage as a label;
+   * the third is "after the proof, before the bake".
+   */
+  var STAGES = [
+    { id: 'knead', label: 'Kneading' },
+    { id: 'proof', label: 'Proofing' },
+    { id: 'proofed', label: 'Proofed' },
+    { id: 'bake', label: 'Baked' }
+  ];
+  /** A stage's place, 1 to 4, or 0 for none. */
+  function stageNumber(id) {
+    for (var i = 0; i < STAGES.length; i++) if (STAGES[i].id === id) return i + 1;
+    return 0;
+  }
+  function cleanStage(id) { return stageNumber(id) ? id : ''; }
+  function stageLabel(id) { var n = stageNumber(id); return n ? STAGES[n - 1].label : ''; }
+  /** The stage a photo starts with, going by its place among the bread's photos: the 1st is kneading, any after the 4th baked. */
+  function stageAt(place) { return STAGES[Math.max(1, Math.min(STAGES.length, place)) - 1].id; }
   /** A bread's photos, cover first. The first versions kept a single `photo`. */
   function photosOf(b) {
     if (!b) return [];
@@ -554,7 +573,8 @@
     cleanIngredient: cleanIngredient, isBlankIngredient: isBlankIngredient, changedLines: changedLines,
     emptyRecipe: emptyRecipe, isEmptyRecipe: isEmptyRecipe, cleanRecipe: cleanRecipe, cleanBake: cleanBake,
     recipeKey: recipeKey, nameKey: nameKey, planRecipeSave: planRecipeSave, roman: roman, tweakName: tweakName, ingredientSummary: ingredientSummary,
-    FLAGS: FLAGS, GLOBAL: GLOBAL, cleanFlag: cleanFlag, flagEmoji: flagEmoji, flagName: flagName, cleanSource: cleanSource, photosOf: photosOf, flourGrams: flourGrams, minutesSpent: minutesSpent, fmtWeight: fmtWeight, fmtSpan: fmtSpan,
+    FLAGS: FLAGS, GLOBAL: GLOBAL, cleanFlag: cleanFlag, flagEmoji: flagEmoji, flagName: flagName, cleanSource: cleanSource, photosOf: photosOf,
+    STAGES: STAGES, stageNumber: stageNumber, cleanStage: cleanStage, stageLabel: stageLabel, stageAt: stageAt, flourGrams: flourGrams, minutesSpent: minutesSpent, fmtWeight: fmtWeight, fmtSpan: fmtSpan,
     RATINGS: RATINGS, rating: rating, fmtRating: fmtRating,
     program: program, manualProgram: manualProgram, sizesFor: sizesFor, hasCrust: hasCrust, hasDough: hasDough,
     hasManual: hasManual, programMinutes: programMinutes, totalMinutes: totalMinutes, programLabels: programLabels,

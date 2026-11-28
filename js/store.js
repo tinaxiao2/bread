@@ -378,32 +378,44 @@
   function lineFlag(l) { return l.flag || (l.parent ? labelFlag(l.parent) : ''); }
   /** What the achievements are worked out from: see achievements.js. Counted the way Stats counts. */
   function achievementFacts() {
-    var loaves = [], flour = [];
+    var loaves = [], flour = [], time = [];
+    function typesOf(rows, group) {
+      return rows.filter(function (i) { return i.group === group; }).map(function (i) { return i.type; });
+    }
     state.breads.forEach(function (b) {
       var r = b.recipeId ? recipe(b.recipeId) : null, l = r ? lineOf(r) : null;
-      var day = isBakedBread(b) ? b.date : '';
+      var day = isBakedBread(b) ? b.date : '', made = b.createdAt || 0;
       var rows = r ? (r.ingredients || []).map(U.upgradeIngredient) : [];
-      if (r && !b.splitFrom) {
+      var bake = U.cleanBake(r ? r.bake : null), ratings = b.ratings || {};
+      if (r) {
         var grams = 0;
-        rows.forEach(function (i) { grams += U.flourGrams(i) || 0; });
-        if (grams) flour.push({ date: day, created: b.createdAt || 0, grams: grams });
+        if (!b.splitFrom) rows.forEach(function (i) { grams += U.flourGrams(i) || 0; });
+        if (grams) flour.push({ date: day, created: made, grams: grams });
+        var minutes = U.minutesSpent(r.bake, !!b.splitFrom);
+        if (minutes) time.push({ date: day, created: made, minutes: minutes });
       }
       if (!day) return;
+      var places = bake.proof.slice();
+      bake.extraProofs.forEach(function (x) { places = places.concat(x.proof); });
       loaves.push({
-        date: day, created: b.createdAt || 0, line: l ? l.id : null,
+        date: day, created: made, line: l ? l.id : null,
         name: l ? l.name : '', label: l ? l.parent : '', bread: b.name || '',
         flag: l ? lineFlag(l) : '', source: r ? U.cleanSource(r.source) : '',
-        rating: U.rating(b), taste: U.num((b.ratings || {}).taste) || 0,
-        programs: r ? U.cleanBake(r.bake).programs : [],
-        flours: rows.filter(function (i) { return i.group === 'flour'; }).map(function (i) { return i.type; })
+        rating: U.rating(b), crust: U.num(ratings.crust) || 0, crumb: U.num(ratings.crumb) || 0, taste: U.num(ratings.taste) || 0,
+        gifted: !!b.gifted, split: !!b.splitFrom,
+        dough: !U.isBaked(r ? r.bake : null), usesDough: U.hasDough(bake.programs),
+        oven: bake.ovenTemp !== null || bake.ovenMinutes !== null, added: bake.added || 0,
+        proof: r ? places : [], programs: r ? bake.programs : [],
+        flours: typesOf(rows, 'flour'), yeasts: typesOf(rows, 'yeast'), dairy: typesOf(rows, 'dairy'),
+        stages: U.photosOf(b).map(function (p) { return U.cleanStage(p.stage); }).filter(Boolean)
       });
     });
     return {
-      loaves: loaves, flour: flour,
+      loaves: loaves, flour: flour, time: time,
       recipes: lines().map(function (l) {
+        var made = l.tweaks.map(function (t) { return t.createdAt || 0; });
         return {
-          created: Math.min.apply(null, l.tweaks.map(function (t) { return t.createdAt || 0; })),
-          flag: lineFlag(l),
+          created: Math.min.apply(null, made), tweaks: made, flag: lineFlag(l),
           read: l.tweaks.some(function (t) { return (t.originals || []).length > 0; })
         };
       })
@@ -417,7 +429,7 @@
   function newAchievements() {
     if (state.phase !== 'ready' || !state.labelsLoaded || !state.seenAchievements) return [];
     var seen = state.seenAchievements;
-    return achievements().filter(function (a) { return a.earned && !seen[a.id]; });
+    return achievements().filter(function (a) { return LGT.achievements.uncelebrated(a, seen); });
   }
   function markAchievementsSeen(ids) {
     if (!ids.length || !db) return Promise.resolve();
@@ -544,7 +556,13 @@
     var name = String(b.name || '').trim();
 
     return Promise.all([
-      Promise.all((input.pics || []).map(function (p) { return p.blob ? putPhoto(p.blob) : Promise.resolve(p.photo); })),
+      Promise.all((input.pics || []).map(function (p) {
+        // a photo keeps the stage it was taken at, when it has one
+        var stage = U.cleanStage(p.stage);
+        return (p.blob ? putPhoto(p.blob) : Promise.resolve(p.photo)).then(function (ph) {
+          return ph && ph.full ? Object.assign({ full: ph.full, thumb: ph.thumb || ph.full }, stage ? { stage: stage } : {}) : null;
+        });
+      })),
       putOriginals(input.originalBlobs)
     ]).then(function (up) {
       var photos = up[0].filter(function (p) { return p && p.full; });
@@ -580,6 +598,7 @@
           ratings: { crust: U.num(r.crust) || 0, crumb: U.num(r.crumb) || 0, taste: U.num(r.taste) || 0 },
           notes: { crust: String(n.crust || '').trim(), crumb: String(n.crumb || '').trim(), taste: String(n.taste || '').trim() },
           comments: String(b.comments || '').trim(),
+          gifted: !!b.gifted,
           splitFrom: (existing && existing.splitFrom) || input.splitFrom || null,
           createdAt: (existing && existing.createdAt) || t,
           updatedAt: t

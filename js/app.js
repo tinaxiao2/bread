@@ -74,7 +74,7 @@
 
     if (st.phase !== 'ready') {
       return html`<div class="shell"><div class="state" role="status">
-        ${st.phase === 'loading' ? html`<div class="spinner"></div>` : null}
+        ${st.phase === 'loading' ? html`<${ui.Dough} stage=${2}/>` : null}
         ${st.phase === 'unavailable' ? html`<span>Unavailable</span>` : st.slow ? html`<span>Can't connect</span>` : null}
       </div></div>`;
     }

@@ -961,25 +961,29 @@ const FEATS = (() => {
     'breads/1': b('Mantou', 'r1', 1, '2026-11-10', 3), 'breads/2': b('Baguette', 'r2', 2, '2026-11-12', 4.5), 'breads/3': b('Cinnamon Rolls', 'r3', 3, '2026-11-15', 5)
   };
 })();
-const EARNED = ['Bakersfield, CA', 'Bing bing', 'Bread-y or not', 'Doughpamine', 'Eat, pray, loaf', 'France', 'Rising star', 'The best thing since sliced'];
+const EARNED = ['Bakersfield, CA', 'Bing bing', 'Bread-y or not', 'Crumb club', 'Doughpamine', 'In crust we trust', 'Life is pain', 'Loaf at first sight',
+  'Rising star', 'Roll with it', 'The best thing since sliced'];
 
 test('achievements are listed on Stats: the earned with their day, the rest with how far along', async (t) => {
   const page = await open(t, { db: FEATS });
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   const box = page.locator('.awards'), rows = box.locator('.ach');
-  assert.equal(await box.locator('.lrow .n').innerText(), '8 / 29', 'earned, of all there are');
+  assert.equal(await box.locator('.lrow .n').innerText(), '11 / 86', 'earned, of all there are');
   await count(rows, 5);
-  assert.deepEqual(await rows.locator('b').allInnerTexts(), ['Doughpamine', 'The best thing since sliced', 'Eat, pray, loaf', 'Bakersfield, CA', 'Rising star'],
+  assert.deepEqual(await rows.locator('b').allInnerTexts(), ['Roll with it', 'In crust we trust', 'Crumb club', 'Doughpamine', 'The best thing since sliced'],
     'the earned first, the latest on top');
-  assert.match(await rows.first().innerText(), /Doughpamine\s+Give Taste 5 stars\s+Nov 15/);
-  assert.equal(await box.locator('.cmore').innerText(), '+24');
+  assert.match(await rows.first().innerText(), /Roll with it\s+Bake rolls\s+Nov 15/);
+  assert.equal(await box.locator('.cmore').innerText(), '+81');
 
   await box.getByRole('button', { name: 'Show all' }).click();
-  await count(rows, 29);
+  await count(rows, 86);
   assert.deepEqual((await box.locator('.ach:not(.locked) b').allInnerTexts()).sort(), EARNED);
   const row = (name) => box.locator('.ach', { has: page.locator('b', { hasText: new RegExp('^' + name + '$') }) });
   assert.match(await row('Doughmesticated').innerText(), /Bake 10 loaves\s+3 \/ 10/);
-  assert.match(await row('Flour power').innerText(), /Use 10 lb of flour\s+3\.3 \/ 10/);
+  assert.match(await row('Flour child').innerText(), /Use 5 lb of flour\s+3\.3 \/ 5/);
+  assert.match(await row('Eat, pray, loaf').innerText(), /Bake from Italy, India and Southeast Asia\s+0 \/ 3/);
+  assert.match(await row('Loafing around').innerText(), /Spend 24 hours baking\s+10 \/ 24/);
+  assert.match(await row('Master baker').innerText(), /Earn 25 achievements\s+11 \/ 25/);
   assert.match(await row('Breddit').innerText(), /Bake 10 recipes from Reddit\s+3 \/ 10/);
   assert.match(await row('Gluten tag').innerText(), /Bake a bread from Germany$/);
   assert.equal(await row('Gluten tag').locator('.aemoji').innerText(), '\u{1F1E9}\u{1F1EA}');
@@ -995,8 +999,100 @@ test('achievements are listed on Stats: the earned with their day, the rest with
   await save(page);
   await formGone(page);
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
-  assert.equal(await box.locator('.lrow .n').innerText(), '9 / 29');
+  assert.equal(await box.locator('.lrow .n').innerText(), '12 / 86');
   assert.match(await rows.first().innerText(), /Gluten tag\s+Bake a bread from Germany\s+Nov 20/);
+});
+
+test('a bread can be marked as gifted', async (t) => {
+  const page = await open(t, { db: FEATS });
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('For the neighbours');
+  const gift = page.getByRole('button', { name: 'Gifted', exact: true });
+  assert.equal(await gift.getAttribute('aria-pressed'), 'false');
+  await gift.click();
+  assert.equal(await gift.getAttribute('aria-pressed'), 'true');
+  await field(page, 'Date').fill('2026-11-18');
+  await snap(page);
+  await save(page);
+  await formGone(page);
+
+  // the tile and the bread's page carry the gift
+  const tile = page.locator('.gal .tile', { hasText: 'For the neighbours' });
+  await count(tile.locator('.gift'), 1);
+  await count(page.locator('.gal .tile .gift'), 1, 'only the one given away');
+  await tile.click();
+  await count(page.locator('.screen .date .gift'), 1);
+
+  // a split copy starts ungifted; taking the gift back works too
+  await page.getByRole('button', { name: 'Split' }).click();
+  assert.equal(await page.getByRole('button', { name: 'Gifted', exact: true }).getAttribute('aria-pressed'), 'false');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('heading', { name: 'Split bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: 'Gifted', exact: true }).getAttribute('aria-pressed'), 'true');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  // it counts towards the gift achievements
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  const box = page.locator('.awards');
+  await box.getByRole('button', { name: 'Show all' }).click();
+  const row = (name) => box.locator('.ach', { has: page.locator('b', { hasText: new RegExp('^' + name + '$') }) });
+  assert.match(await row('Givers and bakers').innerText(), /Gift a bread\s+Nov 18/);
+  assert.match(await row('Take my bread away').innerText(), /Gift 5 breads\s+1 \/ 5/);
+
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
+  await tile.click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Gifted', exact: true }).click();
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
+  await count(page.locator('.screen .date .gift'), 0);
+});
+
+test('each photo keeps the stage it was taken at', async (t) => {
+  const page = await open(t);
+  await page.getByRole('button', { name: 'Add bread' }).click();
+  await field(page, 'Name').fill('Stage by stage');
+  const stages = () => page.locator('.photos .pstage span').allInnerTexts();
+  await field(page, 'Photo').setInputFiles(await picture(page, '#d9c7a0'));
+  await page.locator('.photos .photo.has').nth(0).waitFor();
+  assert.deepEqual(await stages(), ['Kneading'], 'the first photo of a bake');
+  await field(page, 'Photo').setInputFiles([await picture(page, '#e3d3ae'), await picture(page, '#e8dcc0')]);
+  await page.locator('.photos .photo.has').nth(2).waitFor();
+  assert.deepEqual(await stages(), ['Kneading', 'Proofing', 'Proofed']);
+  assert.deepEqual(await page.locator('.photos .pstage select').first().locator('option').allInnerTexts(), ['–', 'Kneading', 'Proofing', 'Proofed', 'Baked']);
+
+  // a label can be changed, or taken off
+  await page.locator('.photos .pstage select').nth(2).selectOption('bake');
+  await page.locator('.photos .pstage select').nth(1).selectOption('');
+  assert.deepEqual(await stages(), ['Kneading', '–', 'Baked']);
+  await save(page);
+  await formGone(page);
+
+  // the bread's page shows each photo's stage
+  await page.locator('.gal .tile').click();
+  await count(page.locator('.screen .hero'), 3);
+  assert.deepEqual(await page.locator('.screen .hero').evaluateAll((els) => els.map((el) => (el.querySelector('.stagechip') || {}).textContent || '')),
+    ['Kneading', '', 'Baked']);
+
+  // and they are still there to edit; a fourth photo is the baked loaf
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  assert.deepEqual(await stages(), ['Kneading', '–', 'Baked']);
+  await field(page, 'Photo').setInputFiles(await picture(page, '#c98a3f'));
+  await page.locator('.photos .photo.has').nth(3).waitFor();
+  assert.deepEqual(await stages(), ['Kneading', '–', 'Baked', 'Baked']);
+  await page.locator('.photos .pstage select').nth(1).selectOption('proof');
+  await page.locator('.photos .pstage select').nth(2).selectOption('proofed');
+  await save(page);
+  await page.getByRole('heading', { name: 'Edit bread' }).waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  // all four stages on one bread is an achievement
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  await page.locator('.awards').getByRole('button', { name: 'Show all' }).click();
+  assert.match(await page.locator('.awards .ach:not(.locked)', { hasText: 'Bake a leg' }).innerText(), /Photograph all 4 stages/);
 });
 
 test('what is already earned is celebrated once; a new bread is greeted, and what it earns springs up', async (t) => {
@@ -1006,6 +1102,7 @@ test('what is already earned is celebrated once; a new bread is greeted, and wha
   assert.deepEqual((await card.locator('b').allInnerTexts()).sort(), EARNED, 'the first time: everything earned so far');
   assert.equal(await card.getAttribute('role'), 'status');
   await page.locator('.spark').first().waitFor({ state: 'attached' });
+  await page.locator('.rainy').first().waitFor({ state: 'attached' });        // their emoji rain down behind it
   // it does not get in the way: what is beside it can still be tapped, and a tap sends it off
   await page.getByRole('button', { name: 'Stats', exact: true }).click();
   await page.getByRole('heading', { name: 'Stats' }).waitFor();
@@ -1022,6 +1119,7 @@ test('what is already earned is celebrated once; a new bread is greeted, and wha
   await page.getByRole('button', { name: 'Recipes', exact: true }).click();
   await page.getByRole('tab', { name: /To try/ }).click();
   await page.locator('.rc').getByRole('button', { name: 'Bake this' }).click();
+  await field(page, 'Date').fill('2026-11-20');                  // not a day the calendar has an achievement for
   await save(page);
   await formGone(page);
   await page.locator('.spark').first().waitFor({ state: 'attached' });
@@ -1072,6 +1170,41 @@ test('a new recipe is greeted where it lands; photos get the little loaf at each
   await page.getByRole('group', { name: 'Taste' }).getByRole('button', { name: '5 of 5' }).click();
   await page.waitForTimeout(150);
   await count(page.locator('.spark'), 0);
+
+  // five stars for all three: the whole card throws stars
+  for (const g of ['Crust', 'Crumb']) {
+    await page.getByRole('group', { name: g }).getByRole('button', { name: '5 of 5' }).click();
+    await page.locator('.spark').first().waitFor({ state: 'detached' });
+  }
+  await page.getByRole('group', { name: 'Taste' }).getByRole('button', { name: '5 of 5' }).click();
+  await page.locator('.spark.em').first().waitFor({ state: 'attached' });
+  assert.ok(await page.locator('.spark').count() >= 30);
+  await page.locator('.spark').first().waitFor({ state: 'detached' });
+
+  // changing a photo's stage shows the loaf at that stage; marking a gift throws sparks
+  await page.locator('.photos').scrollIntoViewIfNeeded();
+  await page.locator('.photos .pstage select').first().selectOption('proofed');
+  await stage(3).waitFor({ state: 'attached' });
+  await page.getByRole('button', { name: 'Gifted', exact: true }).click();
+  await page.locator('.spark.em').first().waitFor({ state: 'attached' });
+  await page.locator('.spark').first().waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Gifted', exact: true }).click();
+  await page.waitForTimeout(150);
+  await count(page.locator('.spark'), 0, 'taking it back is quiet');
+});
+
+test('numbers on Stats run up to their value', async (t) => {
+  const page = await open(t, { db: Object.assign({ 'meta/achievements': { seen: Object.fromEntries(['loaves-1', 'rolls', 'rated-4', 'crust-5', 'crumb-5', 'taste-5', 'rated-5', 'first-5', 'country-CN', 'country-FR', 'country-US'].map((id) => [id, '2026-11-28'])) } }, FEATS), fx: true });
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  const loaves = page.locator('.stat', { has: page.locator('.label', { hasText: /Loaves$/i }) }).locator('b');
+  const seen = new Set();
+  for (let i = 0; i < 12; i++) { seen.add(await loaves.innerText()); await page.waitForTimeout(60); }
+  await page.waitForTimeout(500);
+  assert.equal(await loaves.innerText(), '3');
+  assert.equal(await page.locator('.stat', { has: page.locator('.label', { hasText: /Flour used$/i }) }).locator('b').first().innerText(), '3.3 lb');
+  assert.equal(await page.locator('.stat b.avg').innerText(), '4.2');
+  assert.ok(seen.size > 1, 'it passed through other numbers on the way: ' + Array.from(seen).join(', '));
+  await count(page.locator('.unlock'), 0, 'nothing new to celebrate');
 });
 
 test('with less motion asked for, nothing flies but the card still shows', async (t) => {
@@ -1088,7 +1221,12 @@ test('with less motion asked for, nothing flies but the card still shows', async
   await page.locator('.photos .photo.has').waitFor();
   await page.getByRole('group', { name: 'Taste' }).getByRole('button', { name: '5 of 5' }).click();
   await page.waitForTimeout(400);
-  await count(page.locator('.spark, .stagefx, .floaty'), 0);
+  await count(page.locator('.spark, .stagefx, .floaty, .rainy'), 0);
+  // and numbers are simply there
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Discard' }).click();
+  await page.getByRole('button', { name: 'Stats', exact: true }).click();
+  assert.equal(await page.locator('.stat', { has: page.locator('.label', { hasText: /Loaves$/i }) }).locator('b').innerText(), '3');
 });
 
 test('the Baked recipes can be sorted like the Gallery', async (t) => {
